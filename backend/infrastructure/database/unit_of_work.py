@@ -1,0 +1,161 @@
+"""Реализация Unit of Work для управления транзакциями."""
+
+from __future__ import annotations
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
+from domain.interfaces.user_repository_port import UserRepositoryPort
+from domain.interfaces.resume_filter_settings_repository_port import (
+    ResumeFilterSettingsRepositoryPort,
+)
+from domain.interfaces.resume_repository_port import ResumeRepositoryPort
+from domain.interfaces.user_hh_auth_data_repository_port import (
+    UserHhAuthDataRepositoryPort,
+)
+from domain.interfaces.vacancy_response_repository_port import (
+    VacancyResponseRepositoryPort,
+)
+from infrastructure.database.repositories.user_repository import UserRepository
+from infrastructure.database.repositories.resume_filter_settings_repository import (
+    ResumeFilterSettingsRepository,
+)
+from infrastructure.database.repositories.resume_repository import ResumeRepository
+from infrastructure.database.repositories.user_hh_auth_data_repository import (
+    UserHhAuthDataRepository,
+)
+from infrastructure.database.repositories.vacancy_response_repository import (
+    VacancyResponseRepository,
+)
+
+
+class UnitOfWork(UnitOfWorkPort):
+    """Реализация Unit of Work для управления транзакциями БД."""
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """Инициализация Unit of Work.
+
+        Args:
+            session_factory: Фабрика для создания async сессий SQLAlchemy.
+        """
+        self._session_factory = session_factory
+        self._session: AsyncSession | None = None
+        self._user_repository: UserRepositoryPort | None = None
+        self._resume_filter_settings_repository: ResumeFilterSettingsRepositoryPort | None = None
+        self._resume_repository: ResumeRepositoryPort | None = None
+        self._user_hh_auth_data_repository: UserHhAuthDataRepositoryPort | None = None
+        self._vacancy_response_repository: VacancyResponseRepositoryPort | None = None
+
+    @property
+    def user_repository(self) -> UserRepositoryPort:
+        """Получить репозиторий пользователя.
+
+        Returns:
+            Репозиторий пользователя.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._user_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._user_repository
+
+    @property
+    def resume_filter_settings_repository(self) -> ResumeFilterSettingsRepositoryPort:
+        """Получить репозиторий настроек фильтров резюме.
+
+        Returns:
+            Репозиторий настроек фильтров резюме.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._resume_filter_settings_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._resume_filter_settings_repository
+
+    @property
+    def resume_repository(self) -> ResumeRepositoryPort:
+        """Получить репозиторий резюме.
+
+        Returns:
+            Репозиторий резюме.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._resume_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._resume_repository
+
+    @property
+    def user_hh_auth_data_repository(self) -> UserHhAuthDataRepositoryPort:
+        """Получить репозиторий HH auth data пользователя.
+
+        Returns:
+            Репозиторий HH auth data пользователя.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._user_hh_auth_data_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._user_hh_auth_data_repository
+
+    @property
+    def vacancy_response_repository(self) -> VacancyResponseRepositoryPort:
+        """Получить репозиторий откликов на вакансии.
+
+        Returns:
+            Репозиторий откликов на вакансии.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._vacancy_response_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._vacancy_response_repository
+
+    async def __aenter__(self) -> UnitOfWorkPort:
+        """Вход в контекстный менеджер.
+
+        Returns:
+            Self для использования в async with.
+        """
+        self._session = self._session_factory()
+        self._user_repository = UserRepository(self._session)
+        self._resume_filter_settings_repository = ResumeFilterSettingsRepository(self._session)
+        self._resume_repository = ResumeRepository(self._session)
+        self._user_hh_auth_data_repository = UserHhAuthDataRepository(self._session)
+        self._vacancy_response_repository = VacancyResponseRepository(self._session)
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Выход из контекстного менеджера.
+
+        Args:
+            exc_type: Тип исключения, если было.
+            exc_val: Значение исключения, если было.
+            exc_tb: Traceback исключения, если было.
+        """
+        if exc_type is not None:
+            await self.rollback()
+        else:
+            await self.commit()
+
+        if self._session:
+            await self._session.close()
+
+    async def commit(self) -> None:
+        """Зафиксировать транзакцию."""
+        if self._session:
+            from loguru import logger
+            logger.info("Коммит транзакции в UnitOfWork")
+            await self._session.commit()
+            logger.info("Транзакция успешно закоммичена")
+
+    async def rollback(self) -> None:
+        """Откатить транзакцию."""
+        if self._session:
+            await self._session.rollback()
+

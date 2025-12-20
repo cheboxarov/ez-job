@@ -1,0 +1,240 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, Button, Typography, Spin, Alert, Modal, message, Tag } from 'antd';
+import { 
+  FileTextOutlined, 
+  DownloadOutlined, 
+  RobotOutlined, 
+  CheckCircleOutlined,
+  ArrowRightOutlined
+} from '@ant-design/icons';
+import { listResumes, importResumesFromHH } from '../api/resumes';
+import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/EmptyState';
+import { GradientButton } from '../components/GradientButton';
+import type { Resume } from '../types/api';
+
+const { Text } = Typography;
+
+export const ResumesListPage = () => {
+  const navigate = useNavigate();
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    loadResumes();
+  }, []);
+
+  const loadResumes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await listResumes();
+      setResumes(response.items);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Ошибка при загрузке резюме');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getResumePreview = (content: string) => {
+    const maxLength = 180;
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + '...';
+  };
+
+  const handleImportFromHH = async () => {
+    setImporting(true);
+    setError(null);
+    try {
+      const response = await importResumesFromHH();
+      message.success(`Успешно импортировано ${response.count} резюме из HeadHunter`);
+      await loadResumes();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка при импорте резюме из HeadHunter';
+      if (err.response?.status === 400 && errorMessage.includes('HH auth data')) {
+        Modal.warning({
+          title: 'Не настроена авторизация HeadHunter',
+          content: 'Для импорта резюме необходимо настроить авторизацию HeadHunter в настройках.',
+          okText: 'Перейти в настройки',
+          onOk: () => navigate('/settings/hh-auth'),
+        });
+      } else {
+        message.error(errorMessage);
+        setError(errorMessage);
+      }
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  if (loading && resumes.length === 0) {
+    return (
+      <div style={{ textAlign: 'center', padding: '100px 0' }}>
+        <Spin size="large" tip="Загрузка резюме..." />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Мои резюме"
+        subtitle="Управляйте своими резюме и настройками автооткликов"
+        icon={<FileTextOutlined />}
+        breadcrumbs={[{ title: 'Мои резюме' }]}
+        actions={
+          <Button
+            icon={<DownloadOutlined />}
+            size="large"
+            loading={importing}
+            onClick={handleImportFromHH}
+            style={{ borderRadius: 10, height: 44 }}
+          >
+            Импорт из HeadHunter
+          </Button>
+        }
+      />
+
+      {error && (
+        <Alert
+          message="Ошибка загрузки"
+          description={error}
+          type="error"
+          showIcon
+          style={{ marginBottom: 24, borderRadius: 12 }}
+          closable
+          onClose={() => setError(null)}
+        />
+      )}
+
+      {!loading && resumes.length === 0 && (
+        <EmptyState
+          icon={<FileTextOutlined />}
+          title="У вас пока нет резюме"
+          description="Импортируйте резюме из HeadHunter, чтобы начать получать автоматические отклики на подходящие вакансии"
+          action={
+            <GradientButton
+              icon={<DownloadOutlined />}
+              loading={importing}
+              onClick={handleImportFromHH}
+            >
+              Импортировать из HeadHunter
+            </GradientButton>
+          }
+        />
+      )}
+
+      {resumes.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {resumes.map((resume) => (
+            <Card
+              key={resume.id}
+              hoverable
+              onClick={() => navigate(`/resumes/${resume.id}`)}
+              style={{
+                borderRadius: 16,
+                border: 'none',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                cursor: 'pointer',
+                overflow: 'hidden',
+                transition: 'all 0.2s ease',
+              }}
+              styles={{ body: { padding: 0 } }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.12)';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
+            >
+              <div style={{ display: 'flex' }}>
+                {/* Left gradient strip */}
+                <div
+                  style={{
+                    width: 6,
+                    background: resume.is_auto_reply 
+                      ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)'
+                      : 'linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 100%)',
+                    flexShrink: 0,
+                  }}
+                />
+                
+                <div style={{ flex: 1, padding: '24px 28px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div
+                        style={{
+                          width: 44,
+                          height: 44,
+                          background: resume.is_auto_reply 
+                            ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
+                            : 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                          borderRadius: 12,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <FileTextOutlined style={{ 
+                          fontSize: 20, 
+                          color: resume.is_auto_reply ? '#16a34a' : '#64748b' 
+                        }} />
+                      </div>
+                      <div>
+                        <Text strong style={{ fontSize: 17, color: '#0f172a' }}>
+                          Резюме
+                        </Text>
+                        {resume.is_auto_reply && (
+                          <Tag 
+                            color="success" 
+                            icon={<CheckCircleOutlined />}
+                            style={{ marginLeft: 12, borderRadius: 6 }}
+                          >
+                            Автоотклик активен
+                          </Tag>
+                        )}
+                      </div>
+                    </div>
+                    <ArrowRightOutlined style={{ color: '#94a3b8', fontSize: 16 }} />
+                  </div>
+                  
+                  <Text style={{ 
+                    color: '#475569', 
+                    fontSize: 14, 
+                    lineHeight: 1.7,
+                    display: 'block'
+                  }}>
+                    {getResumePreview(resume.content)}
+                  </Text>
+                  
+                  {resume.user_parameters && (
+                    <div style={{ 
+                      marginTop: 16, 
+                      paddingTop: 16, 
+                      borderTop: '1px solid #f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8
+                    }}>
+                      <RobotOutlined style={{ color: '#94a3b8', fontSize: 14 }} />
+                      <Text type="secondary" style={{ fontSize: 13 }}>
+                        Доп. требования: {resume.user_parameters.substring(0, 60)}
+                        {resume.user_parameters.length > 60 ? '...' : ''}
+                      </Text>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};

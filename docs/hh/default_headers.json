@@ -1,0 +1,22 @@
+{
+  "accept": "application/json",
+  "accept-language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
+  "priority": "u=1, i",
+  "referer": "https://krasnoyarsk.hh.ru/search/vacancy?area=113&order_by=publication_time&resume=8f4249deff0fab66c70039ed1f46357146416e&salary=200000&text=Python&page=1&searchSessionId=a1246843-6168-40ed-84ba-aa44146c36d7",
+  "sec-ch-ua": "\"Google Chrome\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": "\"macOS\"",
+  "sec-fetch-dest": "empty",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-origin",
+  "sentry-trace": "f3cfc08847504f0e88bc013840128cc0-85316cbb69507c9c-0",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+  "x-gib-fgsscgib-w-hh": "JW5pfb3c3e23fa2ed2153ab5224789b80167832a",
+  "x-gib-gsscgib-w-hh": "sME9xHrjWzLWxoBwePdy5hCfo9BbVogBUDMP1dh/fDLZEb3EAp0C0XbRBAZxT31O8XtX2t/Nr0FkH0hWJLOPBXJD0HHGyc9UAwu+aN7SL7i/6PEml4uJ3+PepjgB6gZX7gxWlIZoa6E737JkrULHLKNcvMjyluE2qqmfPsSfX2qToIqDuz+I4HAZ8ige5R5BKk15YJZm55comKAJaoF8K/aMzliHAqZMNW87a08VLlNq/XGKiAfuv6GQjIe/PU8GLMGjNmwtmcJib8I=",
+  "x-hhtmfrom": "vacancy_search_list",
+  "x-hhtmfromlabel": "",
+  "x-hhtmsource": "",
+  "x-requested-with": "XMLHttpRequest",
+  "x-static-version": "25.51.1.2",
+  "x-xsrftoken": "5ec938243413a40463916840131b578b"
+}

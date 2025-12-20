@@ -1,0 +1,228 @@
+"""Воркер для автоматической обработки откликов на вакансии."""
+
+from __future__ import annotations
+
+import asyncio
+import signal
+import sys
+from pathlib import Path
+from typing import Dict
+from uuid import UUID
+
+from loguru import logger
+
+# Добавляем корневую директорию проекта в путь
+backend_dir = Path(__file__).parent.parent
+sys.path.insert(0, str(backend_dir))
+
+from config import AppConfig, load_config
+from domain.use_cases.create_vacancy_response import CreateVacancyResponseUseCase
+from domain.use_cases.process_auto_replies import ProcessAutoRepliesUseCase
+from domain.use_cases.respond_to_vacancy import RespondToVacancyUseCase
+from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
+from infrastructure.agents.cover_letter_generator_agent import CoverLetterGeneratorAgent
+from infrastructure.clients.hh_client import RateLimitedHHHttpClient
+from application.factories.database_factory import create_unit_of_work
+from application.factories.search_and_get_filtered_vacancy_list_factory import (
+    create_search_and_get_filtered_vacancy_list_usecase,
+)
+
+# Настройка loguru
+logger.add(
+    "logs/auto_reply_worker_{time}.log",
+    rotation="1 day",
+    retention="7 days",
+    level="INFO",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} | {message}",
+    enqueue=True,  # Для асинхронной записи
+)
+
+# Флаг для корректного завершения
+shutdown_event = asyncio.Event()
+
+
+def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
+    """Настройка обработчиков сигналов для корректного завершения."""
+    def signal_handler(signum: int) -> None:
+        """Обработчик сигналов для корректного завершения."""
+        logger.info(f"Получен сигнал {signum}, завершаем работу...")
+        shutdown_event.set()
+    
+    # Используем add_signal_handler для правильной работы с asyncio
+    if sys.platform != "win32":
+        loop.add_signal_handler(signal.SIGINT, signal_handler, signal.SIGINT)
+        loop.add_signal_handler(signal.SIGTERM, signal_handler, signal.SIGTERM)
+    else:
+        # На Windows используем signal.signal
+        signal.signal(signal.SIGINT, lambda s, f: signal_handler(s))
+        signal.signal(signal.SIGTERM, lambda s, f: signal_handler(s))
+
+
+async def run_worker(config: AppConfig) -> None:
+    """Запустить воркер для обработки автооткликов.
+
+    Args:
+        config: Конфигурация приложения.
+    """
+    logger.info("Запуск воркера автооткликов")
+
+    # Создаем зависимости, которые не требуют UnitOfWork
+    hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
+    respond_to_vacancy_uc = RespondToVacancyUseCase(hh_client)
+
+    search_and_get_filtered_vacancy_list_uc = (
+        create_search_and_get_filtered_vacancy_list_usecase(config)
+    )
+
+    cover_letter_generator = CoverLetterGeneratorAgent(config.openai)
+
+    # Словарь для отслеживания активных задач по resume_id
+    active_tasks: Dict[UUID, asyncio.Task] = {}
+
+    async def process_resume_task(resume_id: UUID, resume_data) -> None:
+        """Обработать одно резюме в отдельной задаче.
+        
+        Args:
+            resume_id: ID резюме.
+            resume_data: Данные резюме.
+        """
+        try:
+            # Создаем UnitOfWork для обработки этого резюме
+            unit_of_work = create_unit_of_work(config.database)
+
+            async with unit_of_work:
+                # Создаем Use Case с репозиториями из текущего UnitOfWork
+                process_auto_replies_uc = ProcessAutoRepliesUseCase(
+                    resume_repository=unit_of_work.resume_repository,
+                    user_hh_auth_data_repository=unit_of_work.user_hh_auth_data_repository,
+                    resume_filter_settings_repository=unit_of_work.resume_filter_settings_repository,
+                    search_and_get_filtered_vacancy_list_uc=search_and_get_filtered_vacancy_list_uc,
+                    cover_letter_generator=cover_letter_generator,
+                    create_unit_of_work_factory=lambda: create_unit_of_work(config.database),
+                    respond_to_vacancy_uc=respond_to_vacancy_uc,
+                    max_vacancies_per_resume=200,
+                    delay_between_replies_seconds=30,
+                )
+                
+                # Обрабатываем только это резюме
+                await process_auto_replies_uc.process_single_resume(resume_data)
+        except Exception as exc:
+            logger.error(
+                f"Ошибка при обработке резюме {resume_id}: {exc}",
+                exc_info=True,
+            )
+        finally:
+            # Удаляем задачу из словаря активных задач
+            active_tasks.pop(resume_id, None)
+            logger.info(f"Задача для резюме {resume_id} завершена и удалена из активных")
+
+    # Основной цикл работы
+    cycle_delay_seconds = 10  # 10 секунд между циклами
+
+    try:
+        while not shutdown_event.is_set():
+            try:
+                # Получаем список резюме с автооткликом
+                unit_of_work = create_unit_of_work(config.database)
+                async with unit_of_work:
+                    resumes = await unit_of_work.resume_repository.get_all_active_auto_reply_resumes()
+                    logger.info(f"Найдено резюме с автооткликом: {len(resumes)}")
+
+                    # Сначала очищаем завершенные задачи из словаря
+                    completed_resume_ids = [
+                        resume_id 
+                        for resume_id, task in active_tasks.items() 
+                        if task.done()
+                    ]
+                    for resume_id in completed_resume_ids:
+                        active_tasks.pop(resume_id, None)
+                        logger.debug(f"Удалена завершенная задача для резюме {resume_id}")
+
+                    # Запускаем задачи только для резюме, у которых еще нет активной задачи
+                    new_tasks_count = 0
+                    for resume in resumes:
+                        if resume.id not in active_tasks:
+                            # Создаем новую задачу для этого резюме
+                            task = asyncio.create_task(process_resume_task(resume.id, resume))
+                            active_tasks[resume.id] = task
+                            new_tasks_count += 1
+                            logger.info(f"Запущена задача для резюме {resume.id}")
+                        else:
+                            logger.debug(
+                                f"Для резюме {resume.id} уже есть активная задача, пропускаем"
+                            )
+
+                    logger.info(
+                        f"Запущено новых задач: {new_tasks_count}, "
+                        f"активных задач: {len(active_tasks)}"
+                    )
+
+                logger.info(
+                    f"Цикл проверки завершен. Ожидание {cycle_delay_seconds} секунд до следующего цикла..."
+                )
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка в цикле обработки автооткликов: {exc}",
+                    exc_info=True,
+                )
+                # Продолжаем работу даже при ошибке
+
+            # Ожидание до следующего цикла или сигнала завершения
+            try:
+                await asyncio.wait_for(
+                    shutdown_event.wait(),
+                    timeout=cycle_delay_seconds,
+                )
+                # Если событие установлено, выходим из цикла
+                break
+            except asyncio.TimeoutError:
+                # Таймаут истек, продолжаем цикл
+                continue
+
+    except KeyboardInterrupt:
+        logger.info("Получен сигнал прерывания (Ctrl+C)")
+    except Exception as exc:
+        logger.error(f"Критическая ошибка воркера: {exc}", exc_info=True)
+        raise
+    finally:
+        logger.info("Воркер завершает работу. Ожидание завершения активных задач...")
+        # Ожидаем завершения всех активных задач (с таймаутом)
+        if active_tasks:
+            logger.info(f"Ожидание завершения {len(active_tasks)} активных задач...")
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*active_tasks.values(), return_exceptions=True),
+                    timeout=300,  # 5 минут максимум
+                )
+                logger.info("Все активные задачи завершены")
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "Таймаут ожидания завершения задач. Некоторые задачи могут быть прерваны."
+                )
+                # Отменяем оставшиеся задачи
+                for task in active_tasks.values():
+                    if not task.done():
+                        task.cancel()
+        logger.info("Воркер завершил работу")
+
+
+async def main() -> None:
+    """Главная функция воркера."""
+    # Получаем текущий event loop
+    loop = asyncio.get_running_loop()
+    
+    # Регистрируем обработчики сигналов
+    setup_signal_handlers(loop)
+
+    # Загружаем конфигурацию
+    config = load_config()
+
+    try:
+        await run_worker(config)
+    except Exception as exc:
+        logger.error(f"Критическая ошибка: {exc}", exc_info=True)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
