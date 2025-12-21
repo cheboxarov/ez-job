@@ -95,6 +95,7 @@ class VacanciesService:
             headers=headers,
             cookies=cookies,
             user_id=user_id,
+            resume_id=resume.id,  # Передаем resume_id для кэширования
             update_cookies_uc=update_cookies_uc,
         )
 
@@ -108,6 +109,7 @@ class VacanciesService:
         page_indices: List[int],
         search_session_id: str,
         min_confidence_for_cover_letter: float,
+        resume_id: UUID,
         user_filter_params: str | None = None,
         order_by: str | None = None,
         user_id: Optional[UUID] = None,
@@ -143,6 +145,7 @@ class VacanciesService:
                 settings=filter_settings,
                 page_indices=page_indices,
                 search_session_id=search_session_id,
+                resume_id=resume_id,
                 min_confidence_for_cover_letter=min_confidence_for_cover_letter,
                 user_filter_params=user_filter_params,
                 order_by=order_by,
@@ -219,6 +222,7 @@ class VacanciesService:
                 settings=filter_settings,
                 page_indices=page_indices,
                 search_session_id=search_session_id,
+                resume_id=resume.id,
                 resume_hash=resume_hash,
                 user_filter_params=resume.user_parameters,
                 order_by=order_by,

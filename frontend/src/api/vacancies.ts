@@ -5,6 +5,7 @@ import type {
   VacanciesListRequest,
   VacanciesListResponse,
   VacancyResponsesListResponse,
+  StatisticsResponse,
 } from '../types/api';
 
 export const getRelevantVacancies = async (request: VacancyRequest): Promise<VacanciesResponse> => {
@@ -44,6 +45,13 @@ export const getVacancyResponses = async (
   });
   const response = await apiClient.get<VacancyResponsesListResponse>(
     `/api/vacancies/responses?${queryParams.toString()}`
+  );
+  return response.data;
+};
+
+export const getResponsesStatistics = async (days: number = 7): Promise<StatisticsResponse> => {
+  const response = await apiClient.get<StatisticsResponse>(
+    `/api/vacancies/statistics?days=${days}`
   );
   return response.data;
 };

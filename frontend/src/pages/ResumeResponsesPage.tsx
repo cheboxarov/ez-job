@@ -94,7 +94,7 @@ export const ResumeResponsesPage = () => {
             icon={<FileTextOutlined />}
             onClick={() => navigate(`/resumes/${resumeId}/vacancies`)}
           >
-            Найти вакансии
+            Подходящие вакансии
           </GradientButton>
         }
       />

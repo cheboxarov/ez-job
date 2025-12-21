@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from config import AppConfig
-from domain.use_cases.filter_vacancy_list import FilterVacancyListUseCase
+from config import AppConfig, DatabaseConfig
 from domain.use_cases.get_filtered_vacancy_list import GetFilteredVacancyListUseCase
+from domain.use_cases.get_filtered_vacancy_list_with_cache import (
+    GetFilteredVacancyListWithCacheUseCase,
+)
 from domain.use_cases.get_vacancy_list import GetVacancyListUseCase
 from domain.use_cases.search_and_get_filtered_vacancy_list import (
     SearchAndGetFilteredVacancyListUseCase,
 )
 from infrastructure.agents.vacancy_list_filter_agent import VacancyListFilterAgent
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
+from infrastructure.database.session import create_session_factory
 
 
 def create_search_and_get_filtered_vacancy_list_usecase(
@@ -36,8 +39,12 @@ def create_search_and_get_filtered_vacancy_list_usecase(
     # Создаем VacancyListFilterAgent
     vacancy_list_filter_service = VacancyListFilterAgent(config.openai)
 
-    # Создаем FilterVacancyListUseCase
-    filter_vacancy_list_uc = FilterVacancyListUseCase(
+    # Создаем session_factory для работы с репозиторием мэтчей
+    session_factory = create_session_factory(config.database)
+
+    # Создаем GetFilteredVacancyListWithCacheUseCase
+    filter_vacancy_list_with_cache_uc = GetFilteredVacancyListWithCacheUseCase(
+        session_factory=session_factory,
         filter_service=vacancy_list_filter_service,
         minimal_confidence=config.openai.minimal_confidence,
         batch_size=50,
@@ -46,7 +53,7 @@ def create_search_and_get_filtered_vacancy_list_usecase(
     # Создаем GetFilteredVacancyListUseCase
     get_filtered_vacancy_list_uc = GetFilteredVacancyListUseCase(
         get_vacancy_list_uc=get_vacancy_list_uc,
-        filter_vacancy_list_uc=filter_vacancy_list_uc,
+        filter_vacancy_list_with_cache_uc=filter_vacancy_list_with_cache_uc,
     )
 
     # Создаем и возвращаем SearchAndGetFilteredVacancyListUseCase

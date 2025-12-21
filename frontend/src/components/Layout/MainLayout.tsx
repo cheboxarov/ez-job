@@ -11,6 +11,7 @@ import {
   RocketOutlined,
   SendOutlined,
   BarChartOutlined,
+  CrownOutlined,
 } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
 
@@ -40,11 +41,6 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           key: '/resumes',
           icon: <FileTextOutlined />,
           label: 'Мои резюме',
-        },
-        {
-          key: '/vacancies',
-          icon: <SearchOutlined />,
-          label: 'Поиск вакансий',
         },
         {
           key: 'events',
@@ -84,6 +80,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           label: 'Профиль',
         },
         {
+          key: '/plans',
+          icon: <CrownOutlined />,
+          label: 'Планы',
+        },
+        {
           key: '/settings/hh-auth',
           icon: <SettingOutlined />,
           label: 'Настройки',
@@ -97,8 +98,16 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       window.open('https://t.me/wlovemm', '_blank');
       return;
     }
-    if (key === 'events' || key === 'chats' || key === 'statistics') {
+    if (key === 'events') {
       message.info('Раздел находится в разработке');
+      return;
+    }
+    if (key === 'chats') {
+      navigate('/chats');
+      return;
+    }
+    if (key === 'statistics') {
+      navigate('/statistics');
       return;
     }
     navigate(key);
@@ -163,7 +172,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         >
           <Menu
             mode="inline"
-            selectedKeys={[location.pathname]}
+            selectedKeys={[location.pathname === '/statistics' ? 'statistics' : location.pathname]}
             items={menuItems}
             onClick={handleMenuClick}
             style={{

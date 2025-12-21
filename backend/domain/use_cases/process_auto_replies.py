@@ -12,6 +12,7 @@ from domain.entities.filtered_vacancy_list import FilteredVacancyListItem
 from domain.entities.resume import Resume
 from domain.entities.resume_filter_settings import ResumeFilterSettings
 from domain.entities.user_hh_auth_data import UserHhAuthData
+from domain.exceptions.subscription_limit_exceeded import SubscriptionLimitExceededError
 from domain.interfaces.cover_letter_generator_port import CoverLetterGeneratorPort
 from domain.interfaces.resume_filter_settings_repository_port import (
     ResumeFilterSettingsRepositoryPort,
@@ -23,6 +24,7 @@ from domain.interfaces.user_hh_auth_data_repository_port import (
 from domain.use_cases.search_and_get_filtered_vacancy_list import (
     SearchAndGetFilteredVacancyListUseCase,
 )
+from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 
 
 class AutoReplyDisabledError(Exception):
@@ -49,6 +51,8 @@ class ProcessAutoRepliesUseCase:
         cover_letter_generator: CoverLetterGeneratorPort,
         create_unit_of_work_factory,
         respond_to_vacancy_uc,
+        check_subscription_uc=None,
+        increment_response_count_uc=None,
         max_vacancies_per_resume: int = 200,
         delay_between_replies_seconds: int = 30,
     ) -> None:
@@ -62,6 +66,8 @@ class ProcessAutoRepliesUseCase:
             cover_letter_generator: Генератор сопроводительных писем.
             create_unit_of_work_factory: Фабрика для создания UnitOfWork (для каждого отклика отдельная транзакция).
             respond_to_vacancy_uc: Use case для отправки отклика в HH API.
+            check_subscription_uc: Use case для проверки подписки (опционально).
+            increment_response_count_uc: Use case для инкремента счетчика откликов (опционально).
             max_vacancies_per_resume: Максимальное количество вакансий для обработки на одно резюме.
             delay_between_replies_seconds: Задержка между откликами в секундах.
         """
@@ -72,6 +78,8 @@ class ProcessAutoRepliesUseCase:
         self._cover_letter_generator = cover_letter_generator
         self._create_unit_of_work_factory = create_unit_of_work_factory
         self._respond_to_vacancy_uc = respond_to_vacancy_uc
+        self._check_subscription_uc = check_subscription_uc
+        self._increment_response_count_uc = increment_response_count_uc
         self._max_vacancies_per_resume = max_vacancies_per_resume
         self._delay_between_replies_seconds = delay_between_replies_seconds
 
@@ -106,6 +114,26 @@ class ProcessAutoRepliesUseCase:
             resume: Резюме для обработки.
         """
         logger.info(f"Обработка резюме {resume.id}")
+
+        # 0. Проверяем лимит подписки перед началом обработки
+        if self._check_subscription_uc is not None:
+            try:
+                user_subscription, plan = await self._check_subscription_uc.execute(
+                    resume.user_id
+                )
+                if user_subscription.responses_count >= plan.response_limit:
+                    logger.info(
+                        f"Лимит откликов для пользователя {resume.user_id} исчерпан: "
+                        f"{user_subscription.responses_count}/{plan.response_limit}. "
+                        f"Пропускаем резюме {resume.id}"
+                    )
+                    return
+            except ValueError as exc:
+                # Если подписка не найдена, логируем и продолжаем
+                logger.warning(
+                    f"Не удалось проверить лимит подписки для user_id={resume.user_id}: {exc}. "
+                    "Продолжаем без проверки лимита."
+                )
 
         # 1. Получаем auth данные пользователя
         auth_data = await self._user_hh_auth_data_repository.get_by_user_id(resume.user_id)
@@ -156,7 +184,6 @@ class ProcessAutoRepliesUseCase:
         search_session_id = str(uuid.uuid4())
 
         # Создаем use case для обновления cookies
-        from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
             self._user_hh_auth_data_repository
         )
@@ -169,6 +196,7 @@ class ProcessAutoRepliesUseCase:
                 settings=settings,
                 page_indices=page_indices,
                 search_session_id=search_session_id,
+                resume_id=resume.id,
                 resume_hash=resume.headhunter_hash,
                 user_filter_params=resume.user_parameters,
                 user_id=resume.user_id,
@@ -226,20 +254,59 @@ class ProcessAutoRepliesUseCase:
         # 7. Обрабатываем каждую вакансию (каждый отклик в отдельной транзакции)
         for vacancy in suitable_vacancies:
             try:
-                await self._process_vacancy(
-                    vacancy=vacancy,
-                    resume=resume,
-                    auth_data=auth_data,
+                # Проверяем лимит перед каждым откликом
+                if self._check_subscription_uc is not None:
+                    try:
+                        user_subscription, plan = await self._check_subscription_uc.execute(
+                            resume.user_id
+                        )
+                        if user_subscription.responses_count >= plan.response_limit:
+                            logger.info(
+                                f"Лимит откликов для пользователя {resume.user_id} исчерпан: "
+                                f"{user_subscription.responses_count}/{plan.response_limit}. "
+                                f"Прекращаем обработку резюме {resume.id}"
+                            )
+                            raise SubscriptionLimitExceededError(
+                                count=user_subscription.responses_count,
+                                limit=plan.response_limit,
+                            )
+                    except ValueError:
+                        # Если подписка не найдена, продолжаем
+                        pass
+
+                # Запускаем обработку вакансии в асинхронной задаче
+                task = asyncio.create_task(
+                    self._process_vacancy(
+                        vacancy=vacancy,
+                        resume=resume,
+                        auth_data=auth_data,
+                    )
                 )
-            except AutoReplyDisabledError:
-                # Автоотклик выключен во время обработки - прекращаем весь цикл
-                logger.info(
-                    f"Обработка вакансий для резюме {resume.id} прекращена: автоотклик выключен"
-                )
-                break
+                
+                # Обрабатываем ошибки в фоновой задаче
+                def handle_task_result(task: asyncio.Task) -> None:
+                    try:
+                        task.result()
+                    except AutoReplyDisabledError:
+                        logger.info(
+                            f"Обработка вакансий для резюме {resume.id} прекращена: автоотклик выключен"
+                        )
+                    except SubscriptionLimitExceededError as exc:
+                        logger.info(
+                            f"Обработка вакансий для резюме {resume.id} прекращена: "
+                            f"лимит откликов исчерпан ({exc.count}/{exc.limit})"
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            f"Ошибка при обработке вакансии {vacancy.vacancy_id} "
+                            f"для резюме {resume.id}: {exc}",
+                            exc_info=True,
+                        )
+                
+                task.add_done_callback(handle_task_result)
             except Exception as exc:
                 logger.error(
-                    f"Ошибка при обработке вакансии {vacancy.vacancy_id} "
+                    f"Ошибка при создании задачи для вакансии {vacancy.vacancy_id} "
                     f"для резюме {resume.id}: {exc}",
                     exc_info=True,
                 )
@@ -338,6 +405,7 @@ class ProcessAutoRepliesUseCase:
             
             # Создаем отдельную транзакцию для каждого отклика
             unit_of_work = self._create_unit_of_work_factory()
+            updated_cookies_from_hh = None
             async with unit_of_work:
                 from domain.use_cases.create_vacancy_response import CreateVacancyResponseUseCase
                 from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
@@ -347,17 +415,33 @@ class ProcessAutoRepliesUseCase:
                     vacancy_response_repository=unit_of_work.vacancy_response_repository,
                 )
 
-                # Создаем use case для обновления cookies в этой транзакции
-                update_cookies_uc_in_transaction = UpdateUserHhAuthCookiesUseCase(
-                    unit_of_work.user_hh_auth_data_repository
+                # НЕ передаем update_cookies_uc в транзакцию - обновим cookies после коммита
+                # Создаем use cases для проверки подписки и инкремента счетчика
+                from domain.use_cases.check_and_update_subscription import (
+                    CheckAndUpdateSubscriptionUseCase,
                 )
-
+                from domain.use_cases.increment_response_count import (
+                    IncrementResponseCountUseCase,
+                )
+                
+                check_subscription_uc = CheckAndUpdateSubscriptionUseCase(
+                    user_subscription_repository=unit_of_work.user_subscription_repository,
+                    subscription_plan_repository=unit_of_work.subscription_plan_repository,
+                )
+                increment_response_count_uc = IncrementResponseCountUseCase(
+                    check_subscription_uc=check_subscription_uc,
+                    user_subscription_repository=unit_of_work.user_subscription_repository,
+                )
+                
                 # Создаем составной Use Case для отклика с сохранением
                 respond_to_vacancy_and_save_uc = RespondToVacancyAndSaveUseCase(
                     respond_to_vacancy_uc=self._respond_to_vacancy_uc,
                     create_vacancy_response_uc=create_vacancy_response_uc,
+                    check_subscription_uc=check_subscription_uc,
+                    increment_response_count_uc=increment_response_count_uc,
                 )
                 
+                # Отправляем отклик БЕЗ обновления cookies в транзакции
                 await respond_to_vacancy_and_save_uc.execute(
                     vacancy_id=vacancy.vacancy_id,
                     resume_id=resume.id,
@@ -368,10 +452,12 @@ class ProcessAutoRepliesUseCase:
                     letter=cover_letter,
                     vacancy_name=vacancy.name,
                     vacancy_url=vacancy.alternate_url,
-                    update_cookies_uc=update_cookies_uc_in_transaction,
+                    update_cookies_uc=None,  # Не обновляем cookies в транзакции
                 )
                 # Транзакция автоматически коммитится при выходе из async with
             
+            # Cookies не обновляются сразу после отклика, чтобы избежать deadlock
+            # Они обновятся при следующем запросе к HH API через HHHttpClientWithCookieUpdate
             logger.info(
                 f"Успешно отправлен и сохранен отклик на вакансию {vacancy.vacancy_id} "
                 f"для резюме {resume.id} (транзакция закоммичена)"

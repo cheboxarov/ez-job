@@ -37,6 +37,43 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserModel, UUID]):
     async def on_after_register(self, user: UserModel, request=None):
         """Вызывается после регистрации пользователя."""
         print(f"User {user.id} has registered.")
+        
+        # Создаем подписку для нового пользователя (FREE план)
+        from datetime import datetime, timezone
+        from infrastructure.database.unit_of_work import UnitOfWork
+        from domain.entities.user_subscription import UserSubscription
+        
+        config = load_config()
+        session_factory = create_session_factory(config.database)
+        unit_of_work = UnitOfWork(session_factory)
+        
+        async with unit_of_work:
+            # Получаем FREE план
+            free_plan = await unit_of_work.subscription_plan_repository.get_by_name("FREE")
+            if free_plan is None:
+                print(f"WARNING: FREE план не найден при регистрации пользователя {user.id}")
+                return
+            
+            # Проверяем, не создана ли уже подписка
+            existing_subscription = await unit_of_work.user_subscription_repository.get_by_user_id(
+                user.id
+            )
+            if existing_subscription is not None:
+                print(f"Подписка для пользователя {user.id} уже существует")
+                return
+            
+            # Создаем подписку
+            user_subscription = UserSubscription(
+                user_id=user.id,
+                subscription_plan_id=free_plan.id,
+                responses_count=0,
+                period_started_at=None,
+                started_at=datetime.now(timezone.utc),
+                expires_at=None,
+            )
+            await unit_of_work.user_subscription_repository.create(user_subscription)
+            await unit_of_work.commit()
+            print(f"Создана подписка FREE для пользователя {user.id}")
 
     async def on_after_forgot_password(
         self, user: UserModel, token: str, request=None

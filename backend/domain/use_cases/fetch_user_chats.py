@@ -44,5 +44,6 @@ class FetchUserChatsUseCase:
             chat_ids=[],
             headers=headers,
             cookies=cookies,
+            filter_unread=True,
         )
 

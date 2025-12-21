@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from loguru import logger
-from sqlalchemy import func, select
+from sqlalchemy import func, select, cast, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.entities.vacancy_response import VacancyResponse
@@ -165,6 +166,65 @@ class VacancyResponseRepository(VacancyResponseRepositoryPort):
         logger.info(f"Общее количество откликов для resume_hash={resume_hash!r}: {total}")
 
         return responses, total
+
+    async def get_responses_count_by_date_range(
+        self, user_id: UUID, start_date: date, end_date: date
+    ) -> list[tuple[date, int]]:
+        """Получить количество откликов по дням за указанный период.
+        
+        Args:
+            user_id: UUID пользователя.
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+            
+        Returns:
+            Список кортежей (дата, количество откликов) для каждого дня в диапазоне.
+        """
+        logger.info(
+            f"Запрос статистики откликов: user_id={user_id}, "
+            f"start_date={start_date}, end_date={end_date}"
+        )
+        
+        # Преобразуем даты в datetime для сравнения с created_at (который имеет timezone)
+        # Используем UTC timezone для корректного сравнения
+        start_datetime = datetime.combine(start_date, datetime.min.time(), tzinfo=timezone.utc)
+        end_datetime = datetime.combine(end_date, datetime.max.time(), tzinfo=timezone.utc)
+        
+        # Запрос для группировки по дате и подсчета откликов
+        stmt = (
+            select(
+                cast(VacancyResponseModel.created_at, Date).label("response_date"),
+                func.count(VacancyResponseModel.id).label("count")
+            )
+            .where(
+                VacancyResponseModel.user_id == user_id,
+                VacancyResponseModel.created_at >= start_datetime,
+                VacancyResponseModel.created_at < end_datetime + timedelta(days=1)
+            )
+            .group_by(cast(VacancyResponseModel.created_at, Date))
+            .order_by(cast(VacancyResponseModel.created_at, Date))
+        )
+        
+        result = await self._session.execute(stmt)
+        rows = result.all()
+        
+        # Создаем словарь для быстрого доступа
+        data_dict = {row.response_date: row.count for row in rows}
+        
+        # Заполняем все дни в диапазоне (даже если откликов не было)
+        result_list = []
+        current_date = start_date
+        while current_date <= end_date:
+            count = data_dict.get(current_date, 0)
+            result_list.append((current_date, count))
+            current_date += timedelta(days=1)
+        
+        logger.info(
+            f"Получено {len(result_list)} дней статистики, "
+            f"всего откликов: {sum(count for _, count in result_list)}"
+        )
+        
+        return result_list
 
     def _to_domain(self, model: VacancyResponseModel) -> VacancyResponse:
         """Преобразовать SQLAlchemy модель в доменную сущность.

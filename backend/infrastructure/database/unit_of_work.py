@@ -16,6 +16,18 @@ from domain.interfaces.user_hh_auth_data_repository_port import (
 from domain.interfaces.vacancy_response_repository_port import (
     VacancyResponseRepositoryPort,
 )
+from domain.interfaces.resume_to_vacancy_match_repository_port import (
+    ResumeToVacancyMatchRepositoryPort,
+)
+from domain.interfaces.subscription_plan_repository_port import (
+    SubscriptionPlanRepositoryPort,
+)
+from domain.interfaces.user_subscription_repository_port import (
+    UserSubscriptionRepositoryPort,
+)
+from domain.interfaces.agent_action_repository_port import (
+    AgentActionRepositoryPort,
+)
 from infrastructure.database.repositories.user_repository import UserRepository
 from infrastructure.database.repositories.resume_filter_settings_repository import (
     ResumeFilterSettingsRepository,
@@ -26,6 +38,18 @@ from infrastructure.database.repositories.user_hh_auth_data_repository import (
 )
 from infrastructure.database.repositories.vacancy_response_repository import (
     VacancyResponseRepository,
+)
+from infrastructure.database.repositories.resume_to_vacancy_match_repository import (
+    ResumeToVacancyMatchRepository,
+)
+from infrastructure.database.repositories.subscription_plan_repository import (
+    SubscriptionPlanRepository,
+)
+from infrastructure.database.repositories.user_subscription_repository import (
+    UserSubscriptionRepository,
+)
+from infrastructure.database.repositories.agent_action_repository import (
+    AgentActionRepository,
 )
 
 
@@ -45,6 +69,10 @@ class UnitOfWork(UnitOfWorkPort):
         self._resume_repository: ResumeRepositoryPort | None = None
         self._user_hh_auth_data_repository: UserHhAuthDataRepositoryPort | None = None
         self._vacancy_response_repository: VacancyResponseRepositoryPort | None = None
+        self._resume_to_vacancy_match_repository: ResumeToVacancyMatchRepositoryPort | None = None
+        self._subscription_plan_repository: SubscriptionPlanRepositoryPort | None = None
+        self._user_subscription_repository: UserSubscriptionRepositoryPort | None = None
+        self._agent_action_repository: AgentActionRepositoryPort | None = None
 
     @property
     def user_repository(self) -> UserRepositoryPort:
@@ -116,6 +144,62 @@ class UnitOfWork(UnitOfWorkPort):
             raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
         return self._vacancy_response_repository
 
+    @property
+    def resume_to_vacancy_match_repository(self) -> ResumeToVacancyMatchRepositoryPort:
+        """Получить репозиторий мэтчей резюме-вакансия.
+
+        Returns:
+            Репозиторий мэтчей резюме-вакансия.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._resume_to_vacancy_match_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._resume_to_vacancy_match_repository
+
+    @property
+    def subscription_plan_repository(self) -> SubscriptionPlanRepositoryPort:
+        """Получить репозиторий планов подписки.
+
+        Returns:
+            Репозиторий планов подписки.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._subscription_plan_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._subscription_plan_repository
+
+    @property
+    def user_subscription_repository(self) -> UserSubscriptionRepositoryPort:
+        """Получить репозиторий подписок пользователей.
+
+        Returns:
+            Репозиторий подписок пользователей.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._user_subscription_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._user_subscription_repository
+
+    @property
+    def agent_action_repository(self) -> AgentActionRepositoryPort:
+        """Получить репозиторий действий агента.
+
+        Returns:
+            Репозиторий действий агента.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._agent_action_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._agent_action_repository
+
     async def __aenter__(self) -> UnitOfWorkPort:
         """Вход в контекстный менеджер.
 
@@ -128,6 +212,10 @@ class UnitOfWork(UnitOfWorkPort):
         self._resume_repository = ResumeRepository(self._session)
         self._user_hh_auth_data_repository = UserHhAuthDataRepository(self._session)
         self._vacancy_response_repository = VacancyResponseRepository(self._session)
+        self._resume_to_vacancy_match_repository = ResumeToVacancyMatchRepository(self._session)
+        self._subscription_plan_repository = SubscriptionPlanRepository(self._session)
+        self._user_subscription_repository = UserSubscriptionRepository(self._session)
+        self._agent_action_repository = AgentActionRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

@@ -20,6 +20,8 @@ from application.services.vacancy_responses_service import VacancyResponsesServi
 from config import AppConfig, load_config
 from domain.entities.user import User
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
+from domain.use_cases.fetch_chat_detail import FetchChatDetailUseCase
+from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
 from domain.use_cases.generate_user_filter_settings import GenerateUserFilterSettingsUseCase
 from domain.use_cases.get_areas import GetAreasUseCase
 from infrastructure.auth.fastapi_users_setup import get_current_active_user
@@ -191,4 +193,28 @@ async def get_vacancy_responses_service(
         vacancy_response_repository=unit_of_work.vacancy_response_repository,
     )
     return VacancyResponsesService(get_vacancy_responses_by_resume_uc=use_case)
+
+
+@lru_cache()
+def get_fetch_user_chats_uc() -> FetchUserChatsUseCase:
+    """Создает и возвращает FetchUserChatsUseCase (кешируется).
+
+    Returns:
+        Инстанс FetchUserChatsUseCase с настроенными зависимостями.
+    """
+    config = get_config()
+    hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
+    return FetchUserChatsUseCase(hh_client)
+
+
+@lru_cache()
+def get_fetch_chat_detail_uc() -> FetchChatDetailUseCase:
+    """Создает и возвращает FetchChatDetailUseCase (кешируется).
+
+    Returns:
+        Инстанс FetchChatDetailUseCase с настроенными зависимостями.
+    """
+    config = get_config()
+    hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
+    return FetchChatDetailUseCase(hh_client)
 

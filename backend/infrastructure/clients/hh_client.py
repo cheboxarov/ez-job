@@ -1316,6 +1316,7 @@ class HHHttpClient(HHClientPort):
         *,
         chatik_api_base_url: str = "https://chatik.hh.ru",
         return_cookies: bool = False,
+        filter_unread: bool = True,
     ) -> HHListChat | tuple[HHListChat, Dict[str, str]]:
         """Получить список чатов по /chatik/api/chats."""
         base_url = chatik_api_base_url.rstrip("/")
@@ -1335,6 +1336,8 @@ class HHHttpClient(HHClientPort):
         params: Dict[str, str] = {
             "do_not_track_session_events": "true",
         }
+        if filter_unread:
+            params["filterUnread"] = "true"
         # Добавляем ids только если список не пустой
         if chat_ids:
             params["ids"] = ",".join(str(chat_id) for chat_id in chat_ids)
@@ -2007,9 +2010,10 @@ class RateLimitedHHHttpClient(HHHttpClient):
         *,
         chatik_api_base_url: str = "https://chatik.hh.ru",
         return_cookies: bool = False,
+        filter_unread: bool = True,
     ) -> HHListChat | tuple[HHListChat, Dict[str, str]]:
         await self._limiter.acquire()
-        return await super().fetch_chat_list(chat_ids, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=return_cookies)
+        return await super().fetch_chat_list(chat_ids, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=return_cookies, filter_unread=filter_unread)
 
     async def fetch_chat_detail(
         self,

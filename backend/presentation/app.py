@@ -101,6 +101,16 @@ app.include_router(resumes_router)
 app.include_router(dictionaries_router)
 app.include_router(hh_auth_router)
 
+# Subscription router
+from presentation.routers.subscription_router import router as subscription_router
+
+app.include_router(subscription_router)
+
+# Chats router
+from presentation.routers.chats_router import router as chats_router
+
+app.include_router(chats_router)
+
 
 @app.get("/")
 async def root():

@@ -6,6 +6,11 @@ import { ResumeDetailPage } from './pages/ResumeDetailPage';
 import { ResumeVacanciesPage } from './pages/ResumeVacanciesPage';
 import { ResumeResponsesPage } from './pages/ResumeResponsesPage';
 import { HhAuthSettingsPage } from './pages/HhAuthSettingsPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { PlansPage } from './pages/PlansPage';
+import { StatisticsPage } from './pages/StatisticsPage';
+import { ChatsListPage } from './pages/ChatsListPage';
+import { ChatDetailPage } from './pages/ChatDetailPage';
 import { MainLayout } from './components/Layout/MainLayout';
 import { ProtectedRoute } from './components/Layout/ProtectedRoute';
 import { useAuthStore } from './stores/authStore';
@@ -69,10 +74,59 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ProfilePage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/plans"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <PlansPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/statistics"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <StatisticsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chats"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ChatsListPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/chats/:chatId"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ChatDetailPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
         {/* Редиректы со старых маршрутов */}
         <Route path="/vacancies" element={<Navigate to="/resumes" replace />} />
         <Route path="/vacancies/:id" element={<Navigate to="/resumes" replace />} />
-        <Route path="/profile" element={<Navigate to="/resumes" replace />} />
         <Route
           path="/"
           element={<Navigate to={token ? '/resumes' : '/login'} replace />}

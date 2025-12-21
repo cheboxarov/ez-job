@@ -247,4 +247,141 @@ export interface VacancyResponsesListResponse {
   limit: number;
 }
 
+// Типы для подписок
+export interface SubscriptionPlanResponse {
+  id: string;
+  name: string;
+  response_limit: number;
+  reset_period_seconds: number;
+  duration_days: number;
+  price: number;
+}
+
+export interface UserSubscriptionResponse {
+  plan_id: string;
+  plan_name: string;
+  response_limit: number;
+  reset_period_seconds: number;
+  responses_count: number;
+  period_started_at: string | null;
+  next_reset_at: string | null;
+  seconds_until_reset: number | null;
+  started_at: string;
+  expires_at: string | null;
+  days_remaining: number | null;
+}
+
+export interface DailyResponsesResponse {
+  count: number;
+  limit: number;
+  remaining: number;
+  period_started_at: string | null;
+  seconds_until_reset: number | null;
+}
+
+export interface PlansListResponse {
+  plans: SubscriptionPlanResponse[];
+}
+
+// Типы для статистики откликов
+export interface StatisticsDataPoint {
+  date: string; // ISO date string
+  count: number;
+}
+
+export interface StatisticsResponse {
+  data: StatisticsDataPoint[];
+}
+
+// Типы для чатов
+export interface WorkflowTransition {
+  id: number;
+  topic_id: number;
+  applicant_state: string;
+  declined_by_applicant: boolean;
+}
+
+export interface ParticipantDisplay {
+  name: string;
+  is_bot: boolean;
+}
+
+export interface ChatMessage {
+  id: number;
+  chat_id: number;
+  creation_time: string;
+  text: string;
+  type: string;
+  can_edit: boolean;
+  can_delete: boolean;
+  only_visible_for_my_type: boolean;
+  has_content: boolean;
+  hidden: boolean;
+  workflow_transition_id?: number | null;
+  workflow_transition?: WorkflowTransition | null;
+  participant_display?: ParticipantDisplay | null;
+  participant_id?: string | null;
+  resources?: Record<string, string[]> | null;
+}
+
+export interface ChatDisplayInfo {
+  title: string;
+  subtitle?: string | null;
+  icon?: string | null;
+}
+
+export interface ChatListItem {
+  id: number;
+  type: string;
+  unread_count: number;
+  pinned: boolean;
+  notification_enabled: boolean;
+  creation_time: string;
+  idempotency_key: string;
+  owner_violates_rules: boolean;
+  untrusted_employer_restrictions_applied: boolean;
+  current_participant_id: string;
+  last_activity_time?: string | null;
+  last_message?: ChatMessage | null;
+  last_viewed_by_opponent_message_id?: number | null;
+  last_viewed_by_current_user_message_id?: number | null;
+  resources?: Record<string, string[]> | null;
+  participants_ids?: string[] | null;
+  online_until_time?: string | null;
+  block_chat_info?: Record<string, unknown>[] | null;
+  display_info?: ChatDisplayInfo | null;
+}
+
+export interface ChatListResponse {
+  count: number;
+  items: ChatListItem[];
+}
+
+export interface ChatMessages {
+  items: ChatMessage[];
+  has_more: boolean;
+}
+
+export interface ChatDetailedResponse {
+  id: number;
+  type: string;
+  unread_count: number;
+  pinned: boolean;
+  notification_enabled: boolean;
+  creation_time: string;
+  owner_violates_rules: boolean;
+  untrusted_employer_restrictions_applied: boolean;
+  current_participant_id: string;
+  last_activity_time?: string | null;
+  messages?: ChatMessages | null;
+  last_viewed_by_opponent_message_id?: number | null;
+  last_viewed_by_current_user_message_id?: number | null;
+  resources?: Record<string, string[]> | null;
+  write_possibility?: Record<string, unknown> | null;
+  operations?: Record<string, unknown> | null;
+  participants_ids?: string[] | null;
+  online_until_time?: string | null;
+  block_chat_info?: Record<string, unknown>[] | null;
+}
+
 

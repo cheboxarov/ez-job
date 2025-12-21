@@ -8,10 +8,12 @@ from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.entities.hh_list_chat import HHListChat
 from domain.entities.user import User
 from domain.entities.user_hh_auth_data import UserHhAuthData
+from domain.use_cases.analyze_chats_and_respond import AnalyzeChatsAndRespondUseCase
 from domain.use_cases.fetch_chats_details import FetchChatsDetailsUseCase
 from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
 from domain.use_cases.filter_chats_without_rejection import FilterChatsWithoutRejectionUseCase
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from infrastructure.agents.messages_agent import MessagesAgent
 from infrastructure.clients.hh_client import HHHttpClient
 from infrastructure.database.session import create_session_factory
 from infrastructure.database.unit_of_work import UnitOfWork
@@ -106,6 +108,52 @@ class Application:
             # Формируем result.txt
             self._generate_result_txt(chats_details, filtered_chat_list)
             print("[app] Запись result.txt завершена", flush=True)
+
+            # Анализируем чаты и генерируем ответы
+            try:
+                # Получаем первое резюме пользователя для контекста
+                resumes = await uow.resume_repository.list_by_user_id(user.id)
+                if not resumes:
+                    print("[app] У пользователя нет резюме, пропускаем анализ чатов", flush=True)
+                else:
+                    resume = resumes[0]
+                    print(f"[app] Используется резюме {resume.id} для анализа чатов", flush=True)
+
+                    # Создаем агента
+                    messages_agent = MessagesAgent(self._config.openai)
+
+                    # Создаем use case
+                    analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)
+
+                    # Анализируем чаты и генерируем ответы
+                    actions = await analyze_chats_uc.execute(
+                        chats=chats_details,
+                        resume=resume.content,
+                    )
+
+                    print(f"[app] Сгенерировано {len(actions)} действий для ответов", flush=True)
+                    for action in actions:
+                        dialog_id = action.data.get("dialog_id")
+                        if action.type == "send_message":
+                            message_text = action.data.get("message_text", "")
+                            message_to = action.data.get("message_to")
+                            preview = message_text[:100] + "..." if len(message_text) > 100 else message_text
+                            message_to_str = f" (ответ на сообщение {message_to})" if message_to else ""
+                            print(
+                                f"[app] Действие: отправить сообщение в чат {dialog_id}{message_to_str}: {preview}",
+                                flush=True,
+                            )
+                        elif action.type == "create_event":
+                            event_type = action.data.get("event_type", "")
+                            message = action.data.get("message", "")
+                            preview = message[:100] + "..." if len(message) > 100 else message
+                            print(
+                                f"[app] Действие: создать событие в чате {dialog_id}, тип: {event_type}: {preview}",
+                                flush=True,
+                            )
+            except Exception as exc:
+                print(f"[app] Ошибка при анализе чатов: {exc}", flush=True)
+                # Не прерываем выполнение, продолжаем работу
 
     def _generate_result_txt(
         self,

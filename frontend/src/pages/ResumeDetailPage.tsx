@@ -14,6 +14,7 @@ import {
   Row,
   Col,
   Tooltip,
+  Divider,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -24,6 +25,8 @@ import {
   QuestionCircleOutlined,
   SendOutlined,
   ThunderboltOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined,
 } from '@ant-design/icons';
 import { getResume, updateResume } from '../api/resumes';
 import {
@@ -32,12 +35,14 @@ import {
   suggestResumeFilterSettings,
 } from '../api/resumeFilterSettings';
 import { getAreas, type HhArea } from '../api/dictionaries';
+import { getDailyResponses } from '../api/subscription';
 import { FilterSettingsForm } from '../components/FilterSettingsForm';
 import { PageHeader } from '../components/PageHeader';
 import { GradientButton } from '../components/GradientButton';
+import { LimitReachedAlert } from '../components/LimitReachedAlert';
 import type { Resume, ResumeFilterSettings, ResumeFilterSettingsUpdate } from '../types/api';
 
-const { Text, Paragraph } = Typography;
+const { Text, Paragraph, Title } = Typography;
 
 const FILTER_COMPARE_KEYS: (keyof ResumeFilterSettings)[] = [
   'text',
@@ -69,11 +74,13 @@ export const ResumeDetailPage = () => {
   const [initialFilterValues, setInitialFilterValues] = useState<Record<string, unknown> | null>(
     null,
   );
+  const [dailyResponses, setDailyResponses] = useState<{ count: number; limit: number } | null>(null);
 
   useEffect(() => {
     if (resumeId) {
       loadData();
       loadAreas();
+      loadDailyResponses();
     }
   }, [resumeId]);
 
@@ -130,6 +137,15 @@ export const ResumeDetailPage = () => {
       setAreasTree(mapToTreeData(areas));
     } catch {
       setAreasTree([]);
+    }
+  };
+
+  const loadDailyResponses = async () => {
+    try {
+      const response = await getDailyResponses();
+      setDailyResponses({ count: response.count, limit: response.limit });
+    } catch (err) {
+      setDailyResponses(null);
     }
   };
 
@@ -225,8 +241,15 @@ export const ResumeDetailPage = () => {
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" tip="Загрузка резюме..." />
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 400,
+        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+        borderRadius: 24,
+      }}>
+        <Spin size="large" />
       </div>
     );
   }
@@ -247,6 +270,7 @@ export const ResumeDetailPage = () => {
           description={error}
           type="error"
           showIcon
+          style={{ borderRadius: 12 }}
         />
       </div>
     );
@@ -269,7 +293,7 @@ export const ResumeDetailPage = () => {
               size="large"
               onClick={() => navigate(`/resumes/${resumeId}/responses`)}
               disabled={!resume?.headhunter_hash}
-              style={{ borderRadius: 10, height: 44 }}
+              style={{ borderRadius: 10, height: 44, border: '1px solid #e5e7eb' }}
             >
               История откликов
             </Button>
@@ -277,232 +301,399 @@ export const ResumeDetailPage = () => {
               icon={<SearchOutlined />}
               onClick={() => navigate(`/resumes/${resumeId}/vacancies`)}
             >
-              Найти вакансии
+              Подходящие вакансии
             </GradientButton>
           </Space>
         }
       />
 
-      <Row gutter={[24, 24]} style={{ alignItems: 'stretch' }}>
-        {/* Left Column: Resume Content */}
-        <Col xs={24} lg={15} xl={16} style={{ display: 'flex' }}>
-          <Card
-            title={
-              <Space>
-                <FileTextOutlined style={{ color: '#2563eb' }} />
-                <span>Содержание резюме</span>
-              </Space>
-            }
-            bordered={false}
-            style={{
-              borderRadius: 16,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              width: '100%',
-            }}
-            styles={{
-              body: {
-                overflow: 'auto',
-                flex: 1,
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        {dailyResponses && 
+         dailyResponses.count >= dailyResponses.limit && 
+         dailyResponses.limit < 200 && (
+          <LimitReachedAlert 
+            limit={dailyResponses.limit} 
+            count={dailyResponses.count} 
+          />
+        )}
+
+        <Row gutter={[24, 24]} style={{ alignItems: 'stretch' }}>
+          {/* Left Column: Resume Content */}
+          <Col xs={24} lg={15} xl={16} style={{ display: 'flex' }}>
+            <Card
+              bordered={true}
+              style={{
+                borderRadius: 20,
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                height: '100%',
                 display: 'flex',
                 flexDirection: 'column',
-              }
-            }}
-          >
-            <div
-              style={{
-                whiteSpace: 'pre-wrap',
-                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                border: '1px solid #e2e8f0',
-                borderRadius: 12,
-                padding: 24,
-                fontSize: 14,
-                lineHeight: 1.7,
-                color: '#334155',
-                fontFamily: 'Menlo, Monaco, Consolas, "Courier New", monospace',
-                maxHeight: 'calc(100vh - 300px)',
-                margin: 0,
-                overflow: 'auto',
-                boxSizing: 'border-box',
-              }}
-            >
-              {resume?.content || 'Текст резюме отсутствует'}
-            </div>
-          </Card>
-        </Col>
-
-        {/* Right Column: Settings & Filters */}
-        <Col xs={24} lg={9} xl={8}>
-          <Space direction="vertical" size={20} style={{ width: '100%' }}>
-            
-            {/* Auto Reply Card */}
-            <Card
-              bordered={false}
-              style={{
-                borderRadius: 16,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-                background: resume?.is_auto_reply 
-                  ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
-                  : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-                border: resume?.is_auto_reply 
-                  ? '1px solid #86efac'
-                  : '1px solid #e5e7eb',
+                width: '100%',
                 overflow: 'hidden',
-                position: 'relative',
               }}
-            >
-              {/* Pulse animation when active */}
-              {resume?.is_auto_reply && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 16,
-                    right: 16,
-                    width: 8,
-                    height: 8,
-                    background: '#22c55e',
-                    borderRadius: '50%',
-                    animation: 'pulse 2s infinite',
-                  }}
-                />
-              )}
-              
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: 14 }}>
+              styles={{
+                header: {
+                  borderBottom: '1px solid #f1f5f9',
+                  padding: '20px 24px',
+                },
+                body: {
+                  overflow: 'auto',
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  padding: 24,
+                }
+              }}
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div
                     style={{
-                      width: 48,
-                      height: 48,
-                      background: resume?.is_auto_reply 
-                        ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                        : 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%)',
-                      borderRadius: 12,
+                      width: 40,
+                      height: 40,
+                      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                      borderRadius: 10,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: resume?.is_auto_reply 
-                        ? '0 4px 12px rgba(34, 197, 94, 0.3)'
-                        : 'none',
                     }}
                   >
-                    <RobotOutlined style={{ fontSize: 22, color: 'white' }} />
+                    <FileTextOutlined style={{ fontSize: 18, color: '#2563eb' }} />
                   </div>
                   <div>
-                    <Text strong style={{ fontSize: 17, color: '#0f172a', display: 'block' }}>
-                      Автоотклик
+                    <Text strong style={{ fontSize: 16, display: 'block', lineHeight: 1.2 }}>
+                      Содержание резюме
                     </Text>
-                    <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 0, lineHeight: 1.5, marginTop: 4 }}>
-                      {resume?.is_auto_reply 
-                        ? 'Система автоматически откликается на подходящие вакансии'
-                        : 'Включите для автоматического отклика на вакансии'}
-                    </Paragraph>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Импортировано из HeadHunter
+                    </Text>
                   </div>
                 </div>
-                <Switch
-                  checked={resume?.is_auto_reply || false}
-                  onChange={handleAutoReplyToggle}
-                  loading={savingAutoReply}
-                  disabled={savingAutoReply}
-                  style={{ marginTop: 4 }}
-                />
+              }
+            >
+              <div
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: 14,
+                  padding: 24,
+                  fontSize: 14,
+                  lineHeight: 1.8,
+                  color: '#334155',
+                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                  maxHeight: 'calc(100vh - 360px)',
+                  margin: 0,
+                  overflow: 'auto',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {resume?.content || 'Текст резюме отсутствует'}
               </div>
             </Card>
+          </Col>
 
-            {/* User Parameters */}
-            <Card
-              title={
-                <Space>
-                  <ThunderboltOutlined style={{ color: '#f59e0b' }} />
-                  <span>Дополнительные требования</span>
-                  <Tooltip
-                    title={
-                      <div>
-                        <div style={{ marginBottom: 8 }}>
-                          Укажите специфичные требования к вакансиям, которые не могут быть выражены через стандартные фильтры.
-                        </div>
-                        <div>
-                          <strong>Примеры:</strong>
-                        </div>
-                        <div>• Только удаленка, без гибрида</div>
-                        <div>• Без тестовых заданий</div>
-                        <div>• Без легаси кода</div>
+          {/* Right Column: Settings & Filters */}
+          <Col xs={24} lg={9} xl={8}>
+            <Space direction="vertical" size={20} style={{ width: '100%' }}>
+              
+              {/* Auto Reply Card - Hero style */}
+              <Card
+                bordered={true}
+                style={{
+                  borderRadius: 20,
+                  border: resume?.is_auto_reply 
+                    ? '2px solid #86efac'
+                    : '1px solid #e5e7eb',
+                  boxShadow: resume?.is_auto_reply 
+                    ? '0 4px 20px rgba(34, 197, 94, 0.15)'
+                    : '0 2px 8px rgba(0,0,0,0.06)',
+                  background: resume?.is_auto_reply 
+                    ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
+                    : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+                styles={{ body: { padding: 24 } }}
+              >
+                {/* Decorative elements */}
+                {resume?.is_auto_reply && (
+                  <>
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -30,
+                        right: -30,
+                        width: 100,
+                        height: 100,
+                        background: 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%)',
+                        borderRadius: '50%',
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 16,
+                        right: 16,
+                        width: 10,
+                        height: 10,
+                        background: '#22c55e',
+                        borderRadius: '50%',
+                        animation: 'pulse 2s infinite',
+                      }}
+                    />
+                  </>
+                )}
+                
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
+                  <div style={{ display: 'flex', gap: 16 }}>
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        background: resume?.is_auto_reply 
+                          ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                          : 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)',
+                        borderRadius: 14,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: resume?.is_auto_reply 
+                          ? '0 4px 12px rgba(34, 197, 94, 0.35)'
+                          : '0 2px 6px rgba(100, 116, 139, 0.2)',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <RobotOutlined style={{ fontSize: 24, color: 'white' }} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <Title level={5} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+                          Автоотклик
+                        </Title>
+                        {resume?.is_auto_reply && (
+                          <div
+                            style={{
+                              padding: '2px 8px',
+                              background: 'rgba(34, 197, 94, 0.15)',
+                              borderRadius: 12,
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#16a34a',
+                            }}
+                          >
+                            Активен
+                          </div>
+                        )}
                       </div>
-                    }
-                  >
-                    <QuestionCircleOutlined style={{ color: '#94a3b8', cursor: 'help' }} />
-                  </Tooltip>
-                </Space>
-              }
-              size="small"
-              bordered={false}
-              style={{ borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-            >
-              <Form form={resumeForm} layout="vertical" requiredMark={false}>
-                <Form.Item
-                  name="user_parameters"
-                  style={{ marginBottom: 12 }}
-                >
-                  <Input.TextArea
-                    rows={3}
-                    placeholder="Например: Только удаленка, без легаси кода..."
-                    style={{ borderRadius: 10, resize: 'none' }}
-                    maxLength={500}
-                    showCount
+                      <Text style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, display: 'block' }}>
+                        {resume?.is_auto_reply 
+                          ? 'Автоматические отклики на подходящие вакансии'
+                          : 'Включите для автоматического отклика'}
+                      </Text>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={resume?.is_auto_reply || false}
+                    onChange={handleAutoReplyToggle}
+                    loading={savingAutoReply}
+                    disabled={savingAutoReply}
+                    style={{ marginTop: 4, flexShrink: 0 }}
                   />
-                </Form.Item>
-                <Form.Item style={{ marginTop: 24, marginBottom: 0 }}>
+                </div>
+
+                {/* Stats row when active */}
+                {resume?.is_auto_reply && dailyResponses && (
+                  <>
+                    <Divider style={{ margin: '20px 0 16px', borderColor: 'rgba(34, 197, 94, 0.2)' }} />
+                    <div style={{ display: 'flex', gap: 12 }}>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 14px',
+                          background: 'rgba(255, 255, 255, 0.7)',
+                          borderRadius: 12,
+                          border: '1px solid rgba(34, 197, 94, 0.15)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 16 }} />
+                          <div>
+                            <Text style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', display: 'block', lineHeight: 1 }}>
+                              {dailyResponses.count}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#64748b' }}>сегодня</Text>
+                          </div>
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          flex: 1,
+                          padding: '12px 14px',
+                          background: 'rgba(255, 255, 255, 0.7)',
+                          borderRadius: 12,
+                          border: '1px solid rgba(34, 197, 94, 0.15)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <ClockCircleOutlined style={{ color: '#64748b', fontSize: 16 }} />
+                          <div>
+                            <Text style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', display: 'block', lineHeight: 1 }}>
+                              {dailyResponses.limit - dailyResponses.count}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#64748b' }}>осталось</Text>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </Card>
+
+              {/* User Parameters */}
+              <Card
+                bordered={true}
+                style={{ 
+                  borderRadius: 20, 
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                }}
+                styles={{ 
+                  header: { 
+                    borderBottom: '1px solid #f1f5f9',
+                    padding: '16px 20px',
+                  },
+                  body: { padding: 20 } 
+                }}
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <ThunderboltOutlined style={{ fontSize: 16, color: '#d97706' }} />
+                    </div>
+                    <Text strong style={{ fontSize: 15 }}>Дополнительные требования</Text>
+                    <Tooltip
+                      title={
+                        <div>
+                          <div style={{ marginBottom: 8 }}>
+                            Укажите специфичные требования к вакансиям.
+                          </div>
+                          <div><strong>Примеры:</strong></div>
+                          <div>• Только удаленка, без гибрида</div>
+                          <div>• Без тестовых заданий</div>
+                          <div>• Без легаси кода</div>
+                        </div>
+                      }
+                    >
+                      <QuestionCircleOutlined style={{ color: '#94a3b8', cursor: 'help', marginLeft: 'auto' }} />
+                    </Tooltip>
+                  </div>
+                }
+              >
+                <Form form={resumeForm} layout="vertical" requiredMark={false}>
+                  <Form.Item
+                    name="user_parameters"
+                    style={{ marginBottom: 16 }}
+                  >
+                    <Input.TextArea
+                      rows={3}
+                      placeholder="Например: Только удаленка, без легаси кода..."
+                      style={{ 
+                        borderRadius: 12, 
+                        resize: 'none',
+                        border: '1px solid #e5e7eb',
+                      }}
+                      maxLength={500}
+                      showCount
+                    />
+                  </Form.Item>
                   <Button
-                    type="dashed"
+                    type="primary"
                     block
                     onClick={handleResumeParamsSave}
                     loading={savingResumeParams}
-                    style={{ borderRadius: 10, height: 40 }}
+                    style={{ 
+                      borderRadius: 12, 
+                      height: 42,
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      border: 'none',
+                      fontWeight: 600,
+                    }}
                   >
                     Сохранить требования
                   </Button>
-                </Form.Item>
-              </Form>
-            </Card>
+                </Form>
+              </Card>
 
-            {/* Filters */}
-            <Card
-              title={
-                <Space>
-                  <SettingOutlined style={{ color: '#8b5cf6' }} />
-                  <span>Настройки поиска</span>
-                </Space>
-              }
-              bordered={false}
-              style={{ borderRadius: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}
-              styles={{ body: { padding: '16px 20px' } }}
-            >
-              <Form
-                form={filterForm}
-                layout="vertical"
-                onValuesChange={handleFilterValuesChange}
-                initialValues={{
-                  only_with_salary: false,
-                  ...filterSettings,
+              {/* Filters */}
+              <Card
+                bordered={true}
+                style={{ 
+                  borderRadius: 20, 
+                  border: '1px solid #e5e7eb',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                 }}
+                styles={{ 
+                  header: { 
+                    borderBottom: '1px solid #f1f5f9',
+                    padding: '16px 20px',
+                  },
+                  body: { padding: 20 } 
+                }}
+                title={
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
+                        borderRadius: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <SettingOutlined style={{ fontSize: 16, color: '#9333ea' }} />
+                    </div>
+                    <Text strong style={{ fontSize: 15 }}>Настройки поиска</Text>
+                  </div>
+                }
               >
-                <FilterSettingsForm
+                <Form
                   form={filterForm}
-                  initialValues={filterSettings}
-                  areasTree={areasTree}
-                  loading={savingFilters}
-                  isDirty={isDirty}
-                  onSave={handleFilterSave}
-                  onSuggest={handleFilterSuggest}
+                  layout="vertical"
                   onValuesChange={handleFilterValuesChange}
-                />
-              </Form>
-            </Card>
+                  initialValues={{
+                    only_with_salary: false,
+                    ...filterSettings,
+                  }}
+                >
+                  <FilterSettingsForm
+                    form={filterForm}
+                    initialValues={filterSettings}
+                    areasTree={areasTree}
+                    loading={savingFilters}
+                    isDirty={isDirty}
+                    onSave={handleFilterSave}
+                    onSuggest={handleFilterSuggest}
+                    onValuesChange={handleFilterValuesChange}
+                  />
+                </Form>
+              </Card>
 
-          </Space>
-        </Col>
-      </Row>
+            </Space>
+          </Col>
+        </Row>
+      </div>
       
       {/* CSS for pulse animation */}
       <style>{`

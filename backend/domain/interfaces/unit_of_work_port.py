@@ -15,6 +15,15 @@ from domain.interfaces.user_hh_auth_data_repository_port import (
 from domain.interfaces.vacancy_response_repository_port import (
     VacancyResponseRepositoryPort,
 )
+from domain.interfaces.subscription_plan_repository_port import (
+    SubscriptionPlanRepositoryPort,
+)
+from domain.interfaces.user_subscription_repository_port import (
+    UserSubscriptionRepositoryPort,
+)
+from domain.interfaces.agent_action_repository_port import (
+    AgentActionRepositoryPort,
+)
 
 
 class UnitOfWorkPort(ABC):
@@ -52,6 +61,21 @@ class UnitOfWorkPort(ABC):
     @abstractmethod
     def vacancy_response_repository(self) -> VacancyResponseRepositoryPort:
         """Получить репозиторий откликов на вакансии."""
+
+    @property
+    @abstractmethod
+    def subscription_plan_repository(self) -> SubscriptionPlanRepositoryPort:
+        """Получить репозиторий планов подписки."""
+
+    @property
+    @abstractmethod
+    def user_subscription_repository(self) -> UserSubscriptionRepositoryPort:
+        """Получить репозиторий подписок пользователей."""
+
+    @property
+    @abstractmethod
+    def agent_action_repository(self) -> AgentActionRepositoryPort:
+        """Получить репозиторий действий агента."""
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWorkPort":

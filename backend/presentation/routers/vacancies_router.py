@@ -31,7 +31,12 @@ from presentation.dto.vacancy_responses_list_response import (
     VacancyResponseItem,
     VacancyResponsesListResponse,
 )
+from presentation.dto.statistics_response import (
+    StatisticsResponse,
+    StatisticsDataPoint,
+)
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from domain.use_cases.get_responses_statistics import GetResponsesStatisticsUseCase
 
 router = APIRouter(prefix="/api/vacancies", tags=["vacancies"])
 
@@ -301,6 +306,15 @@ async def respond_to_vacancy(
         from domain.use_cases.respond_to_vacancy import RespondToVacancyUseCase
         from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
         from domain.use_cases.create_vacancy_response import CreateVacancyResponseUseCase
+        from domain.use_cases.check_and_update_subscription import (
+            CheckAndUpdateSubscriptionUseCase,
+        )
+        from domain.use_cases.increment_response_count import (
+            IncrementResponseCountUseCase,
+        )
+        from domain.exceptions.subscription_limit_exceeded import (
+            SubscriptionLimitExceededError,
+        )
         from infrastructure.clients.hh_client import RateLimitedHHHttpClient
         
         hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
@@ -308,9 +322,22 @@ async def respond_to_vacancy(
         create_vacancy_response_uc = CreateVacancyResponseUseCase(
             vacancy_response_repository=unit_of_work.vacancy_response_repository
         )
+        
+        # Создаем use cases для проверки подписки и инкремента счетчика
+        check_subscription_uc = CheckAndUpdateSubscriptionUseCase(
+            user_subscription_repository=unit_of_work.user_subscription_repository,
+            subscription_plan_repository=unit_of_work.subscription_plan_repository,
+        )
+        increment_response_count_uc = IncrementResponseCountUseCase(
+            check_subscription_uc=check_subscription_uc,
+            user_subscription_repository=unit_of_work.user_subscription_repository,
+        )
+        
         respond_to_vacancy_and_save_uc = RespondToVacancyAndSaveUseCase(
             respond_to_vacancy_uc=respond_to_vacancy_uc,
             create_vacancy_response_uc=create_vacancy_response_uc,
+            check_subscription_uc=check_subscription_uc,
+            increment_response_count_uc=increment_response_count_uc,
         )
 
         # Получаем название вакансии (если нужно, можно получить из HH API)
@@ -334,6 +361,20 @@ async def respond_to_vacancy(
 
     except HTTPException:
         raise
+    except SubscriptionLimitExceededError as exc:
+        logger.warning(
+            f"Лимит откликов исчерпан для user_id={current_user.id}: "
+            f"{exc.count}/{exc.limit}"
+        )
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "message": str(exc),
+                "count": exc.count,
+                "limit": exc.limit,
+                "seconds_until_reset": exc.seconds_until_reset,
+            },
+        ) from exc
     except ValueError as exc:
         logger.error(f"Ошибка валидации: {exc}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -439,5 +480,73 @@ async def get_vacancy_responses(
         )
         raise HTTPException(
             status_code=500, detail="Внутренняя ошибка при получении откликов"
+        ) from exc
+
+
+@router.get("/statistics", response_model=StatisticsResponse)
+async def get_responses_statistics(
+    days: int = 7,
+    current_user=Depends(get_current_user),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> StatisticsResponse:
+    """Получить статистику откликов за последние N дней.
+
+    Доступен только для авторизованных пользователей.
+    Возвращает количество откликов по дням за указанный период.
+
+    Args:
+        days: Количество дней для статистики (по умолчанию 7, максимум 30).
+        current_user: Текущий авторизованный пользователь.
+        unit_of_work: UnitOfWork для работы с БД.
+
+    Returns:
+        Статистика откликов по дням.
+
+    Raises:
+        HTTPException: 400 при невалидных параметрах,
+            500 при внутренних ошибках.
+    """
+    try:
+        # Валидация параметров
+        if days <= 0:
+            raise HTTPException(
+                status_code=400, detail="days должен быть > 0"
+            )
+        if days > 30:
+            raise HTTPException(
+                status_code=400, detail="days не должен превышать 30"
+            )
+
+        # Создаем use case
+        get_statistics_uc = GetResponsesStatisticsUseCase(
+            vacancy_response_repository=unit_of_work.vacancy_response_repository
+        )
+
+        # Получаем статистику
+        statistics = await get_statistics_uc.execute(
+            user_id=current_user.id,
+            days=days,
+        )
+
+        # Преобразуем в DTO
+        data_points = [
+            StatisticsDataPoint(response_date=stat_date, count=count)
+            for stat_date, count in statistics
+        ]
+
+        return StatisticsResponse(data=data_points)
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        logger.error(f"Ошибка валидации: {exc}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error(
+            f"Внутренняя ошибка при получении статистики: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Внутренняя ошибка при получении статистики"
         ) from exc
 

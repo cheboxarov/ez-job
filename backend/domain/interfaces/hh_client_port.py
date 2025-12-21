@@ -201,6 +201,7 @@ class HHClientPort(ABC):
         *,
         chatik_api_base_url: str = "https://chatik.hh.ru",
         return_cookies: bool = False,
+        filter_unread: bool = True,
     ) -> Union[HHListChat, tuple[HHListChat, Dict[str, str]]]:  # pragma: no cover - интерфейс
         """Получить список чатов по /chatik/api/chats.
         
@@ -210,6 +211,7 @@ class HHClientPort(ABC):
             cookies: HTTP cookies для запроса.
             chatik_api_base_url: Базовый URL Chatik API.
             return_cookies: Если True, возвращает tuple (result, updated_cookies).
+            filter_unread: Если True, возвращать только непрочитанные чаты.
         
         Returns:
             HHListChat или tuple[HHListChat, Dict[str, str]] если return_cookies=True.

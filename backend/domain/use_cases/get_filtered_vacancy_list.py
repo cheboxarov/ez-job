@@ -5,7 +5,9 @@ from uuid import UUID
 
 from domain.entities.filtered_vacancy_list import FilteredVacancyListItem
 from domain.entities.resume_filter_settings import ResumeFilterSettings
-from domain.use_cases.filter_vacancy_list import FilterVacancyListUseCase
+from domain.use_cases.get_filtered_vacancy_list_with_cache import (
+    GetFilteredVacancyListWithCacheUseCase,
+)
 from domain.use_cases.get_vacancy_list import GetVacancyListUseCase
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 
@@ -14,17 +16,17 @@ class GetFilteredVacancyListUseCase:
     """Верхнеуровневый use case получения отфильтрованных list-вакансий.
 
     1. Получает list-вакансии через GetVacancyListUseCase (один запрос к /vacancies).
-    2. Передаёт их в FilterVacancyListUseCase вместе с резюме.
+    2. Передаёт их в GetFilteredVacancyListWithCacheUseCase вместе с резюме.
     3. Возвращает список отфильтрованных list-вакансий (list_item + confidence).
     """
 
     def __init__(
         self,
         get_vacancy_list_uc: GetVacancyListUseCase,
-        filter_vacancy_list_uc: FilterVacancyListUseCase,
+        filter_vacancy_list_with_cache_uc: GetFilteredVacancyListWithCacheUseCase,
     ) -> None:
         self._get_vacancy_list_uc = get_vacancy_list_uc
-        self._filter_vacancy_list_uc = filter_vacancy_list_uc
+        self._filter_vacancy_list_with_cache_uc = filter_vacancy_list_with_cache_uc
 
     async def execute(
         self,
@@ -36,6 +38,7 @@ class GetFilteredVacancyListUseCase:
         page: str,
         search_session_id: str,
         user_resume: str,
+        resume_id: UUID,
         resume_hash: str | None = None,
         user_filter_params: str | None = None,
         order_by: str | None = None,
@@ -56,9 +59,10 @@ class GetFilteredVacancyListUseCase:
             update_cookies_uc=update_cookies_uc,
         )
 
-        # 2. Фильтруем их через нейронный use case
-        filtered: List[FilteredVacancyListItem] = await self._filter_vacancy_list_uc.execute(
+        # 2. Фильтруем их через use case с кэшированием
+        filtered: List[FilteredVacancyListItem] = await self._filter_vacancy_list_with_cache_uc.execute(
             vacancies=vacancy_list.items,
+            resume_id=resume_id,
             resume=user_resume,
             user_filter_params=user_filter_params,
         )

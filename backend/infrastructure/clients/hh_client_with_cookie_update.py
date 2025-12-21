@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -21,6 +22,9 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
 
     После каждого запроса к HH API извлекает обновленные cookies и сохраняет их
     в БД через UpdateUserHhAuthCookiesUseCase.
+    
+    Использует lock для синхронизации обновления cookies, чтобы избежать race conditions
+    при параллельных запросах.
     """
 
     def __init__(
@@ -39,6 +43,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         self._hh_client = hh_client
         self._user_id = user_id
         self._update_cookies_uc = update_cookies_uc
+        self._cookies_lock = asyncio.Lock()
 
     async def _update_cookies(self, updated_cookies: Dict[str, str]) -> None:
         """Обновить cookies пользователя в БД.
@@ -46,21 +51,22 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         Args:
             updated_cookies: Обновленные cookies из ответа HH API.
         """
-        try:
-            await self._update_cookies_uc.execute(
-                user_id=self._user_id,
-                updated_cookies=updated_cookies,
-            )
-            logger.debug(
-                f"Updated cookies for user_id={self._user_id}. "
-                f"Cookies keys: {list(updated_cookies.keys())}"
-            )
-        except Exception as exc:
-            # Логируем ошибку, но не прерываем выполнение основного запроса
-            logger.warning(
-                f"Failed to update cookies for user_id={self._user_id}: {exc}",
-                exc_info=True,
-            )
+        async with self._cookies_lock:
+            try:
+                await self._update_cookies_uc.execute(
+                    user_id=self._user_id,
+                    updated_cookies=updated_cookies,
+                )
+                logger.debug(
+                    f"Updated cookies for user_id={self._user_id}. "
+                    f"Cookies keys: {list(updated_cookies.keys())}"
+                )
+            except Exception as exc:
+                # Логируем ошибку, но не прерываем выполнение основного запроса
+                logger.warning(
+                    f"Failed to update cookies for user_id={self._user_id}: {exc}",
+                    exc_info=True,
+                )
 
     async def fetch_vacancy_list(
         self,
@@ -208,9 +214,10 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         *,
         chatik_api_base_url: str = "https://chatik.hh.ru",
         return_cookies: bool = False,
+        filter_unread: bool = True,
     ) -> HHListChat | tuple[HHListChat, Dict[str, str]]:
         result, updated_cookies = await self._hh_client.fetch_chat_list(
-            chat_ids, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=True
+            chat_ids, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=True, filter_unread=filter_unread
         )
         await self._update_cookies(updated_cookies)
         if return_cookies:
