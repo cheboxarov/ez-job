@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import BigInteger, DateTime, Integer, String
+from sqlalchemy import BigInteger, Boolean, DateTime, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -67,6 +67,13 @@ class AgentActionModel(Base):
         JSONB,
         nullable=False,
         comment="JSON данные действия (зависят от типа действия)",
+    )
+    is_read: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default="false",
+        index=True,
+        comment="Флаг прочитанности действия пользователем",
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

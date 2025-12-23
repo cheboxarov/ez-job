@@ -1,4 +1,4 @@
-import { Layout, Menu, Button } from 'antd';
+import { Layout, Menu, Button, Badge } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileTextOutlined,
@@ -11,7 +11,9 @@ import {
   BarChartOutlined,
   CrownOutlined,
   } from '@ant-design/icons';
+import { useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
+import { useAgentActionsStore } from '../../stores/agentActionsStore';
 import { Logo } from '../Logo';
 
 const { Sider, Content } = Layout;
@@ -22,8 +24,13 @@ interface MainLayoutProps {
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const { logout } = useAuthStore();
+  const { unreadCount, fetchUnreadCount } = useAgentActionsStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
 
   const handleLogout = () => {
     logout();
@@ -42,7 +49,15 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         },
         {
           key: 'events',
-          icon: <CalendarOutlined />,
+          icon: (
+            <Badge
+              dot={unreadCount > 0}
+              offset={[4, 0]}
+              style={{ boxShadow: 'none' }}
+            >
+              <CalendarOutlined />
+            </Badge>
+          ),
           label: 'События',
         },
         {

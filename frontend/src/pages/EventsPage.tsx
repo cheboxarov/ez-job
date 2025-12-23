@@ -6,6 +6,7 @@ import { getAgentActions } from '../api/agentActions';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import type { AgentAction } from '../types/api';
+import { useAgentActionsStore } from '../stores/agentActionsStore';
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -111,10 +112,19 @@ export const EventsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
+  const { markAllAsRead, fetchUnreadCount } = useAgentActionsStore();
 
   useEffect(() => {
     loadEvents();
   }, [filterType]);
+
+  useEffect(() => {
+    const markAndRefresh = async () => {
+      await markAllAsRead();
+      await fetchUnreadCount();
+    };
+    markAndRefresh();
+  }, [markAllAsRead, fetchUnreadCount]);
 
   const loadEvents = async () => {
     setLoading(true);

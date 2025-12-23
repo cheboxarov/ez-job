@@ -7,16 +7,19 @@ from loguru import logger
 from uuid import UUID
 
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
+from domain.interfaces.agent_action_service_port import AgentActionServicePort
 from domain.use_cases.list_agent_actions import ListAgentActionsUseCase
 from infrastructure.auth.fastapi_users_setup import get_current_active_user
 from infrastructure.database.models.user_model import UserModel
 from presentation.dependencies import (
+    get_agent_action_service,
     get_list_agent_actions_uc,
     get_unit_of_work,
 )
 from presentation.dto.agent_action_response import (
     AgentActionResponse,
     AgentActionsListResponse,
+    AgentActionsUnreadCountResponse,
 )
 
 router = APIRouter(prefix="/api/agent-actions", tags=["agent-actions"])
@@ -72,5 +75,48 @@ async def list_agent_actions(
         raise HTTPException(
             status_code=500,
             detail="Внутренняя ошибка при получении списка действий агента",
+        ) from exc
+
+
+@router.get("/unread/count", response_model=AgentActionsUnreadCountResponse)
+async def get_unread_agent_actions_count(
+    current_user: UserModel = Depends(get_current_active_user),
+    agent_action_service: AgentActionServicePort = Depends(get_agent_action_service),
+) -> AgentActionsUnreadCountResponse:
+    """Получить количество непрочитанных действий агента для текущего пользователя."""
+    try:
+        unread_count = await agent_action_service.get_unread_count(current_user.id)
+        return AgentActionsUnreadCountResponse(unread_count=unread_count)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"Ошибка при получении количества непрочитанных действий агента: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка при получении количества непрочитанных действий агента",
+        ) from exc
+
+
+@router.post("/read-all")
+async def mark_all_agent_actions_as_read(
+    current_user: UserModel = Depends(get_current_active_user),
+    agent_action_service: AgentActionServicePort = Depends(get_agent_action_service),
+) -> None:
+    """Пометить все действия агента для текущего пользователя как прочитанные."""
+    try:
+        await agent_action_service.mark_all_as_read(current_user.id)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"Ошибка при пометке действий агента как прочитанных: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка при пометке действий агента как прочитанных",
         ) from exc
 

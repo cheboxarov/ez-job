@@ -370,10 +370,15 @@ export interface AgentAction {
   };
   created_at: string;
   updated_at: string;
+  is_read: boolean;
 }
 
 export interface AgentActionsListResponse {
   items: AgentAction[];
+}
+
+export interface AgentActionsUnreadCountResponse {
+  unread_count: number;
 }
 
 export interface ChatListResponse {

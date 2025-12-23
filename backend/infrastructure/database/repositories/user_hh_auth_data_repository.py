@@ -26,11 +26,14 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         """
         self._session = session
 
-    async def get_by_user_id(self, user_id: UUID) -> UserHhAuthData | None:
+    async def get_by_user_id(
+        self, user_id: UUID, *, with_for_update: bool = False
+    ) -> UserHhAuthData | None:
         """Получить HH auth data по user_id.
 
         Args:
             user_id: UUID пользователя.
+            with_for_update: Использовать SELECT ... FOR UPDATE (блокировка строки).
 
         Returns:
             Доменная сущность UserHhAuthData или None, если не найдено.
@@ -38,6 +41,10 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         stmt = select(UserHhAuthDataModel).where(
             UserHhAuthDataModel.user_id == user_id
         )
+
+        if with_for_update:
+            stmt = stmt.with_for_update()
+
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 

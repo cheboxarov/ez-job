@@ -92,20 +92,16 @@ class AgentActionServicePort(ABC):
         cookies: Dict[str, str],
         user_id: UUID | None = None,
     ) -> tuple[AgentAction, Dict[str, Any]]:
-        """Создать действие агента в БД и выполнить его.
+        """Создать действие агента в БД и выполнить его."""
+        raise NotImplementedError
 
-        Args:
-            action: Действие агента для создания и выполнения.
-            headers: HTTP заголовки для запросов к HH API.
-            cookies: HTTP cookies для запросов к HH API.
-            user_id: UUID пользователя для обновления cookies (опционально).
+    @abstractmethod
+    async def get_unread_count(self, user_id: UUID) -> int:
+        """Получить количество непрочитанных действий для пользователя."""
+        raise NotImplementedError
 
-        Returns:
-            Кортеж из созданной доменной сущности AgentAction и результата выполнения.
-
-        Raises:
-            ValueError: Если тип действия неизвестен или данные действия некорректны.
-            Exception: При ошибках создания или выполнения действия.
-        """
+    @abstractmethod
+    async def mark_all_as_read(self, user_id: UUID) -> None:
+        """Пометить все действия пользователя как прочитанные."""
         raise NotImplementedError
 

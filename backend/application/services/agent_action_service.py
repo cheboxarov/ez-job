@@ -214,3 +214,14 @@ class AgentActionService(AgentActionServicePort):
 
         return created_action, result
 
+    async def get_unread_count(self, user_id: UUID) -> int:
+        async with self._unit_of_work:
+            return await self._unit_of_work.agent_action_repository.get_unread_count(
+                user_id
+            )
+
+    async def mark_all_as_read(self, user_id: UUID) -> None:
+        async with self._unit_of_work:
+            await self._unit_of_work.agent_action_repository.mark_all_as_read(user_id)
+            await self._unit_of_work.commit()
+

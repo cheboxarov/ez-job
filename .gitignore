@@ -159,8 +159,6 @@ coverage.xml
 .classpath
 .settings/
 
-# Cursor IDE
-.cursor/
 
 # Secrets and credentials
 *.pem

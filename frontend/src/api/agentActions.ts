@@ -1,5 +1,8 @@
 import apiClient from './client';
-import type { AgentActionsListResponse } from '../types/api';
+import type {
+  AgentActionsListResponse,
+  AgentActionsUnreadCountResponse,
+} from '../types/api';
 
 export interface GetAgentActionsParams {
   type?: string;
@@ -26,5 +29,16 @@ export const getAgentActions = async (
   
   const response = await apiClient.get<AgentActionsListResponse>(url);
   return response.data;
+};
+
+export const getAgentActionsUnreadCount = async (): Promise<number> => {
+  const response = await apiClient.get<AgentActionsUnreadCountResponse>(
+    '/api/agent-actions/unread/count',
+  );
+  return response.data.unread_count;
+};
+
+export const markAllAgentActionsAsRead = async (): Promise<void> => {
+  await apiClient.post('/api/agent-actions/read-all');
 };
 

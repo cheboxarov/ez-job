@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.entities.agent_action import AgentAction
@@ -46,6 +46,7 @@ class AgentActionRepository(AgentActionRepositoryPort):
             user_id=action.user_id,
             resume_hash=action.resume_hash,
             data=action.data,
+            is_read=action.is_read,
         )
         self._session.add(model)
         await self._session.flush()
@@ -91,6 +92,25 @@ class AgentActionRepository(AgentActionRepositoryPort):
 
         return [self._to_domain(model) for model in models]
 
+    async def get_unread_count(self, user_id: UUID) -> int:
+        stmt = select(func.count()).select_from(AgentActionModel).where(
+            AgentActionModel.user_id == user_id,
+            AgentActionModel.is_read.is_(False),
+        )
+        result = await self._session.execute(stmt)
+        return int(result.scalar_one())
+
+    async def mark_all_as_read(self, user_id: UUID) -> None:
+        stmt = (
+            update(AgentActionModel)
+            .where(
+                AgentActionModel.user_id == user_id,
+                AgentActionModel.is_read.is_(False),
+            )
+            .values(is_read=True)
+        )
+        await self._session.execute(stmt)
+
     def _to_domain(self, model: AgentActionModel) -> AgentAction:
         """Преобразовать SQLAlchemy модель в доменную сущность.
 
@@ -111,5 +131,6 @@ class AgentActionRepository(AgentActionRepositoryPort):
             data=model.data,
             created_at=model.created_at,
             updated_at=model.updated_at,
+            is_read=model.is_read,
         )
 

@@ -48,8 +48,10 @@ class UpdateUserHhAuthCookiesUseCase:
         Raises:
             ValueError: Если auth данные для пользователя не найдены.
         """
-        # Получить текущие auth данные
-        current_auth = await self._repository.get_by_user_id(user_id)
+        # Получить текущие auth данные с блокировкой для обновления
+        current_auth = await self._repository.get_by_user_id(
+            user_id, with_for_update=True
+        )
         if current_auth is None:
             raise ValueError(
                 f"HH auth data not found for user_id={user_id}. "

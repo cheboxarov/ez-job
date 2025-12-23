@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import List
+from uuid import UUID
 
 from domain.entities.agent_action import AgentAction
 
@@ -49,4 +50,10 @@ class AgentActionRepositoryPort(ABC):
         Returns:
             Список доменных сущностей AgentAction, отсортированный по created_at (desc).
         """
+    @abstractmethod
+    async def get_unread_count(self, user_id: UUID) -> int:
+        """Получить количество непрочитанных действий для пользователя."""
 
+    @abstractmethod
+    async def mark_all_as_read(self, user_id: UUID) -> None:
+        """Пометить все действия пользователя как прочитанные."""

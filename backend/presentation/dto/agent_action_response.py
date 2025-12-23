@@ -24,6 +24,7 @@ class AgentActionResponse(BaseModel):
     data: Dict[str, Any] = Field(..., description="JSON данные действия (зависят от типа действия)")
     created_at: datetime = Field(..., description="Время создания действия")
     updated_at: datetime = Field(..., description="Время последнего обновления действия")
+    is_read: bool = Field(..., description="Флаг прочитанности действия пользователем")
 
     @classmethod
     def from_entity(cls, action: AgentAction) -> "AgentActionResponse":
@@ -46,6 +47,7 @@ class AgentActionResponse(BaseModel):
             data=action.data,
             created_at=action.created_at,
             updated_at=action.updated_at,
+            is_read=action.is_read,
         )
 
 
@@ -53,4 +55,10 @@ class AgentActionsListResponse(BaseModel):
     """DTO для ответа со списком действий агента."""
 
     items: List[AgentActionResponse] = Field(..., description="Список действий агента")
+
+
+class AgentActionsUnreadCountResponse(BaseModel):
+    """DTO для ответа с количеством непрочитанных действий агента."""
+
+    unread_count: int = Field(..., description="Количество непрочитанных действий")
 
