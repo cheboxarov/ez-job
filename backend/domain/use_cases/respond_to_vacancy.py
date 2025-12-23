@@ -40,6 +40,8 @@ class RespondToVacancyUseCase:
         internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
         user_id: Optional[UUID] = None,
         update_cookies_uc: Optional[UpdateUserHhAuthCookiesUseCase] = None,
+        test_answers: Dict[str, str | List[str]] | None = None,
+        test_metadata: Dict[str, str] | None = None,
     ) -> Dict[str, Any]:
         """Откликнуться на вакансию.
 
@@ -52,6 +54,8 @@ class RespondToVacancyUseCase:
             internal_api_base_url: Базовый URL внутреннего API HH.
             user_id: UUID пользователя для обновления cookies (опционально).
             update_cookies_uc: Use case для обновления cookies (опционально).
+            test_answers: Ответы на вопросы теста (ключ - field_name, значение - ответ).
+            test_metadata: Метаданные теста (uidPk, guid, startTime, testRequired).
 
         Returns:
             Ответ от API HH после отклика.
@@ -72,6 +76,8 @@ class RespondToVacancyUseCase:
                 cookies=cookies,
                 letter=letter,
                 internal_api_base_url=internal_api_base_url,
+                test_answers=test_answers,
+                test_metadata=test_metadata,
             )
             logger.info(
                 f"Успешно отправлен отклик на вакансию vacancy_id={vacancy_id}, resume_hash={resume_hash}"

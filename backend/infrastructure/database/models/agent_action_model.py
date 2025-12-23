@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import BigInteger, DateTime, Integer, String
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
@@ -40,7 +40,7 @@ class AgentActionModel(Base):
         comment="Тип сущности (hh_dialog и т.д.)",
     )
     entity_id: Mapped[int] = mapped_column(
-        Integer,
+        BigInteger,
         nullable=False,
         index=True,
         comment="ID сущности (например, ID диалога)",
@@ -50,6 +50,18 @@ class AgentActionModel(Base):
         nullable=False,
         index=True,
         comment="Идентификатор агента, создавшего действие",
+    )
+    user_id: Mapped[UUID] = mapped_column(
+        PostgresUUID(as_uuid=True),
+        nullable=False,
+        index=True,
+        comment="ID пользователя, для которого создано действие",
+    )
+    resume_hash: Mapped[str | None] = mapped_column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Hash резюме, использованного при создании действия",
     )
     data: Mapped[dict[str, Any]] = mapped_column(
         JSONB,

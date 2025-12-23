@@ -30,6 +30,9 @@ class AgentAction:
     created_by: str
     """Идентификатор агента, который создал это действие (например, "messages_agent")."""
 
+    user_id: UUID
+    """ID пользователя, для которого создано действие."""
+
     data: Dict[str, Any]
     """Данные действия.
     
@@ -51,3 +54,6 @@ class AgentAction:
 
     updated_at: datetime
     """Время последнего обновления действия."""
+
+    resume_hash: str | None = None
+    """Hash резюме, использованного при создании действия (опционально)."""

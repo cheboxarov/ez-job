@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 from loguru import logger
@@ -61,6 +61,8 @@ class RespondToVacancyAndSaveUseCase:
         vacancy_url: str | None = None,
         internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
         update_cookies_uc: Optional[UpdateUserHhAuthCookiesUseCase] = None,
+        test_answers: Dict[str, str | List[str]] | None = None,
+        test_metadata: Dict[str, str] | None = None,
     ) -> Dict[str, Any]:
         """Откликнуться на вакансию и сохранить отклик в БД.
 
@@ -75,6 +77,8 @@ class RespondToVacancyAndSaveUseCase:
             vacancy_name: Название вакансии.
             vacancy_url: URL вакансии (опционально).
             internal_api_base_url: Базовый URL внутреннего API HH.
+            test_answers: Ответы на вопросы теста (ключ - field_name, значение - ответ).
+            test_metadata: Метаданные теста (uidPk, guid, startTime, testRequired).
 
         Returns:
             Ответ от API HH после отклика.
@@ -122,6 +126,8 @@ class RespondToVacancyAndSaveUseCase:
                 internal_api_base_url=internal_api_base_url,
                 user_id=user_id,
                 update_cookies_uc=update_cookies_uc,
+                test_answers=test_answers,
+                test_metadata=test_metadata,
             )
         except Exception as exc:
             logger.error(

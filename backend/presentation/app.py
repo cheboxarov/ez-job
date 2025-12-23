@@ -111,6 +111,11 @@ from presentation.routers.chats_router import router as chats_router
 
 app.include_router(chats_router)
 
+# Agent Actions router
+from presentation.routers.agent_actions_router import router as agent_actions_router
+
+app.include_router(agent_actions_router)
+
 
 @app.get("/")
 async def root():

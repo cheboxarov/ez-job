@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Card, Typography, Spin, Alert, Button, Avatar, Tag, Divider } from 'antd';
-import { ArrowLeftOutlined, MessageOutlined, UserOutlined } from '@ant-design/icons';
-import { getChat } from '../api/chats';
+import { Typography, Spin, Alert, Button, Input, Space } from 'antd';
+import { MessageOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
+import { getChat, sendChatMessage } from '../api/chats';
+import { getAgentActions } from '../api/agentActions';
+import { ActionCard } from '../components/ActionCard';
 import { PageHeader } from '../components/PageHeader';
-import type { ChatDetailedResponse, ChatMessage } from '../types/api';
+import type { ChatDetailedResponse, ChatMessage, AgentAction } from '../types/api';
 
-const { Title, Text, Paragraph } = Typography;
+const { TextArea } = Input;
+const { Text, Paragraph } = Typography;
 
 export const ChatDetailPage = () => {
   const navigate = useNavigate();
@@ -14,6 +17,11 @@ export const ChatDetailPage = () => {
   const [chat, setChat] = useState<ChatDetailedResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [messageText, setMessageText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [actions, setActions] = useState<AgentAction[]>([]);
+  const [loadingActions, setLoadingActions] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (chatId) {
@@ -27,6 +35,7 @@ export const ChatDetailPage = () => {
     try {
       const data = await getChat(id);
       setChat(data);
+      await loadActions(id);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка при загрузке чата');
     } finally {
@@ -34,39 +43,71 @@ export const ChatDetailPage = () => {
     }
   };
 
-  const formatTime = (timeStr: string) => {
+  const loadActions = async (chatId: number) => {
+    setLoadingActions(true);
     try {
-      const date = new Date(timeStr);
-      return date.toLocaleString('ru-RU', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
+      const response = await getAgentActions({
+        type: 'send_message',
+        entity_type: 'hh_dialog',
+        entity_id: chatId,
       });
-    } catch {
-      return timeStr;
+      setActions(response.items);
+    } catch (err: any) {
+      console.error('Ошибка при загрузке actions:', err);
+    } finally {
+      setLoadingActions(false);
+    }
+  };
+
+  const actionsByMessageId = useMemo(() => {
+    const map = new Map<number, AgentAction[]>();
+    actions.forEach((action) => {
+      const messageTo = action.data.message_to;
+      if (messageTo !== undefined) {
+        if (!map.has(messageTo)) {
+          map.set(messageTo, []);
+        }
+        map.get(messageTo)!.push(action);
+      }
+    });
+    return map;
+  }, [actions]);
+
+  const handleSendMessage = async () => {
+    if (!messageText.trim() || !chatId) return;
+
+    setSending(true);
+    try {
+      await sendChatMessage(parseInt(chatId, 10), messageText);
+      setMessageText('');
+      await loadChat(parseInt(chatId, 10));
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Ошибка при отправке сообщения');
+    } finally {
+      setSending(false);
     }
   };
 
   const formatTimeShort = (timeStr: string) => {
     try {
       const date = new Date(timeStr);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      const diffMins = Math.floor(diffMs / 60000);
-      const diffHours = Math.floor(diffMs / 3600000);
-      const diffDays = Math.floor(diffMs / 86400000);
-
-      if (diffMins < 1) return 'только что';
-      if (diffMins < 60) return `${diffMins} мин назад`;
-      if (diffHours < 24) return `${diffHours} ч назад`;
-      if (diffDays < 7) return `${diffDays} дн назад`;
-      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      const hours = date.getHours().toString().padStart(2, '0');
+      const minutes = date.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
     } catch {
       return timeStr;
     }
   };
+
+  const isUserMessage = (message: ChatMessage) => {
+    return message.participant_display?.is_bot === true;
+  };
+
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
+    }
+  }, [chat?.messages?.items.length]);
 
   if (loading && !chat) {
     return (
@@ -79,7 +120,14 @@ export const ChatDetailPage = () => {
   if (error && !chat) {
     return (
       <div>
-        <PageHeader title="Ошибка загрузки чата" />
+        <PageHeader
+          title="Ошибка загрузки чата"
+          icon={<MessageOutlined />}
+          breadcrumbs={[
+            { title: 'Чаты', path: '/chats' },
+            { title: 'Ошибка' }
+          ]}
+        />
         <Alert
           message="Ошибка"
           description={error}
@@ -102,180 +150,199 @@ export const ChatDetailPage = () => {
   return (
     <div>
       <PageHeader
-        title={
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Button
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate('/chats')}
-              style={{ marginRight: 8 }}
-            >
-              Назад
-            </Button>
-            <div>
-              <Title level={2} style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#0f172a' }}>
-                {chat.id ? `Чат #${chat.id}` : 'Чат'}
-              </Title>
-            </div>
-          </div>
-        }
+        title={`Чат #${chat.id}`}
+        icon={<MessageOutlined />}
+        breadcrumbs={[
+          { title: 'Чаты', path: '/chats' },
+          { title: `Чат #${chat.id}` }
+        ]}
       />
 
-      <Card
-        style={{
-          borderRadius: 16,
-          border: '1px solid #f0f0f0',
-          marginBottom: 24,
-        }}
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar size={48} icon={<MessageOutlined />} style={{ backgroundColor: '#1890ff' }} />
-              <div>
-                <Text strong style={{ fontSize: 18, display: 'block' }}>
-                  Чат #{chat.id}
+      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        {/* Messages area */}
+        <div
+          style={{
+            marginBottom: 24,
+            padding: '24px',
+            background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+            borderRadius: 20,
+            display: 'flex',
+            flexDirection: 'column',
+            maxHeight: 'calc(100vh - 280px)',
+            minHeight: 500,
+          }}
+        >
+          <div
+            ref={messagesEndRef}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16,
+              flex: 1,
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
+          >
+            {chat.messages && chat.messages.items.length > 0 ? (
+              chat.messages.items.map((message: ChatMessage) => {
+            const isUser = isUserMessage(message);
+            return (
+              <div
+                key={message.id}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: isUser ? 'flex-end' : 'flex-start',
+                }}
+              >
+                {/* Sender name */}
+                <Text 
+                  type="secondary" 
+                  style={{ 
+                    fontSize: 12, 
+                    marginBottom: 6,
+                    marginLeft: isUser ? 0 : 16,
+                    marginRight: isUser ? 16 : 0,
+                  }}
+                >
+                  {message.participant_display?.name || 'Участник'}
                 </Text>
-                <Text type="secondary" style={{ fontSize: 14 }}>
-                  Тип: {chat.type}
-                </Text>
-              </div>
-            </div>
-            {chat.unread_count > 0 && (
-              <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
-                {chat.unread_count} непрочитанных
-              </Tag>
-            )}
-          </div>
+                
+                {/* Message bubble */}
+                <div
+                  style={{
+                    maxWidth: '75%',
+                    padding: '14px 18px',
+                    borderRadius: isUser 
+                      ? '20px 20px 4px 20px' 
+                      : '20px 20px 20px 4px',
+                    background: isUser
+                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                      : '#ffffff',
+                    color: isUser ? '#ffffff' : '#0f172a',
+                    boxShadow: isUser
+                      ? '0 4px 12px rgba(37, 99, 235, 0.3)'
+                      : '0 1px 3px rgba(0,0,0,0.08)',
+                    position: 'relative',
+                  }}
+                >
+                  <Paragraph 
+                    style={{ 
+                      margin: 0, 
+                      whiteSpace: 'pre-wrap', 
+                      wordBreak: 'break-word',
+                      fontSize: 15,
+                      lineHeight: 1.5,
+                      color: isUser ? '#ffffff' : '#0f172a',
+                    }}
+                  >
+                    {message.text}
+                  </Paragraph>
+                  
+                  <Text 
+                    style={{ 
+                      fontSize: 11, 
+                      marginTop: 8,
+                      display: 'block',
+                      textAlign: 'right',
+                      color: isUser ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                    }}
+                  >
+                    {formatTimeShort(message.creation_time)}
+                  </Text>
+                </div>
 
-          <Divider style={{ margin: '8px 0' }} />
-
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                Создан
-              </Text>
-              <Text style={{ fontSize: 14 }}>{formatTime(chat.creation_time)}</Text>
-            </div>
-            {chat.last_activity_time && (
-              <div>
-                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                  Последняя активность
-                </Text>
-                <Text style={{ fontSize: 14 }}>{formatTime(chat.last_activity_time)}</Text>
+                {/* Action cards for this message */}
+                {actionsByMessageId.has(message.id) && (
+                  <div style={{ 
+                    marginTop: 8,
+                    maxWidth: '75%',
+                    width: '100%',
+                  }}>
+                    {actionsByMessageId.get(message.id)!.map((action) => (
+                      <ActionCard
+                        key={action.id}
+                        action={action}
+                        chatId={parseInt(chatId || '0', 10)}
+                        onSent={() => {
+                          if (chatId) {
+                            loadChat(parseInt(chatId, 10));
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-            {chat.participants_ids && chat.participants_ids.length > 0 && (
-              <div>
-                <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                  Участников
+              );
+            })
+            ) : (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '60px 20px',
+                  color: '#94a3b8',
+                }}
+              >
+                <MessageOutlined style={{ fontSize: 48, marginBottom: 16, opacity: 0.5 }} />
+                <Text type="secondary" style={{ fontSize: 16, display: 'block' }}>
+                  В этом чате пока нет сообщений
                 </Text>
-                <Text style={{ fontSize: 14 }}>{chat.participants_ids.length}</Text>
               </div>
             )}
           </div>
         </div>
-      </Card>
 
-      {chat.messages && chat.messages.items.length > 0 ? (
-        <Card
-          title={
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <MessageOutlined />
-              <span>Сообщения ({chat.messages.items.length})</span>
-              {chat.messages.has_more && (
-                <Tag color="default" style={{ marginLeft: 8 }}>
-                  Есть еще сообщения
-                </Tag>
-              )}
-            </div>
-          }
+        {/* Message input (fixed inside page, без собственной прокрутки) */}
+        <div
           style={{
+            background: '#ffffff',
             borderRadius: 16,
-            border: '1px solid #f0f0f0',
+            padding: '16px 20px',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+            border: '1px solid #e5e7eb',
           }}
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            {chat.messages.items.map((message: ChatMessage) => (
-              <Card
-                key={message.id}
-                size="small"
-                style={{
-                  borderRadius: 12,
-                  border: '1px solid #f0f0f0',
-                  backgroundColor: message.hidden ? '#fafafa' : '#ffffff',
-                }}
-                bodyStyle={{ padding: 16 }}
-              >
-                <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                  <Avatar
-                    size={40}
-                    icon={
-                      message.participant_display?.is_bot ? (
-                        <UserOutlined />
-                      ) : (
-                        <UserOutlined />
-                      )
-                    }
-                    style={{
-                      backgroundColor: message.participant_display?.is_bot ? '#52c41a' : '#1890ff',
-                    }}
-                  />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                      <Text strong style={{ fontSize: 14 }}>
-                        {message.participant_display?.name || `Участник #${message.participant_id || '?'}`}
-                      </Text>
-                      <Text type="secondary" style={{ fontSize: 12 }}>
-                        {formatTimeShort(message.creation_time)}
-                      </Text>
-                    </div>
-                    {message.hidden && (
-                      <Tag color="default" style={{ marginBottom: 8, fontSize: 11 }}>
-                        Скрыто
-                      </Tag>
-                    )}
-                    <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                      {message.text}
-                    </Paragraph>
-                    {message.workflow_transition && (
-                      <div style={{ marginTop: 8, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          Workflow: {message.workflow_transition.applicant_state}
-                        </Text>
-                      </div>
-                    )}
-                    <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <Text type="secondary" style={{ fontSize: 11 }}>
-                        {formatTime(message.creation_time)}
-                      </Text>
-                      {message.type && (
-                        <Tag color="default" style={{ fontSize: 11 }}>
-                          {message.type}
-                        </Tag>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            ))}
+          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+            <TextArea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              placeholder="Введите сообщение..."
+              autoSize={{ minRows: 1, maxRows: 4 }}
+              onPressEnter={(e) => {
+                if (e.shiftKey) return;
+                e.preventDefault();
+                handleSendMessage();
+              }}
+              disabled={sending}
+              style={{
+                flex: 1,
+                borderRadius: 12,
+                resize: 'none',
+                fontSize: 15,
+              }}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={handleSendMessage}
+              loading={sending}
+              disabled={!messageText.trim()}
+              style={{
+                height: 44,
+                width: 44,
+                borderRadius: 12,
+                background: messageText.trim()
+                  ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                  : undefined,
+                boxShadow: messageText.trim()
+                  ? '0 4px 12px rgba(37, 99, 235, 0.3)'
+                  : undefined,
+              }}
+            />
           </div>
-        </Card>
-      ) : (
-        <Card
-          style={{
-            borderRadius: 16,
-            border: '1px dashed #d9d9d9',
-            textAlign: 'center',
-            padding: '40px 20px',
-          }}
-        >
-          <MessageOutlined style={{ fontSize: 48, color: '#d9d9d9', marginBottom: 16 }} />
-          <Text type="secondary" style={{ fontSize: 16 }}>
-            В этом чате пока нет сообщений
-          </Text>
-        </Card>
-      )}
+        </div>
+      </div>
     </div>
   );
 };
-

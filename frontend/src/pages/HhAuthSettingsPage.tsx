@@ -1,27 +1,29 @@
 import { useEffect, useState } from 'react';
-import { Form, Input, Button, Card, Typography, message, Alert, Space, Steps } from 'antd';
+import { Form, Input, Button, Card, Typography, message, Alert, Space } from 'antd';
 import { 
   SaveOutlined, 
   ReloadOutlined, 
   SettingOutlined,
-  ChromeOutlined,
-  CodeOutlined,
-  CopyOutlined,
+  PhoneOutlined,
+  SafetyOutlined,
   CheckCircleOutlined,
-  LinkOutlined
+  LogoutOutlined,
 } from '@ant-design/icons';
-import { getHhAuth, updateHhAuth } from '../api/hhAuth';
+import { getHhAuth, generateOtp, loginByCode, deleteHhAuth } from '../api/hhAuth';
 import { PageHeader } from '../components/PageHeader';
 import { GradientButton } from '../components/GradientButton';
 
 const { Text, Paragraph } = Typography;
-const { TextArea } = Input;
 
 export const HhAuthSettingsPage = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [step, setStep] = useState<'phone' | 'code'>('phone');
+  const [intermediateCookies, setIntermediateCookies] = useState<Record<string, string> | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
     loadCurrentData();
@@ -32,85 +34,106 @@ export const HhAuthSettingsPage = () => {
     setError(null);
     try {
       const data = await getHhAuth();
+      setIsAuthorized(true);
       form.setFieldsValue({
-        headers: JSON.stringify(data.headers, null, 2),
-        cookies: JSON.stringify(data.cookies, null, 2),
+        phone: '',
+        code: '',
       });
     } catch (err: any) {
       if (err.response?.status === 404) {
+        setIsAuthorized(false);
         setError(null);
       } else {
         setError(err.response?.data?.detail || 'Ошибка при загрузке данных');
+        setIsAuthorized(false);
       }
     } finally {
       setLoadingData(false);
     }
   };
 
-  const validateJson = (_: any, value: string) => {
-    if (!value || value.trim() === '') {
-      return Promise.reject(new Error('Поле обязательно для заполнения'));
-    }
-    try {
-      const parsed = JSON.parse(value);
-      if (typeof parsed !== 'object' || Array.isArray(parsed)) {
-        return Promise.reject(new Error('Должен быть JSON-объект (не массив)'));
-      }
-      for (const [key, val] of Object.entries(parsed)) {
-        if (typeof val !== 'string') {
-          return Promise.reject(
-            new Error(`Значение для ключа "${key}" должно быть строкой`)
-          );
-        }
-      }
-      return Promise.resolve();
-    } catch (e) {
-      return Promise.reject(new Error('Некорректный JSON'));
-    }
-  };
-
-  const onFinish = async (values: { headers: string; cookies: string }) => {
+  const handleGenerateOtp = async (values: { phone: string }) => {
     setLoading(true);
     setError(null);
     try {
-      const headers = JSON.parse(values.headers);
-      const cookies = JSON.parse(values.cookies);
-
-      await updateHhAuth({ headers, cookies });
-      message.success('Данные авторизации успешно сохранены');
-    } catch (err: any) {
-      if (err instanceof SyntaxError) {
-        setError('Ошибка парсинга JSON. Проверьте формат данных.');
-      } else {
-        setError(err.response?.data?.detail || 'Ошибка при сохранении данных');
+      const phone = values.phone.trim();
+      if (!phone.startsWith('+7') || phone.length !== 12) {
+        setError('Номер телефона должен быть в формате +7XXXXXXXXXX');
+        return;
       }
+
+      const response = await generateOtp(phone);
+      setIntermediateCookies(response.cookies);
+      setPhoneNumber(phone);
+      setStep('code');
+      message.success('Код отправлен на ваш телефон');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка при запросе кода';
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const steps = [
-    {
-      title: 'Откройте hh.ru',
-      description: 'Войдите в свой аккаунт HeadHunter',
-      icon: <LinkOutlined />,
-    },
-    {
-      title: 'Откройте DevTools',
-      description: 'Нажмите F12 или Cmd+Option+I',
-      icon: <ChromeOutlined />,
-    },
-    {
-      title: 'Перейдите в Network',
-      description: 'Выберите любой запрос к hh.ru',
-      icon: <CodeOutlined />,
-    },
-    {
-      title: 'Скопируйте данные',
-      description: 'Headers и Cookies из запроса',
-      icon: <CopyOutlined />,
-    },
-  ];
+  const handleLoginByCode = async (values: { code: string }) => {
+    if (!intermediateCookies || !phoneNumber) {
+      setError('Ошибка: промежуточные данные не найдены. Начните заново.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const code = values.code.trim();
+      if (!code || code.length < 4) {
+        setError('Код должен содержать не менее 4 символов');
+        return;
+      }
+
+      await loginByCode(phoneNumber, code, intermediateCookies);
+      setIsAuthorized(true);
+      setStep('phone');
+      setIntermediateCookies(null);
+      setPhoneNumber('');
+      form.resetFields();
+      message.success('Авторизация успешна! Данные сохранены.');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка при входе по коду';
+      setError(errorMessage);
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setStep('phone');
+    setIntermediateCookies(null);
+    setPhoneNumber('');
+    form.resetFields();
+    setError(null);
+  };
+
+  const handleLogout = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteHhAuth();
+      setIsAuthorized(false);
+      setStep('phone');
+      setIntermediateCookies(null);
+      setPhoneNumber('');
+      form.resetFields();
+      message.success('Вы вышли из HeadHunter. Данные авторизации удалены.');
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка при выходе из HeadHunter';
+      setError(errorMessage);
+      message.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div>
@@ -121,7 +144,7 @@ export const HhAuthSettingsPage = () => {
         breadcrumbs={[{ title: 'Настройки HH' }]}
       />
 
-      <div style={{ maxWidth: 900 }}>
+      <div style={{ maxWidth: 600, margin: '0 auto' }}>
         {error && (
           <Alert
             message="Ошибка"
@@ -134,156 +157,142 @@ export const HhAuthSettingsPage = () => {
           />
         )}
 
-        {/* Instructions Card */}
-        <Card
-          bordered={false}
-          style={{
-            borderRadius: 16,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-            marginBottom: 24,
-            background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
-            border: '1px solid #fde047',
-          }}
-        >
-          <div style={{ marginBottom: 20 }}>
-            <Text strong style={{ fontSize: 16, color: '#854d0e' }}>
-              Как получить данные авторизации?
-            </Text>
-          </div>
-          
-          <Steps
-            direction="horizontal"
-            size="small"
-            items={steps.map((step, index) => ({
-              title: <Text style={{ fontSize: 13, fontWeight: 500 }}>{step.title}</Text>,
-              description: <Text type="secondary" style={{ fontSize: 12 }}>{step.description}</Text>,
-              icon: (
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    background: 'white',
-                    borderRadius: 8,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#ca8a04',
-                    fontSize: 14,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                  }}
-                >
-                  {step.icon}
-                </div>
-              ),
-            }))}
-          />
-        </Card>
-
-        {/* Form Card */}
-        <Card
-          bordered={false}
-          style={{
-            borderRadius: 16,
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          }}
-        >
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={onFinish}
-            requiredMark={false}
-            size="large"
-          >
-            <Form.Item
-              name="headers"
-              label={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
-                      borderRadius: 6,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <CodeOutlined style={{ fontSize: 14, color: '#2563eb' }} />
-                  </div>
-                  <span style={{ fontWeight: 500 }}>Headers (JSON)</span>
-                </div>
-              }
-              rules={[{ validator: validateJson }]}
-              tooltip="JSON-объект с заголовками для запросов к HH API"
-            >
-              <TextArea
-                rows={10}
-                placeholder='{"accept": "application/json", "user-agent": "...", ...}'
-                style={{ 
-                  fontFamily: 'Menlo, Monaco, Consolas, monospace', 
-                  fontSize: 13,
-                  borderRadius: 10,
-                  background: '#f8fafc',
-                }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="cookies"
-              label={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div
-                    style={{
-                      width: 28,
-                      height: 28,
-                      background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                      borderRadius: 6,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <CodeOutlined style={{ fontSize: 14, color: '#16a34a' }} />
-                  </div>
-                  <span style={{ fontWeight: 500 }}>Cookies (JSON)</span>
-                </div>
-              }
-              rules={[{ validator: validateJson }]}
-              tooltip="JSON-объект с cookies для запросов к HH API"
-            >
-              <TextArea
-                rows={10}
-                placeholder='{"hhtoken": "...", "hhuid": "...", ...}'
-                style={{ 
-                  fontFamily: 'Menlo, Monaco, Consolas, monospace', 
-                  fontSize: 13,
-                  borderRadius: 10,
-                  background: '#f8fafc',
-                }}
-              />
-            </Form.Item>
-
-            <Form.Item style={{ marginBottom: 0 }}>
-              <Space size="middle">
-                <GradientButton
-                  htmlType="submit"
-                  icon={<SaveOutlined />}
-                  loading={loading}
-                >
-                  Сохранить
-                </GradientButton>
+        {isAuthorized && (
+          <Alert
+            message="Авторизация настроена"
+            description={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Вы успешно авторизованы в HeadHunter. Данные сохранены и готовы к использованию.</span>
                 <Button
-                  icon={<ReloadOutlined />}
-                  onClick={loadCurrentData}
-                  loading={loadingData}
-                  style={{ borderRadius: 10, height: 44 }}
+                  danger
+                  icon={<LogoutOutlined />}
+                  onClick={handleLogout}
+                  loading={loading}
+                  size="small"
+                  style={{ marginLeft: 16 }}
                 >
-                  Загрузить текущие
+                  Выйти из HH
                 </Button>
-              </Space>
-            </Form.Item>
-          </Form>
+              </div>
+            }
+            type="success"
+            showIcon
+            icon={<CheckCircleOutlined />}
+            style={{ marginBottom: 24, borderRadius: 12 }}
+          />
+        )}
+
+        <Card
+          bordered={false}
+          style={{
+            borderRadius: 16,
+            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          }}
+        >
+          {step === 'phone' ? (
+            <div>
+              <div style={{ marginBottom: 24 }}>
+                <Text strong style={{ fontSize: 16 }}>
+                  Вход по номеру телефона
+                </Text>
+                <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                  Введите номер телефона для получения SMS кода
+                </Paragraph>
+              </div>
+
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleGenerateOtp}
+                requiredMark={false}
+                size="large"
+              >
+                <Form.Item
+                  name="phone"
+                  label="Номер телефона"
+                  rules={[
+                    { required: true, message: 'Введите номер телефона' },
+                    {
+                      pattern: /^\+7\d{10}$/,
+                      message: 'Номер должен быть в формате +7XXXXXXXXXX',
+                    },
+                  ]}
+                >
+                  <Input
+                    prefix={<PhoneOutlined />}
+                    placeholder="+7XXXXXXXXXX"
+                    style={{ borderRadius: 10 }}
+                  />
+                </Form.Item>
+
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <GradientButton
+                    htmlType="submit"
+                    icon={<PhoneOutlined />}
+                    loading={loading}
+                    block
+                  >
+                    Запросить код
+                  </GradientButton>
+                </Form.Item>
+              </Form>
+            </div>
+          ) : (
+            <div>
+              <div style={{ marginBottom: 24 }}>
+                <Text strong style={{ fontSize: 16 }}>
+                  Введите код из SMS
+                </Text>
+                <Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                  Код был отправлен на номер {phoneNumber}
+                </Paragraph>
+              </div>
+
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleLoginByCode}
+                requiredMark={false}
+                size="large"
+              >
+                <Form.Item
+                  name="code"
+                  label="Код подтверждения"
+                  rules={[
+                    { required: true, message: 'Введите код из SMS' },
+                    { min: 4, message: 'Код должен содержать не менее 4 символов' },
+                  ]}
+                >
+                  <Input
+                    prefix={<SafetyOutlined />}
+                    placeholder="Введите код"
+                    style={{ borderRadius: 10 }}
+                    maxLength={10}
+                  />
+                </Form.Item>
+
+                <Form.Item style={{ marginBottom: 0 }}>
+                  <Space size="middle" style={{ width: '100%' }}>
+                    <GradientButton
+                      htmlType="submit"
+                      icon={<CheckCircleOutlined />}
+                      loading={loading}
+                      style={{ flex: 1 }}
+                    >
+                      Войти
+                    </GradientButton>
+                    <Button
+                      onClick={handleReset}
+                      disabled={loading}
+                      style={{ borderRadius: 10 }}
+                    >
+                      Назад
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+            </div>
+          )}
         </Card>
       </div>
     </div>

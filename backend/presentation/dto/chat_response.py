@@ -315,3 +315,10 @@ class ChatDetailedResponse(BaseModel):
             block_chat_info=chat.block_chat_info,
         )
 
+
+class SendChatMessageResponse(BaseModel):
+    """DTO для ответа отправки сообщения в чат."""
+
+    success: bool = Field(..., description="Успешно ли отправлено сообщение")
+    data: Optional[Dict[str, Any]] = Field(None, description="Данные ответа API")
+

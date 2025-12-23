@@ -40,6 +40,7 @@ import { FilterSettingsForm } from '../components/FilterSettingsForm';
 import { PageHeader } from '../components/PageHeader';
 import { GradientButton } from '../components/GradientButton';
 import { LimitReachedAlert } from '../components/LimitReachedAlert';
+import { ResumeContent } from '../components/ResumeContent';
 import type { Resume, ResumeFilterSettings, ResumeFilterSettingsUpdate } from '../types/api';
 
 const { Text, Paragraph, Title } = Typography;
@@ -71,6 +72,7 @@ export const ResumeDetailPage = () => {
   const [savingAutoReply, setSavingAutoReply] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
+  const [resumeParamsDirty, setResumeParamsDirty] = useState(false);
   const [initialFilterValues, setInitialFilterValues] = useState<Record<string, unknown> | null>(
     null,
   );
@@ -100,6 +102,7 @@ export const ResumeDetailPage = () => {
       resumeForm.setFieldsValue({
         user_parameters: resumeData.user_parameters || '',
       });
+      setResumeParamsDirty(false);
 
       if (settingsData) {
         filterForm.setFieldsValue({
@@ -158,6 +161,7 @@ export const ResumeDetailPage = () => {
         user_parameters: values.user_parameters?.trim() || null,
       });
       setResume(updated);
+      setResumeParamsDirty(false);
       message.success('Параметры сохранены');
     } catch (err: any) {
       message.error(err.response?.data?.detail || 'Ошибка при сохранении параметров');
@@ -236,6 +240,12 @@ export const ResumeDetailPage = () => {
       return (prev ?? null) !== (curr ?? null);
     });
     setIsDirty(dirty);
+  };
+
+  const handleResumeParamsChange = () => {
+    const current = (resumeForm.getFieldValue('user_parameters') ?? '').trim();
+    const initial = (resume?.user_parameters ?? '').trim();
+    setResumeParamsDirty(current !== initial);
   };
 
 
@@ -317,40 +327,183 @@ export const ResumeDetailPage = () => {
           />
         )}
 
-        <Row gutter={[24, 24]} style={{ alignItems: 'stretch' }}>
-          {/* Left Column: Resume Content */}
-          <Col xs={24} lg={15} xl={16} style={{ display: 'flex' }}>
+        <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
+          <Col xs={24} lg={8}>
             <Card
               bordered={true}
               style={{
                 borderRadius: 20,
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                width: '100%',
+                border: resume?.is_auto_reply 
+                  ? '2px solid #86efac'
+                  : '1px solid #e5e7eb',
+                boxShadow: resume?.is_auto_reply 
+                  ? '0 4px 20px rgba(34, 197, 94, 0.15)'
+                  : '0 2px 8px rgba(0,0,0,0.06)',
+                background: resume?.is_auto_reply 
+                  ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
+                  : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
                 overflow: 'hidden',
+                position: 'relative',
+                height: '100%',
               }}
-              styles={{
-                header: {
-                  borderBottom: '1px solid #f1f5f9',
-                  padding: '20px 24px',
-                },
-                body: {
-                  overflow: 'auto',
-                  flex: 1,
+              styles={{ 
+                body: { 
+                  padding: 24,
                   display: 'flex',
                   flexDirection: 'column',
-                  padding: 24,
-                }
+                  justifyContent: 'space-between',
+                  height: '100%',
+                } 
               }}
-              title={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            >
+              {resume?.is_auto_reply && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: -30,
+                    right: -30,
+                    width: 100,
+                    height: 100,
+                    background: 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%)',
+                    borderRadius: '50%',
+                  }}
+                />
+              )}
+              
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
+                <div style={{ display: 'flex', gap: 16 }}>
                   <div
                     style={{
-                      width: 40,
-                      height: 40,
+                      width: 52,
+                      height: 52,
+                      background: resume?.is_auto_reply 
+                        ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
+                        : 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)',
+                      borderRadius: 14,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: resume?.is_auto_reply 
+                        ? '0 4px 12px rgba(34, 197, 94, 0.35)'
+                        : '0 2px 6px rgba(100, 116, 139, 0.2)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <RobotOutlined style={{ fontSize: 24, color: 'white' }} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <Title level={5} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
+                        Автоотклик
+                      </Title>
+                      {resume?.is_auto_reply && (
+                        <div
+                          style={{
+                            padding: '2px 8px',
+                            background: 'rgba(34, 197, 94, 0.15)',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#16a34a',
+                          }}
+                        >
+                          Активен
+                        </div>
+                      )}
+                    </div>
+                    <Text style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, display: 'block' }}>
+                      {resume?.is_auto_reply 
+                        ? 'Автоматические отклики на подходящие вакансии'
+                        : 'Включите для автоматического отклика'}
+                    </Text>
+                  </div>
+                </div>
+                <Switch
+                  checked={resume?.is_auto_reply || false}
+                  onChange={handleAutoReplyToggle}
+                  loading={savingAutoReply}
+                  disabled={savingAutoReply}
+                  style={{ marginTop: 4, flexShrink: 0 }}
+                />
+              </div>
+
+              {resume?.is_auto_reply && dailyResponses && (
+                <>
+                  <Divider style={{ margin: '20px 0 16px', borderColor: 'rgba(34, 197, 94, 0.2)' }} />
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '12px 14px',
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        borderRadius: 12,
+                        border: '1px solid rgba(34, 197, 94, 0.15)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 16 }} />
+                        <div>
+                          <Text style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', display: 'block', lineHeight: 1 }}>
+                            {dailyResponses.count}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>сегодня</Text>
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        flex: 1,
+                        padding: '12px 14px',
+                        background: 'rgba(255, 255, 255, 0.7)',
+                        borderRadius: 12,
+                        border: '1px solid rgba(34, 197, 94, 0.15)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <ClockCircleOutlined style={{ color: '#64748b', fontSize: 16 }} />
+                        <div>
+                          <Text style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', display: 'block', lineHeight: 1 }}>
+                            {dailyResponses.limit - dailyResponses.count}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: '#64748b' }}>осталось</Text>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </Card>
+          </Col>
+
+          <Col xs={24} lg={8}>
+            <Card
+              bordered={true}
+              style={{ 
+                borderRadius: 20, 
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column'
+              }}
+              styles={{ 
+                header: { 
+                  borderBottom: '1px solid #f1f5f9',
+                  padding: '16px 20px',
+                },
+                body: { 
+                  padding: 20,
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column'
+                } 
+              }}
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
                       background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
                       borderRadius: 10,
                       display: 'flex',
@@ -358,264 +511,53 @@ export const ResumeDetailPage = () => {
                       justifyContent: 'center',
                     }}
                   >
-                    <FileTextOutlined style={{ fontSize: 18, color: '#2563eb' }} />
+                    <ThunderboltOutlined style={{ fontSize: 16, color: '#2563eb' }} />
                   </div>
-                  <div>
-                    <Text strong style={{ fontSize: 16, display: 'block', lineHeight: 1.2 }}>
-                      Содержание резюме
-                    </Text>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      Импортировано из HeadHunter
-                    </Text>
-                  </div>
+                  <Text strong style={{ fontSize: 15 }}>Дополнительные требования</Text>
                 </div>
               }
             >
-              <div
-                style={{
-                  whiteSpace: 'pre-wrap',
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: 14,
-                  padding: 24,
-                  fontSize: 14,
-                  lineHeight: 1.8,
-                  color: '#334155',
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                  maxHeight: 'calc(100vh - 360px)',
-                  margin: 0,
-                  overflow: 'auto',
-                  boxSizing: 'border-box',
-                }}
+              <Form 
+                form={resumeForm} 
+                layout="vertical" 
+                requiredMark={false}
+                onValuesChange={handleResumeParamsChange}
+                style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
               >
-                {resume?.content || 'Текст резюме отсутствует'}
-              </div>
-            </Card>
-          </Col>
-
-          {/* Right Column: Settings & Filters */}
-          <Col xs={24} lg={9} xl={8}>
-            <Space direction="vertical" size={20} style={{ width: '100%' }}>
-              
-              {/* Auto Reply Card - Hero style */}
-              <Card
-                bordered={true}
-                style={{
-                  borderRadius: 20,
-                  border: resume?.is_auto_reply 
-                    ? '2px solid #86efac'
-                    : '1px solid #e5e7eb',
-                  boxShadow: resume?.is_auto_reply 
-                    ? '0 4px 20px rgba(34, 197, 94, 0.15)'
-                    : '0 2px 8px rgba(0,0,0,0.06)',
-                  background: resume?.is_auto_reply 
-                    ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
-                    : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
-                  overflow: 'hidden',
-                  position: 'relative',
-                }}
-                styles={{ body: { padding: 24 } }}
-              >
-                {/* Decorative elements */}
-                {resume?.is_auto_reply && (
-                  <>
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: -30,
-                        right: -30,
-                        width: 100,
-                        height: 100,
-                        background: 'radial-gradient(circle, rgba(34, 197, 94, 0.15) 0%, transparent 70%)',
-                        borderRadius: '50%',
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: 16,
-                        right: 16,
-                        width: 10,
-                        height: 10,
-                        background: '#22c55e',
-                        borderRadius: '50%',
-                        animation: 'pulse 2s infinite',
-                      }}
-                    />
-                  </>
-                )}
-                
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', position: 'relative' }}>
-                  <div style={{ display: 'flex', gap: 16 }}>
-                    <div
-                      style={{
-                        width: 52,
-                        height: 52,
-                        background: resume?.is_auto_reply 
-                          ? 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)'
-                          : 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)',
-                        borderRadius: 14,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: resume?.is_auto_reply 
-                          ? '0 4px 12px rgba(34, 197, 94, 0.35)'
-                          : '0 2px 6px rgba(100, 116, 139, 0.2)',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <RobotOutlined style={{ fontSize: 24, color: 'white' }} />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <Title level={5} style={{ margin: 0, fontWeight: 700, color: '#0f172a' }}>
-                          Автоотклик
-                        </Title>
-                        {resume?.is_auto_reply && (
-                          <div
-                            style={{
-                              padding: '2px 8px',
-                              background: 'rgba(34, 197, 94, 0.15)',
-                              borderRadius: 12,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              color: '#16a34a',
-                            }}
-                          >
-                            Активен
-                          </div>
-                        )}
-                      </div>
-                      <Text style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5, display: 'block' }}>
-                        {resume?.is_auto_reply 
-                          ? 'Автоматические отклики на подходящие вакансии'
-                          : 'Включите для автоматического отклика'}
-                      </Text>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={resume?.is_auto_reply || false}
-                    onChange={handleAutoReplyToggle}
-                    loading={savingAutoReply}
-                    disabled={savingAutoReply}
-                    style={{ marginTop: 4, flexShrink: 0 }}
-                  />
-                </div>
-
-                {/* Stats row when active */}
-                {resume?.is_auto_reply && dailyResponses && (
-                  <>
-                    <Divider style={{ margin: '20px 0 16px', borderColor: 'rgba(34, 197, 94, 0.2)' }} />
-                    <div style={{ display: 'flex', gap: 12 }}>
-                      <div
-                        style={{
-                          flex: 1,
-                          padding: '12px 14px',
-                          background: 'rgba(255, 255, 255, 0.7)',
-                          borderRadius: 12,
-                          border: '1px solid rgba(34, 197, 94, 0.15)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 16 }} />
-                          <div>
-                            <Text style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', display: 'block', lineHeight: 1 }}>
-                              {dailyResponses.count}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#64748b' }}>сегодня</Text>
-                          </div>
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          flex: 1,
-                          padding: '12px 14px',
-                          background: 'rgba(255, 255, 255, 0.7)',
-                          borderRadius: 12,
-                          border: '1px solid rgba(34, 197, 94, 0.15)',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <ClockCircleOutlined style={{ color: '#64748b', fontSize: 16 }} />
-                          <div>
-                            <Text style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', display: 'block', lineHeight: 1 }}>
-                              {dailyResponses.limit - dailyResponses.count}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#64748b' }}>осталось</Text>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </Card>
-
-              {/* User Parameters */}
-              <Card
-                bordered={true}
-                style={{ 
-                  borderRadius: 20, 
-                  border: '1px solid #e5e7eb',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                }}
-                styles={{ 
-                  header: { 
-                    borderBottom: '1px solid #f1f5f9',
-                    padding: '16px 20px',
-                  },
-                  body: { padding: 20 } 
-                }}
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-                        borderRadius: 10,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <ThunderboltOutlined style={{ fontSize: 16, color: '#d97706' }} />
-                    </div>
-                    <Text strong style={{ fontSize: 15 }}>Дополнительные требования</Text>
-                    <Tooltip
-                      title={
-                        <div>
-                          <div style={{ marginBottom: 8 }}>
-                            Укажите специфичные требования к вакансиям.
-                          </div>
-                          <div><strong>Примеры:</strong></div>
-                          <div>• Только удаленка, без гибрида</div>
-                          <div>• Без тестовых заданий</div>
-                          <div>• Без легаси кода</div>
-                        </div>
-                      }
-                    >
-                      <QuestionCircleOutlined style={{ color: '#94a3b8', cursor: 'help', marginLeft: 'auto' }} />
-                    </Tooltip>
-                  </div>
-                }
-              >
-                <Form form={resumeForm} layout="vertical" requiredMark={false}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <Form.Item
                     name="user_parameters"
-                    style={{ marginBottom: 16 }}
+                    style={{ marginBottom: 12, flex: 1 }}
                   >
                     <Input.TextArea
-                      rows={3}
                       placeholder="Например: Только удаленка, без легаси кода..."
                       style={{ 
                         borderRadius: 12, 
                         resize: 'none',
                         border: '1px solid #e5e7eb',
+                        height: '100%',
+                        minHeight: 200
                       }}
                       maxLength={500}
                       showCount
                     />
                   </Form.Item>
+                  
+                  {!resumeParamsDirty && (
+                    <div style={{ marginTop: 'auto', paddingTop: 12 }}>
+                      <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 4 }}>
+                        Примеры:
+                      </Text>
+                      <ul style={{ margin: 0, paddingLeft: 20, fontSize: 12, color: '#94a3b8' }}>
+                        <li>Только удаленка, без гибрида</li>
+                        <li>Без тестовых заданий</li>
+                        <li>Без легаси кода</li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {resumeParamsDirty && (
                   <Button
                     type="primary"
                     block
@@ -624,91 +566,103 @@ export const ResumeDetailPage = () => {
                     style={{ 
                       borderRadius: 12, 
                       height: 42,
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       border: 'none',
                       fontWeight: 600,
+                      marginTop: 24,
                     }}
                   >
                     Сохранить требования
                   </Button>
-                </Form>
-              </Card>
+                )}
+              </Form>
+            </Card>
+          </Col>
 
-              {/* Filters */}
-              <Card
-                bordered={true}
-                style={{ 
-                  borderRadius: 20, 
-                  border: '1px solid #e5e7eb',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                }}
-                styles={{ 
-                  header: { 
-                    borderBottom: '1px solid #f1f5f9',
-                    padding: '16px 20px',
-                  },
-                  body: { padding: 20 } 
-                }}
-                title={
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        background: 'linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%)',
-                        borderRadius: 10,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <SettingOutlined style={{ fontSize: 16, color: '#9333ea' }} />
-                    </div>
-                    <Text strong style={{ fontSize: 15 }}>Настройки поиска</Text>
+          <Col xs={24} lg={8}>
+            <Card
+              bordered={true}
+              style={{ 
+                borderRadius: 20, 
+                border: '1px solid #e5e7eb',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                height: '100%',
+              }}
+              styles={{ 
+                header: { 
+                  borderBottom: '1px solid #f1f5f9',
+                  padding: '16px 20px',
+                },
+                body: { padding: 20 } 
+              }}
+              title={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div
+                    style={{
+                      width: 36,
+                      height: 36,
+                      background: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+                      borderRadius: 10,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <SettingOutlined style={{ fontSize: 16, color: '#2563eb' }} />
                   </div>
-                }
+                  <Text strong style={{ fontSize: 15 }}>Настройки поиска</Text>
+                </div>
+              }
+            >
+              <Form
+                form={filterForm}
+                layout="vertical"
+                onValuesChange={handleFilterValuesChange}
+                initialValues={{
+                  only_with_salary: false,
+                  ...filterSettings,
+                }}
               >
-                <Form
+                <FilterSettingsForm
                   form={filterForm}
-                  layout="vertical"
+                  initialValues={filterSettings}
+                  areasTree={areasTree}
+                  loading={savingFilters}
+                  isDirty={isDirty}
+                  onSave={handleFilterSave}
+                  onSuggest={handleFilterSuggest}
                   onValuesChange={handleFilterValuesChange}
-                  initialValues={{
-                    only_with_salary: false,
-                    ...filterSettings,
-                  }}
-                >
-                  <FilterSettingsForm
-                    form={filterForm}
-                    initialValues={filterSettings}
-                    areasTree={areasTree}
-                    loading={savingFilters}
-                    isDirty={isDirty}
-                    onSave={handleFilterSave}
-                    onSuggest={handleFilterSuggest}
-                    onValuesChange={handleFilterValuesChange}
-                  />
-                </Form>
-              </Card>
+                />
+              </Form>
+            </Card>
+          </Col>
+        </Row>
 
-            </Space>
+        <Row gutter={[24, 24]}>
+          <Col xs={24}>
+            <div
+              style={{
+                background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                border: '1px solid #e2e8f0',
+                borderRadius: 14,
+                padding: 24,
+                fontSize: 14,
+                lineHeight: 1.8,
+                color: '#334155',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+                margin: 0,
+                boxSizing: 'border-box',
+              }}
+            >
+              {resume?.content ? (
+                <ResumeContent content={resume.content} />
+              ) : (
+                <Text type="secondary">Текст резюме отсутствует</Text>
+              )}
+            </div>
           </Col>
         </Row>
       </div>
-      
-      {/* CSS for pulse animation */}
-      <style>{`
-        @keyframes pulse {
-          0% {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4);
-          }
-          70% {
-            box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
-          }
-          100% {
-            box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
-          }
-        }
-      `}</style>
     </div>
   );
 };

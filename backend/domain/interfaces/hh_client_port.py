@@ -9,6 +9,7 @@ from domain.entities.hh_resume import HHResume
 from domain.entities.hh_resume_detailed import HHResumeDetailed
 from domain.entities.vacancy_detail import VacancyDetail
 from domain.entities.vacancy_list import VacancyList
+from domain.entities.vacancy_test import VacancyTest
 
 
 class HHClientPort(ABC):
@@ -104,6 +105,31 @@ class HHClientPort(ABC):
         """
 
     @abstractmethod
+    async def get_vacancy_test(
+        self,
+        vacancy_id: int,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        return_cookies: bool = False,
+    ) -> Union[Optional[VacancyTest], tuple[Optional[VacancyTest], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Получить тест вакансии по /applicant/vacancy_response.
+        
+        Возвращает None, если тест отсутствует или не удалось распарсить HTML.
+        
+        Args:
+            vacancy_id: ID вакансии.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            internal_api_base_url: Базовый URL внутреннего API.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Optional[VacancyTest] или tuple[Optional[VacancyTest], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
     async def respond_to_vacancy(
         self,
         vacancy_id: int,
@@ -121,6 +147,8 @@ class HHClientPort(ABC):
         without_test: str = "no",
         hhtm_from_label: str = "",
         hhtm_source_label: str = "",
+        test_answers: Dict[str, str | List[str]] | None = None,
+        test_metadata: Dict[str, str] | None = None,
         return_cookies: bool = False,
     ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
         """Откликнуться на вакансию по /applicant/vacancy_response/popup.
@@ -140,6 +168,8 @@ class HHClientPort(ABC):
             without_test: Без теста.
             hhtm_from_label: Метка источника.
             hhtm_source_label: Метка источника.
+            test_answers: Ответы на вопросы теста (ключ - field_name, например "task_291683492_text", значение - ответ).
+            test_metadata: Метаданные теста (uidPk, guid, startTime, testRequired).
             return_cookies: Если True, возвращает tuple (result, updated_cookies).
         
         Returns:
@@ -261,6 +291,122 @@ class HHClientPort(ABC):
             cookies: HTTP cookies для запроса.
             internal_api_base_url: Базовый URL внутреннего API.
             undirectable: Не перенаправлять.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def generate_otp(
+        self,
+        phone: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        login_trust_flags: Optional[str] = None,
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Запросить код OTP на телефон по /account/otp_generate.
+        
+        Args:
+            phone: Номер телефона в формате +7XXXXXXXXXX.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            internal_api_base_url: Базовый URL внутреннего API.
+            login_trust_flags: Флаги доверия логина.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def login_by_code(
+        self,
+        phone: str,
+        code: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        backurl: str = "",
+        remember: bool = True,
+        login_trust_flags: Optional[str] = None,
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Войти по коду OTP и получить cookies по /account/login/by_code.
+        
+        Args:
+            phone: Номер телефона в формате +7XXXXXXXXXX.
+            code: Код OTP из SMS.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            internal_api_base_url: Базовый URL внутреннего API.
+            backurl: URL для редиректа после входа.
+            remember: Запомнить пользователя.
+            login_trust_flags: Флаги доверия логина.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def send_chat_message(
+        self,
+        chat_id: int,
+        text: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        chatik_api_base_url: str = "https://chatik.hh.ru",
+        idempotency_key: Optional[str] = None,
+        hhtm_source: str = "app",
+        hhtm_source_label: str = "chat",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Отправить сообщение в чат по /chatik/api/send.
+        
+        Args:
+            chat_id: ID чата.
+            text: Текст сообщения для отправки.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            chatik_api_base_url: Базовый URL Chatik API.
+            idempotency_key: Ключ идемпотентности. Если не указан, будет сгенерирован автоматически.
+            hhtm_source: Источник запроса (по умолчанию "app").
+            hhtm_source_label: Метка источника (по умолчанию "chat").
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def mark_chat_message_read(
+        self,
+        chat_id: int,
+        message_id: int,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        chatik_api_base_url: str = "https://chatik.hh.ru",
+        hhtm_source: str = "app",
+        hhtm_source_label: str = "negotiation_list",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Пометить сообщение в чате как прочитанное по /chatik/api/mark_read.
+        
+        Args:
+            chat_id: ID чата.
+            message_id: ID сообщения для пометки как прочитанного.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            chatik_api_base_url: Базовый URL Chatik API.
+            hhtm_source: Источник запроса (по умолчанию "app").
+            hhtm_source_label: Метка источника (по умолчанию "negotiation_list").
             return_cookies: Если True, возвращает tuple (result, updated_cookies).
         
         Returns:

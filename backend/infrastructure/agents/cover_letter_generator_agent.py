@@ -33,12 +33,18 @@ class CoverLetterGeneratorAgent(CoverLetterGeneratorPort):
             )
         self._client = client
 
-    async def generate(self, resume: str, vacancy_description: str) -> str:
+    async def generate(
+        self,
+        resume: str,
+        vacancy_description: str,
+        user_params: str | None = None,
+    ) -> str:
         """Сгенерировать сопроводительное письмо для вакансии.
 
         Args:
             resume: Текст резюме кандидата.
             vacancy_description: Описание вакансии (название, требования, обязанности).
+            user_params: Дополнительные требования/предпочтения пользователя (опционально).
 
         Returns:
             Текст сопроводительного письма на русском языке.
@@ -47,7 +53,7 @@ class CoverLetterGeneratorAgent(CoverLetterGeneratorPort):
             return ""
 
         try:
-            prompt = self._build_prompt(resume, vacancy_description)
+            prompt = self._build_prompt(resume, vacancy_description, user_params)
             print(
                 f"[ai] генерирую сопроводительное письмо model={self._config.model}",
                 flush=True,
@@ -119,7 +125,12 @@ class CoverLetterGeneratorAgent(CoverLetterGeneratorPort):
             print(f"[ai] ошибка при генерации сопроводительного письма: {exc}", flush=True)
             return ""
 
-    def _build_prompt(self, resume: str, vacancy_description: str) -> str:
+    def _build_prompt(
+        self,
+        resume: str,
+        vacancy_description: str,
+        user_params: str | None = None,
+    ) -> str:
         """Формирует текстовый промпт с информацией о вакансии и резюме."""
 
         lines: list[str] = []
@@ -129,6 +140,17 @@ class CoverLetterGeneratorAgent(CoverLetterGeneratorPort):
         lines.append("ВАКАНСИЯ:")
         lines.append(vacancy_description.strip())
         lines.append("")
+        
+        # Добавляем дополнительные требования пользователя, если есть
+        if user_params and user_params.strip():
+            lines.append("ДОПОЛНИТЕЛЬНЫЕ ТРЕБОВАНИЯ/ПРЕДПОЧТЕНИЯ:")
+            lines.append(user_params.strip())
+            lines.append("")
+            lines.append(
+                "Учитывай эти требования при генерации письма. "
+                "Если они релевантны, можно кратко упомянуть их в письме."
+            )
+            lines.append("")
         lines.append(
             "Напиши КОРОТКОЕ сопроводительное письмо (100-150 слов, один абзац) для этой вакансии. "
             "ОБЯЗАТЕЛЬНО:"

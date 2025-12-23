@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import AsyncGenerator, Dict
+from typing import TYPE_CHECKING, AsyncGenerator, Dict
 
 from fastapi import Depends, HTTPException
 
@@ -17,11 +17,16 @@ from application.services.filter_settings_generation_service import (
 )
 from application.services.vacancies_service import VacanciesService
 from application.services.vacancy_responses_service import VacancyResponsesService
+
+if TYPE_CHECKING:
+    from application.services.agent_action_service import AgentActionService
 from config import AppConfig, load_config
 from domain.entities.user import User
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from domain.use_cases.fetch_chat_detail import FetchChatDetailUseCase
 from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
+from domain.use_cases.list_agent_actions import ListAgentActionsUseCase
+from domain.use_cases.send_chat_message import SendChatMessageUseCase
 from domain.use_cases.generate_user_filter_settings import GenerateUserFilterSettingsUseCase
 from domain.use_cases.get_areas import GetAreasUseCase
 from infrastructure.auth.fastapi_users_setup import get_current_active_user
@@ -196,6 +201,26 @@ async def get_vacancy_responses_service(
 
 
 @lru_cache()
+def get_hh_auth_service():
+    """Создает и возвращает HhAuthService.
+
+    Returns:
+        Инстанс HhAuthService с настроенными зависимостями.
+    """
+    from application.services.hh_auth_service import HhAuthService
+    from domain.interfaces.hh_auth_service_port import HhAuthServicePort
+    from infrastructure.clients.hh_client import HHHttpClient
+
+    config = get_config()
+    hh_client = HHHttpClient(base_url=config.hh.base_url)
+    service: HhAuthServicePort = HhAuthService(
+        hh_client=hh_client,
+        login_trust_flags_public_key=config.hh.login_trust_flags_public_key,
+    )
+    return service
+
+
+@lru_cache()
 def get_fetch_user_chats_uc() -> FetchUserChatsUseCase:
     """Создает и возвращает FetchUserChatsUseCase (кешируется).
 
@@ -217,4 +242,53 @@ def get_fetch_chat_detail_uc() -> FetchChatDetailUseCase:
     config = get_config()
     hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
     return FetchChatDetailUseCase(hh_client)
+
+
+@lru_cache()
+def get_send_chat_message_uc() -> SendChatMessageUseCase:
+    """Создает и возвращает SendChatMessageUseCase (кешируется).
+
+    Returns:
+        Инстанс SendChatMessageUseCase с настроенными зависимостями.
+    """
+    config = get_config()
+    hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
+    return SendChatMessageUseCase(hh_client)
+
+
+async def get_list_agent_actions_uc(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> ListAgentActionsUseCase:
+    """Создает и возвращает ListAgentActionsUseCase.
+
+    Args:
+        unit_of_work: UnitOfWork для работы с репозиториями.
+
+    Returns:
+        Инстанс ListAgentActionsUseCase с настроенными зависимостями.
+    """
+    return ListAgentActionsUseCase(unit_of_work.agent_action_repository)
+
+
+async def get_agent_action_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+    send_chat_message_uc: SendChatMessageUseCase = Depends(get_send_chat_message_uc),
+) -> AgentActionService:
+    """Создает и возвращает AgentActionService.
+
+    Args:
+        unit_of_work: UnitOfWork для работы с репозиториями.
+        send_chat_message_uc: Use case для отправки сообщений в чат.
+
+    Returns:
+        Инстанс AgentActionService с настроенными зависимостями.
+    """
+    from application.services.agent_action_service import AgentActionService
+    from domain.interfaces.agent_action_service_port import AgentActionServicePort
+
+    service: AgentActionServicePort = AgentActionService(
+        unit_of_work=unit_of_work,
+        send_chat_message_uc=send_chat_message_uc,
+    )
+    return service
 

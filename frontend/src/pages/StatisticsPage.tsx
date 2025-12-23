@@ -104,7 +104,7 @@ export const StatisticsPage = () => {
                     backgroundColor: '#ffffff',
                     border: '1px solid #e5e7eb',
                     borderRadius: 8,
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                   }}
                   labelStyle={{ color: '#0f172a', fontWeight: 600 }}
                   formatter={(value: number) => [`${value} откликов`, 'Количество']}

@@ -11,6 +11,7 @@ import { PlansPage } from './pages/PlansPage';
 import { StatisticsPage } from './pages/StatisticsPage';
 import { ChatsListPage } from './pages/ChatsListPage';
 import { ChatDetailPage } from './pages/ChatDetailPage';
+import { EventsPage } from './pages/EventsPage';
 import { MainLayout } from './components/Layout/MainLayout';
 import { ProtectedRoute } from './components/Layout/ProtectedRoute';
 import { useAuthStore } from './stores/authStore';
@@ -100,6 +101,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <StatisticsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <EventsPage />
               </MainLayout>
             </ProtectedRoute>
           }

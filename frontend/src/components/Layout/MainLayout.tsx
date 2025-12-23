@@ -1,22 +1,20 @@
-import { Layout, Menu, Typography, message, Button } from 'antd';
+import { Layout, Menu, Button } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileTextOutlined,
   LogoutOutlined,
   SettingOutlined,
   UserOutlined,
-  SearchOutlined,
   CalendarOutlined,
   MessageOutlined,
-  RocketOutlined,
   SendOutlined,
   BarChartOutlined,
   CrownOutlined,
-} from '@ant-design/icons';
+  } from '@ant-design/icons';
 import { useAuthStore } from '../../stores/authStore';
+import { Logo } from '../Logo';
 
-const { Sider, Content, Footer } = Layout;
-const { Title, Text } = Typography;
+const { Sider, Content } = Layout;
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -99,7 +97,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       return;
     }
     if (key === 'events') {
-      message.info('Раздел находится в разработке');
+      navigate('/events');
       return;
     }
     if (key === 'chats') {
@@ -132,35 +130,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       >
         <div
           style={{
-            padding: '28px 24px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 12,
+            padding: '16px 20px',
             marginBottom: 8,
           }}
         >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
-            }}
-          >
-            <RocketOutlined style={{ color: 'white', fontSize: 22 }} />
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <Title level={4} style={{ margin: 0, color: '#0f172a', fontSize: 22, fontWeight: 700, lineHeight: 1 }}>
-              EzJob
-            </Title>
-            <Text type="secondary" style={{ fontSize: 11, fontWeight: 500, letterSpacing: 0.5 }}>
-              Твой легкий оффер
-            </Text>
-          </div>
+          <Logo />
         </div>
 
         <div
@@ -172,7 +146,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         >
           <Menu
             mode="inline"
-            selectedKeys={[location.pathname === '/statistics' ? 'statistics' : location.pathname]}
+            selectedKeys={[
+              location.pathname === '/statistics' ? 'statistics' : 
+              location.pathname === '/events' ? 'events' : 
+              location.pathname
+            ]}
             items={menuItems}
             onClick={handleMenuClick}
             style={{
@@ -198,13 +176,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           </div>
         </div>
       </Sider>
-      <Layout style={{ marginLeft: 260 }}>
-        <Content style={{ padding: '32px 32px', maxWidth: '1400px', margin: '0 auto', width: '100%' }}>
+      <Layout style={{ marginLeft: 260, background: '#fafbfc' }}>
+        <Content style={{ padding: '32px 32px', width: '100%' }}>
           {children}
         </Content>
-        <Footer style={{ textAlign: 'center', background: 'transparent', color: '#94a3b8', fontSize: 13 }}>
-          EzJob AI Assistant ©2025
-        </Footer>
       </Layout>
     </Layout>
   );

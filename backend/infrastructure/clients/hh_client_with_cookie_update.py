@@ -12,6 +12,7 @@ from domain.entities.hh_resume import HHResume
 from domain.entities.hh_resume_detailed import HHResumeDetailed
 from domain.entities.vacancy_detail import VacancyDetail
 from domain.entities.vacancy_list import VacancyList
+from domain.entities.vacancy_test import VacancyTest
 from domain.interfaces.hh_client_port import HHClientPort
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 from loguru import logger
@@ -132,6 +133,27 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             return result, updated_cookies
         return result
 
+    async def get_vacancy_test(
+        self,
+        vacancy_id: int,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        return_cookies: bool = False,
+    ) -> Optional[VacancyTest] | tuple[Optional[VacancyTest], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.get_vacancy_test(
+            vacancy_id,
+            headers,
+            cookies,
+            internal_api_base_url=internal_api_base_url,
+            return_cookies=True,
+        )
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
     async def respond_to_vacancy(
         self,
         vacancy_id: int,
@@ -149,6 +171,8 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         without_test: str = "no",
         hhtm_from_label: str = "",
         hhtm_source_label: str = "",
+        test_answers: Dict[str, str | List[str]] | None = None,
+        test_metadata: Dict[str, str] | None = None,
         return_cookies: bool = False,
     ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
         result, updated_cookies = await self._hh_client.respond_to_vacancy(
@@ -166,6 +190,8 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             without_test=without_test,
             hhtm_from_label=hhtm_from_label,
             hhtm_source_label=hhtm_source_label,
+            test_answers=test_answers,
+            test_metadata=test_metadata,
             return_cookies=True,
         )
         await self._update_cookies(updated_cookies)
@@ -257,6 +283,114 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             cookies,
             internal_api_base_url=internal_api_base_url,
             undirectable=undirectable,
+            return_cookies=True,
+        )
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def generate_otp(
+        self,
+        phone: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        login_trust_flags: Optional[str] = None,
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.generate_otp(
+            phone,
+            headers,
+            cookies,
+            internal_api_base_url=internal_api_base_url,
+            login_trust_flags=login_trust_flags,
+            return_cookies=True,
+        )
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def login_by_code(
+        self,
+        phone: str,
+        code: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        backurl: str = "",
+        remember: bool = True,
+        login_trust_flags: Optional[str] = None,
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.login_by_code(
+            phone,
+            code,
+            headers,
+            cookies,
+            internal_api_base_url=internal_api_base_url,
+            backurl=backurl,
+            remember=remember,
+            login_trust_flags=login_trust_flags,
+            return_cookies=True,
+        )
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def send_chat_message(
+        self,
+        chat_id: int,
+        text: str,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        chatik_api_base_url: str = "https://chatik.hh.ru",
+        idempotency_key: Optional[str] = None,
+        hhtm_source: str = "app",
+        hhtm_source_label: str = "chat",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.send_chat_message(
+            chat_id,
+            text,
+            headers,
+            cookies,
+            chatik_api_base_url=chatik_api_base_url,
+            idempotency_key=idempotency_key,
+            hhtm_source=hhtm_source,
+            hhtm_source_label=hhtm_source_label,
+            return_cookies=True,
+        )
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def mark_chat_message_read(
+        self,
+        chat_id: int,
+        message_id: int,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        chatik_api_base_url: str = "https://chatik.hh.ru",
+        hhtm_source: str = "app",
+        hhtm_source_label: str = "negotiation_list",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.mark_chat_message_read(
+            chat_id,
+            message_id,
+            headers,
+            cookies,
+            chatik_api_base_url=chatik_api_base_url,
+            hhtm_source=hhtm_source,
+            hhtm_source_label=hhtm_source_label,
             return_cookies=True,
         )
         await self._update_cookies(updated_cookies)

@@ -150,7 +150,7 @@ export const RegisterPage = () => {
               <RocketOutlined style={{ color: 'white', fontSize: 18 }} />
             </div>
             <Title level={4} style={{ margin: 0, color: '#0f172a', fontWeight: 700, lineHeight: 1 }}>
-              EzJob
+              AutoOffer
             </Title>
           </div>
 

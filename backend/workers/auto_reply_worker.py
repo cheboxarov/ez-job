@@ -17,10 +17,12 @@ sys.path.insert(0, str(backend_dir))
 
 from config import AppConfig, load_config
 from domain.use_cases.create_vacancy_response import CreateVacancyResponseUseCase
+from domain.use_cases.generate_test_answers import GenerateTestAnswersUseCase
 from domain.use_cases.process_auto_replies import ProcessAutoRepliesUseCase
 from domain.use_cases.respond_to_vacancy import RespondToVacancyUseCase
 from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
 from infrastructure.agents.cover_letter_generator_agent import CoverLetterGeneratorAgent
+from infrastructure.agents.vacancy_test_agent import VacancyTestAgent
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
 from application.factories.database_factory import create_unit_of_work
 from application.factories.search_and_get_filtered_vacancy_list_factory import (
@@ -76,6 +78,10 @@ async def run_worker(config: AppConfig) -> None:
 
     cover_letter_generator = CoverLetterGeneratorAgent(config.openai)
 
+    # Создаем агента для генерации ответов на тесты вакансий
+    vacancy_test_agent = VacancyTestAgent(config.openai)
+    generate_test_answers_uc = GenerateTestAnswersUseCase(vacancy_test_agent)
+
     # Словарь для отслеживания активных задач по resume_id
     active_tasks: Dict[UUID, asyncio.Task] = {}
 
@@ -100,6 +106,8 @@ async def run_worker(config: AppConfig) -> None:
                     cover_letter_generator=cover_letter_generator,
                     create_unit_of_work_factory=lambda: create_unit_of_work(config.database),
                     respond_to_vacancy_uc=respond_to_vacancy_uc,
+                    hh_client=hh_client,
+                    generate_test_answers_uc=generate_test_answers_uc,
                     max_vacancies_per_resume=200,
                     delay_between_replies_seconds=30,
                 )

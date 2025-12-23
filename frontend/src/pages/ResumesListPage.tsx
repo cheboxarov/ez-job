@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Button, Typography, Spin, Alert, Modal, message, Tag } from 'antd';
+import { Card, Typography, Alert, Modal, Tag } from 'antd';
 import { 
   FileTextOutlined, 
-  DownloadOutlined, 
   RobotOutlined, 
   CheckCircleOutlined,
   ArrowRightOutlined,
@@ -13,7 +12,6 @@ import { listResumes, importResumesFromHH } from '../api/resumes';
 import { getDailyResponses } from '../api/subscription';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import { GradientButton } from '../components/GradientButton';
 import { LimitReachedAlert } from '../components/LimitReachedAlert';
 import type { Resume } from '../types/api';
 
@@ -22,26 +20,31 @@ const { Text } = Typography;
 export const ResumesListPage = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState<Resume[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
   const [dailyResponses, setDailyResponses] = useState<{ count: number; limit: number } | null>(null);
 
   useEffect(() => {
-    loadResumes();
-    loadDailyResponses();
+    const initializePage = async () => {
+      // Сначала загружаем резюме
+      await loadResumes();
+      // Затем импортируем из HH
+      await importFromHH();
+      // И снова загружаем резюме
+      await loadResumes();
+      // Загружаем лимиты
+      await loadDailyResponses();
+    };
+    
+    initializePage();
   }, []);
 
   const loadResumes = async () => {
-    setLoading(true);
     setError(null);
     try {
       const response = await listResumes();
       setResumes(response.items);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Ошибка при загрузке резюме');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -55,44 +58,24 @@ export const ResumesListPage = () => {
     }
   };
 
+  const importFromHH = async () => {
+    try {
+      await importResumesFromHH();
+    } catch (err: any) {
+      const errorMessage = err.response?.data?.detail || 'Ошибка при импорте резюме из HeadHunter';
+      if (err.response?.status === 400 && errorMessage.includes('HH auth data')) {
+        // Тихо игнорируем ошибку отсутствия авторизации
+        return;
+      }
+      // Тихо игнорируем другие ошибки импорта
+    }
+  };
+
   const getResumePreview = (content: string) => {
     const maxLength = 180;
     if (content.length <= maxLength) return content;
     return content.substring(0, maxLength) + '...';
   };
-
-  const handleImportFromHH = async () => {
-    setImporting(true);
-    setError(null);
-    try {
-      const response = await importResumesFromHH();
-      message.success(`Успешно импортировано ${response.count} резюме из HeadHunter`);
-      await loadResumes();
-    } catch (err: any) {
-      const errorMessage = err.response?.data?.detail || 'Ошибка при импорте резюме из HeadHunter';
-      if (err.response?.status === 400 && errorMessage.includes('HH auth data')) {
-        Modal.warning({
-          title: 'Не настроена авторизация HeadHunter',
-          content: 'Для импорта резюме необходимо настроить авторизацию HeadHunter в настройках.',
-          okText: 'Перейти в настройки',
-          onOk: () => navigate('/settings/hh-auth'),
-        });
-      } else {
-        message.error(errorMessage);
-        setError(errorMessage);
-      }
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  if (loading && resumes.length === 0) {
-    return (
-      <div style={{ textAlign: 'center', padding: '100px 0' }}>
-        <Spin size="large" tip="Загрузка резюме..." />
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -101,17 +84,6 @@ export const ResumesListPage = () => {
         subtitle="Управляйте своими резюме и настройками автооткликов"
         icon={<FileTextOutlined />}
         breadcrumbs={[{ title: 'Мои резюме' }]}
-        actions={
-          <Button
-            icon={<DownloadOutlined />}
-            size="large"
-            loading={importing}
-            onClick={handleImportFromHH}
-            style={{ borderRadius: 10, height: 44 }}
-          >
-            Импорт из HeadHunter
-          </Button>
-        }
       />
 
       {error && (
@@ -136,20 +108,11 @@ export const ResumesListPage = () => {
           />
         )}
 
-        {!loading && resumes.length === 0 && (
+        {resumes.length === 0 && (
         <EmptyState
           icon={<FileTextOutlined />}
           title="У вас пока нет резюме"
-          description="Импортируйте резюме из HeadHunter, чтобы начать получать автоматические отклики на подходящие вакансии"
-          action={
-            <GradientButton
-              icon={<DownloadOutlined />}
-              loading={importing}
-              onClick={handleImportFromHH}
-            >
-              Импортировать из HeadHunter
-            </GradientButton>
-          }
+          description="Резюме будут автоматически импортированы из HeadHunter при наличии настроенной авторизации"
         />
       )}
 

@@ -34,6 +34,8 @@ export const PageHeader = ({
   return (
     <div
       style={{
+        width: '100%',
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         gap: 16,

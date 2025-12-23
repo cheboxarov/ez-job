@@ -150,7 +150,7 @@ export const ProfilePage = () => {
                 overflow: 'hidden',
                 marginBottom: 24,
                 border: '1px solid #e5e7eb',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
               }}
               styles={{ body: { padding: 0 } }}
             >
@@ -225,7 +225,7 @@ export const ProfilePage = () => {
                     </div>
                     <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 16 }}>
                       <MailOutlined style={{ marginRight: 8 }} />
-                      Пользователь EzJob
+                      Пользователь AutoOffer
                     </Text>
                   </Col>
                 </Row>

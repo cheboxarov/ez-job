@@ -43,6 +43,8 @@ class AgentActionRepository(AgentActionRepositoryPort):
             entity_type=action.entity_type,
             entity_id=action.entity_id,
             created_by=action.created_by,
+            user_id=action.user_id,
+            resume_hash=action.resume_hash,
             data=action.data,
         )
         self._session.add(model)
@@ -104,6 +106,8 @@ class AgentActionRepository(AgentActionRepositoryPort):
             entity_type=model.entity_type,
             entity_id=model.entity_id,
             created_by=model.created_by,
+            user_id=model.user_id,
+            resume_hash=model.resume_hash,
             data=model.data,
             created_at=model.created_at,
             updated_at=model.updated_at,

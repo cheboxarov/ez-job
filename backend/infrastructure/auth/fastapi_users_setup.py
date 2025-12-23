@@ -106,7 +106,7 @@ def get_jwt_strategy() -> JWTStrategy:
     """Получить стратегию JWT для аутентификации."""
     config = load_config()
     # TODO: Вынести SECRET в конфиг
-    return JWTStrategy(secret="SECRET", lifetime_seconds=3600)
+    return JWTStrategy(secret="SECRET", lifetime_seconds=7200000)
 
 
 bearer_transport = BearerTransport(tokenUrl="/auth/login")

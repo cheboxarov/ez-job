@@ -60,7 +60,7 @@ export const StatsCard = ({ icon, value, label, color = 'blue' }: StatsCardProps
           justifyContent: 'center',
           fontSize: 22,
           color: colors.icon,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         }}
       >
         {icon}

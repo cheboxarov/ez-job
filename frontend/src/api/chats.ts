@@ -11,3 +11,26 @@ export const getChat = async (chatId: number): Promise<ChatDetailedResponse> => 
   return response.data;
 };
 
+export interface SendChatMessageRequest {
+  text: string;
+  idempotency_key?: string;
+  hhtm_source?: string;
+  hhtm_source_label?: string;
+}
+
+export interface SendChatMessageResponse {
+  success: boolean;
+  data?: Record<string, unknown>;
+}
+
+export const sendChatMessage = async (
+  chatId: number,
+  text: string
+): Promise<SendChatMessageResponse> => {
+  const response = await apiClient.post<SendChatMessageResponse>(
+    `/api/chats/${chatId}/send`,
+    { text }
+  );
+  return response.data;
+};
+

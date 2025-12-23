@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import (
 
 from config import DatabaseConfig
 
+_SESSION_FACTORY_CACHE: dict[str, async_sessionmaker[AsyncSession]] = {}
+_ENGINE_CACHE: dict[str, object] = {}
+
 
 def create_session_factory(config: DatabaseConfig) -> async_sessionmaker[AsyncSession]:
     """Создает фабрику async сессий SQLAlchemy.
@@ -21,17 +24,24 @@ def create_session_factory(config: DatabaseConfig) -> async_sessionmaker[AsyncSe
         Фабрика для создания async сессий.
     """
     db_url = config.get_db_url()
-    engine = create_async_engine(
-        db_url,
-        echo=False,  # Включить для отладки SQL запросов
-        pool_pre_ping=True,  # Проверка соединений перед использованием
-        pool_size=10,
-        max_overflow=20,
-    )
+    if db_url in _SESSION_FACTORY_CACHE:
+        session_factory = _SESSION_FACTORY_CACHE[db_url]
+        engine = _ENGINE_CACHE[db_url]
+    else:
+        engine = create_async_engine(
+            db_url,
+            echo=False,  # Включить для отладки SQL запросов
+            pool_pre_ping=True,  # Проверка соединений перед использованием
+            pool_size=10,
+            max_overflow=20,
+        )
+        session_factory = async_sessionmaker(
+            engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+        _SESSION_FACTORY_CACHE[db_url] = session_factory
+        _ENGINE_CACHE[db_url] = engine
 
-    return async_sessionmaker(
-        engine,
-        class_=AsyncSession,
-        expire_on_commit=False,
-    )
+    return session_factory
 

@@ -11,6 +11,20 @@ class HHConfig:
     base_url: str = "https://api.hh.ru"
     max_vacancies: int = 50
     default_pages_depth: int = 1
+    login_trust_flags_public_key: str = """-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEArfxXPfnUIiXXnopK1tHq
+rYX4mjfSrM+m24rRcsIbZc0f9ZgZsca9cVy1afJe3f91FeJLKstE/hdexMLogUTq
+7x0c/gDMQ8uqgptDpnkk5KHtSie47tE1LDV2qgJ8HUnVA+1uB9FJFiF0t4ppn8P2
+fEt8L05lBn5Oe5tUVuLc5J52iBZAlY9AiHiAaRePcxHp8zlMGRjFoE7veeZMmlT8
+IKDLYRMGxZ7HIPuRVFh3k1q5yKLAJ9BePoK8P/q7vBh+W1eYFA+q15q0Lna6h7C9
+ZUA29wM1BYUwqQfRZldWxwy74XZE+WE9F5WoeIYzxnfTZzO87aeyfVaXA80uRAp0
+l3+2GHORSVF5jmyag8i3ZnvIFFoO5pr/g6sKdimB72CYxS1nqdGDiJ1OIovKUI5w
+VDlFeEgr+Ut8my5FVSlxLo7ZllrtRI0/RvXV91AqjyaTul4ZV2LjdpKRnofp01GV
+aOYPatVR3bu6mBaf5y1E7aCPGLxTZwuZvgY4DYARNlzWLob+YARAt20s8fxb85/3
+k8SG4+nYl4At9dtBQM0GA3fr6Xs6SSPK0DtS0p77/ddhqTFHTEX4IX4RAY6aMpc6
+uaVq2CRxPYSj2aBfv+xCkAU5BI/9cftJKyXiD89oT/lkbUFPJDp8bxGipZ7Bwn2q
+X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
+-----END PUBLIC KEY-----"""
 
 
 @dataclass(slots=True)
@@ -75,6 +89,24 @@ def load_config() -> AppConfig:
     hh_base_url = os.getenv("HH_BASE_URL", "https://api.hh.ru")
     hh_max_vacancies = _get_env_int("HH_MAX_VACANCIES", 50)
     hh_default_pages_depth = _get_env_int("HH_DEFAULT_PAGES_DEPTH", 1)
+    
+    # Дефолтный публичный ключ для login_trust_flags
+    default_login_trust_flags_public_key = """-----BEGIN PUBLIC KEY-----
+MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEArfxXPfnUIiXXnopK1tHq
+rYX4mjfSrM+m24rRcsIbZc0f9ZgZsca9cVy1afJe3f91FeJLKstE/hdexMLogUTq
+7x0c/gDMQ8uqgptDpnkk5KHtSie47tE1LDV2qgJ8HUnVA+1uB9FJFiF0t4ppn8P2
+fEt8L05lBn5Oe5tUVuLc5J52iBZAlY9AiHiAaRePcxHp8zlMGRjFoE7veeZMmlT8
+IKDLYRMGxZ7HIPuRVFh3k1q5yKLAJ9BePoK8P/q7vBh+W1eYFA+q15q0Lna6h7C9
+ZUA29wM1BYUwqQfRZldWxwy74XZE+WE9F5WoeIYzxnfTZzO87aeyfVaXA80uRAp0
+l3+2GHORSVF5jmyag8i3ZnvIFFoO5pr/g6sKdimB72CYxS1nqdGDiJ1OIovKUI5w
+VDlFeEgr+Ut8my5FVSlxLo7ZllrtRI0/RvXV91AqjyaTul4ZV2LjdpKRnofp01GV
+aOYPatVR3bu6mBaf5y1E7aCPGLxTZwuZvgY4DYARNlzWLob+YARAt20s8fxb85/3
+k8SG4+nYl4At9dtBQM0GA3fr6Xs6SSPK0DtS0p77/ddhqTFHTEX4IX4RAY6aMpc6
+uaVq2CRxPYSj2aBfv+xCkAU5BI/9cftJKyXiD89oT/lkbUFPJDp8bxGipZ7Bwn2q
+X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
+-----END PUBLIC KEY-----"""
+    
+    hh_login_trust_flags_public_key = os.getenv("HH_LOGIN_TRUST_FLAGS_PUBLIC_KEY", default_login_trust_flags_public_key)
 
     openai_base_url = os.getenv("OPENAI_BASE_URL", "https://bothub.chat/api/v2/openai/v1")
     openai_model = os.getenv("OPENAI_MODEL", "grok-4.1-fast")
@@ -91,6 +123,7 @@ def load_config() -> AppConfig:
         base_url=hh_base_url,
         max_vacancies=hh_max_vacancies,
         default_pages_depth=hh_default_pages_depth,
+        login_trust_flags_public_key=hh_login_trust_flags_public_key,
     )
     openai_cfg = OpenAIConfig(
         base_url=openai_base_url,

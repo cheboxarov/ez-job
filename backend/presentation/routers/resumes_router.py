@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from loguru import logger
 
 from application.services.resumes_service import ResumesService
@@ -144,10 +144,11 @@ async def delete_resume(
     resume_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     service: ResumeServicePort = Depends(get_resumes_service),
-) -> None:
+) -> Response:
     """Удалить резюме (с проверкой принадлежности)."""
     try:
         await service.delete_resume(resume_id=resume_id, user_id=current_user.id)
+        return Response(status_code=204)
     except PermissionError as exc:
         logger.warning(f"Попытка удалить чужое резюме: {exc}")
         raise HTTPException(status_code=403, detail=str(exc)) from exc

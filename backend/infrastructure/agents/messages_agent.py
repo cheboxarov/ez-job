@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import List
+from uuid import UUID
 
 from openai import AsyncOpenAI
 
@@ -48,12 +49,18 @@ class MessagesAgent(MessagesAgentServicePort):
         self,
         chats: List[HHChatDetailed],
         resume: str,
+        user_id: UUID,
+        user_parameters: str | None = None,
+        resume_hash: str | None = None,
     ) -> List[AgentAction]:
         """Анализирует чаты и генерирует ответы на вопросы.
 
         Args:
             chats: Список чатов с детальной информацией и сообщениями.
             resume: Текст резюме кандидата для контекста при генерации ответов.
+            user_id: ID пользователя, для которого создаются действия.
+            user_parameters: Дополнительные параметры пользователя для контекста (опционально).
+            resume_hash: Hash резюме, использованного при создании действий (опционально).
 
         Returns:
             Список действий для отправки сообщений в чаты с вопросами.
@@ -62,7 +69,7 @@ class MessagesAgent(MessagesAgentServicePort):
             return []
 
         try:
-            prompt = self._build_prompt(chats, resume)
+            prompt = self._build_prompt(chats, resume, user_parameters)
             print(
                 f"[messages_agent] Анализирую {len(chats)} чатов, model={self._config.model}",
                 flush=True,
@@ -93,6 +100,14 @@ send_message - используй когда:
 - Есть простой вопрос, на который можно дать краткий ответ прямо в чате
 - Вопросы общего характера (например, "Есть ли у вас опыт с Python?")
 - НЕ использовать для: запросов на созвон, встречи, собеседования, действий вне чата
+
+Стиль ответа для send_message:
+- Пиши по-человечески: дружелюбно, спокойно, без канцелярита и без “роботской” детализации.
+- Будь лаконичным: обычно 1–3 коротких предложения. Не превращай ответ в самопрезентацию.
+- Отвечай строго на вопрос собеседника. Не пересказывай резюме/вакансию и не добавляй лишние подробности “на всякий случай”.
+- Используй детали из резюме только если они реально помогают ответить на вопрос. Если деталь не спрашивали (например, адрес, точные цифры, длинные списки навыков) — не включай её сама.
+- Если вопрос неясный или не хватает данных — задай один уточняющий вопрос вместо длинного ответа.
+- Обращение делай нейтральным (“Здравствуйте!”), не используй ФИО/отчество и не выдумывай его.
 
 create_event - используй когда:
 - Компания просит назначить созвон/встречу/собеседование (например, "В какое время вам удобно созвониться?", "Когда можем встретиться?", "Предлагаем созвон для знакомства")
@@ -165,7 +180,7 @@ create_event - используй когда:
             preview = content
             print(f"[messages_agent] Raw content preview: {preview}", flush=True)
 
-            return self._parse_response(content, chats)
+            return self._parse_response(content, chats, user_id, resume_hash)
         except Exception as exc:  # pragma: no cover - диагностический путь
             print(f"[messages_agent] Ошибка при анализе чатов: {exc}", flush=True)
             return []
@@ -174,12 +189,14 @@ create_event - используй когда:
         self,
         chats: List[HHChatDetailed],
         resume: str,
+        user_parameters: str | None = None,
     ) -> str:
         """Формирует промпт с информацией о чатах и резюме.
 
         Args:
             chats: Список чатов для анализа.
             resume: Текст резюме кандидата.
+            user_parameters: Дополнительные параметры пользователя для контекста (опционально).
 
         Returns:
             Текстовый промпт для LLM.
@@ -188,6 +205,12 @@ create_event - используй когда:
         lines.append("РЕЗЮМЕ КАНДИДАТА:")
         lines.append(resume.strip())
         lines.append("")
+        
+        if user_parameters and user_parameters.strip():
+            lines.append("ДОПОЛНИТЕЛЬНЫЕ ПАРАМЕТРЫ ПОЛЬЗОВАТЕЛЯ:")
+            lines.append(user_parameters.strip())
+            lines.append("")
+        
         lines.append("=" * 80)
         lines.append("")
 
@@ -223,12 +246,16 @@ create_event - используй когда:
         self,
         content: str,
         chats: List[HHChatDetailed],
+        user_id: UUID,
+        resume_hash: str | None = None,
     ) -> List[AgentAction]:
         """Парсит JSON ответ от LLM в список действий.
 
         Args:
             content: JSON-строка с ответом от LLM.
             chats: Список чатов для валидации dialog_id.
+            user_id: ID пользователя, для которого создаются действия.
+            resume_hash: Hash резюме, использованного при создании действий (опционально).
 
         Returns:
             Список действий агента.
@@ -316,6 +343,8 @@ create_event - используй когда:
                         entity_type="hh_dialog",
                         entity_id=dialog_id,
                         created_by="messages_agent",
+                        user_id=user_id,
+                        resume_hash=resume_hash,
                         data=action_data_dict,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
@@ -342,6 +371,8 @@ create_event - используй когда:
                         entity_type="hh_dialog",
                         entity_id=dialog_id,
                         created_by="messages_agent",
+                        user_id=user_id,
+                        resume_hash=resume_hash,
                         data={
                             "dialog_id": dialog_id,
                             "event_type": event_type.strip(),

@@ -224,7 +224,7 @@ export const VacancyCard = ({ vacancy, resumeId, onRespondSuccess }: VacancyCard
                   fontWeight: 600,
                   background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   border: 'none',
-                  boxShadow: '0 2px 8px rgba(37, 99, 235, 0.3)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 }}
               >
                 Откликнуться

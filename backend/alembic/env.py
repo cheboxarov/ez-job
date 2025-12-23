@@ -21,6 +21,7 @@ from infrastructure.database.base import Base
 from infrastructure.database.models import user_model  # noqa: F401
 from infrastructure.database.models import resume_model  # noqa: F401
 from infrastructure.database.models import resume_filter_settings_model  # noqa: F401
+from infrastructure.database.models import agent_action_model  # noqa: F401
 
 target_metadata = Base.metadata
 

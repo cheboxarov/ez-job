@@ -21,6 +21,9 @@ from domain.interfaces.resume_repository_port import ResumeRepositoryPort
 from domain.interfaces.user_hh_auth_data_repository_port import (
     UserHhAuthDataRepositoryPort,
 )
+from domain.interfaces.hh_client_port import HHClientPort
+from domain.use_cases.generate_test_answers import GenerateTestAnswersUseCase
+from domain.use_cases.get_vacancy_test import GetVacancyTestUseCase
 from domain.use_cases.search_and_get_filtered_vacancy_list import (
     SearchAndGetFilteredVacancyListUseCase,
 )
@@ -36,10 +39,11 @@ class ProcessAutoRepliesUseCase:
 
     Для каждого резюме с включенным автооткликом:
     1. Получает подходящие вакансии (до 200 штук)
-    2. Фильтрует вакансии без тестов (has_test == False)
+    2. Фильтрует вакансии с confidence >= 0.5 (50%)
     3. Сортирует по confidence (сначала самые подходящие)
     4. Для каждой вакансии генерирует письмо и отправляет отклик
-    5. Делает паузу 30 секунд между откликами
+    5. Для вакансий с тестами получает тест, генерирует ответы и отправляет их с откликом
+    6. Делает паузу 30 секунд между откликами
     """
 
     def __init__(
@@ -51,6 +55,8 @@ class ProcessAutoRepliesUseCase:
         cover_letter_generator: CoverLetterGeneratorPort,
         create_unit_of_work_factory,
         respond_to_vacancy_uc,
+        hh_client: HHClientPort,
+        generate_test_answers_uc: GenerateTestAnswersUseCase,
         check_subscription_uc=None,
         increment_response_count_uc=None,
         max_vacancies_per_resume: int = 200,
@@ -66,6 +72,8 @@ class ProcessAutoRepliesUseCase:
             cover_letter_generator: Генератор сопроводительных писем.
             create_unit_of_work_factory: Фабрика для создания UnitOfWork (для каждого отклика отдельная транзакция).
             respond_to_vacancy_uc: Use case для отправки отклика в HH API.
+            hh_client: Клиент для работы с HeadHunter API (для получения теста вакансии).
+            generate_test_answers_uc: Use case для генерации ответов на тест вакансии.
             check_subscription_uc: Use case для проверки подписки (опционально).
             increment_response_count_uc: Use case для инкремента счетчика откликов (опционально).
             max_vacancies_per_resume: Максимальное количество вакансий для обработки на одно резюме.
@@ -78,6 +86,8 @@ class ProcessAutoRepliesUseCase:
         self._cover_letter_generator = cover_letter_generator
         self._create_unit_of_work_factory = create_unit_of_work_factory
         self._respond_to_vacancy_uc = respond_to_vacancy_uc
+        self._hh_client = hh_client
+        self._generate_test_answers_uc = generate_test_answers_uc
         self._check_subscription_uc = check_subscription_uc
         self._increment_response_count_uc = increment_response_count_uc
         self._max_vacancies_per_resume = max_vacancies_per_resume
@@ -209,8 +219,11 @@ class ProcessAutoRepliesUseCase:
             )
             return
 
-        # 4. Фильтруем вакансии: только без тестов
-        suitable_vacancies = [v for v in vacancies if not v.has_test]
+        # 4. Фильтруем вакансии: с confidence >= 0.5 (50%)
+        suitable_vacancies = [
+            v for v in vacancies 
+            if (v.confidence or 0.0) >= 0.5
+        ]
 
         # Ограничиваем количество вакансий
         if len(suitable_vacancies) > self._max_vacancies_per_resume:
@@ -221,7 +234,7 @@ class ProcessAutoRepliesUseCase:
 
         logger.info(
             f"Для резюме {resume.id} найдено {len(suitable_vacancies)} подходящих вакансий "
-            f"(без тестов, из {len(vacancies)} всего)"
+            f"(confidence >= 50%, из {len(vacancies)} всего)"
         )
 
         # 6. Проверяем наличие headhunter_hash
@@ -376,6 +389,7 @@ class ProcessAutoRepliesUseCase:
             cover_letter = await self._cover_letter_generator.generate(
                 resume=resume.content,
                 vacancy_description=vacancy_description,
+                user_params=resume.user_parameters,
             )
         except Exception as exc:
             logger.error(
@@ -387,6 +401,64 @@ class ProcessAutoRepliesUseCase:
 
         if not cover_letter:
             cover_letter = "1"
+
+        # Обрабатываем тест вакансии, если он есть
+        test_answers: Dict[str, str | List[str]] | None = None
+        test_metadata: Dict[str, str] | None = None
+        internal_api_base_url = "https://krasnoyarsk.hh.ru"
+        
+        if vacancy.has_test:
+            try:
+                # Получаем тест вакансии
+                get_vacancy_test_uc = GetVacancyTestUseCase(self._hh_client)
+                test = await get_vacancy_test_uc.execute(
+                    vacancy_id=vacancy.vacancy_id,
+                    headers=auth_data.headers,
+                    cookies=auth_data.cookies,
+                    internal_api_base_url=internal_api_base_url,
+                )
+                
+                if test is None:
+                    logger.warning(
+                        f"Тест для вакансии {vacancy.vacancy_id} не найден "
+                        f"(возможно, форма с тестом отсутствует в HTML-странице). "
+                        "Пропускаем вакансию."
+                    )
+                    return
+                
+                # Генерируем ответы на тест
+                test_answers = await self._generate_test_answers_uc.execute(
+                    test=test,
+                    resume=resume.content,
+                    user_params=resume.user_parameters,
+                )
+                
+                if not test_answers:
+                    logger.warning(
+                        f"Не удалось сгенерировать ответы на тест для вакансии {vacancy.vacancy_id}. "
+                        "Пропускаем вакансию."
+                    )
+                    return
+                
+                # Подготавливаем метаданные теста
+                test_metadata = {
+                    "uidPk": test.uid_pk or "",
+                    "guid": test.guid or "",
+                    "startTime": test.start_time or "",
+                    "testRequired": str(test.test_required).lower(),
+                }
+                
+                logger.info(
+                    f"Подготовлены ответы на тест для вакансии {vacancy.vacancy_id}: "
+                    f"{len(test_answers)} ответов"
+                )
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка при обработке теста для вакансии {vacancy.vacancy_id}: {exc}",
+                    exc_info=True,
+                )
+                # Пропускаем вакансию при ошибке обработки теста
+                return
 
         # Отправляем отклик и сохраняем в БД (в отдельной транзакции для каждого отклика)
         try:
@@ -400,7 +472,7 @@ class ProcessAutoRepliesUseCase:
             logger.info(
                 f"Отправка отклика: vacancy_id={vacancy.vacancy_id}, "
                 f"resume_id={resume.id}, resume_hash={resume.headhunter_hash}, "
-                f"user_id={resume.user_id}"
+                f"user_id={resume.user_id}, has_test={vacancy.has_test}"
             )
             
             # Создаем отдельную транзакцию для каждого отклика
@@ -452,6 +524,9 @@ class ProcessAutoRepliesUseCase:
                     letter=cover_letter,
                     vacancy_name=vacancy.name,
                     vacancy_url=vacancy.alternate_url,
+                    test_answers=test_answers,
+                    test_metadata=test_metadata,
+                    internal_api_base_url=internal_api_base_url,
                     update_cookies_uc=None,  # Не обновляем cookies в транзакции
                 )
                 # Транзакция автоматически коммитится при выходе из async with

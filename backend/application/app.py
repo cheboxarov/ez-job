@@ -4,14 +4,19 @@ import asyncio
 from typing import Dict, List
 
 from config import AppConfig, load_config
+from domain.entities.agent_action import AgentAction
 from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.entities.hh_list_chat import HHListChat
 from domain.entities.user import User
 from domain.entities.user_hh_auth_data import UserHhAuthData
 from domain.use_cases.analyze_chats_and_respond import AnalyzeChatsAndRespondUseCase
+from domain.use_cases.create_agent_action import CreateAgentActionUseCase
 from domain.use_cases.fetch_chats_details import FetchChatsDetailsUseCase
 from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
-from domain.use_cases.filter_chats_without_rejection import FilterChatsWithoutRejectionUseCase
+from domain.use_cases.filter_chats_without_rejection_and_mark_read import (
+    FilterChatsWithoutRejectionAndMarkReadUseCase,
+)
+from domain.use_cases.mark_chat_message_read import MarkChatMessageReadUseCase
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 from infrastructure.agents.messages_agent import MessagesAgent
 from infrastructure.clients.hh_client import HHHttpClient
@@ -35,7 +40,10 @@ class Application:
         # Создаем use cases для работы с чатами
         self._fetch_user_chats_uc = FetchUserChatsUseCase(self._hh_client)
         self._fetch_chats_details_uc = FetchChatsDetailsUseCase(self._hh_client)
-        self._filter_chats_uc = FilterChatsWithoutRejectionUseCase()
+        self._mark_chat_message_read_uc = MarkChatMessageReadUseCase(self._hh_client)
+        self._filter_chats_uc = FilterChatsWithoutRejectionAndMarkReadUseCase(
+            mark_chat_message_read_uc=self._mark_chat_message_read_uc
+        )
 
     async def run(self) -> None:
         print("[app] Запускаю получение чатов пользователя...", flush=True)
@@ -78,8 +86,14 @@ class Application:
                 print(f"[app] Ошибка при получении списка чатов: {exc}", flush=True)
                 return
 
-            # Фильтруем чаты без отказа
-            filtered_chat_list = await self._filter_chats_uc.execute(chat_list)
+            # Фильтруем чаты без отказа и помечаем чаты с отказом как прочитанные
+            filtered_chat_list = await self._filter_chats_uc.execute(
+                chat_list=chat_list,
+                headers=auth_data.headers,
+                cookies=auth_data.cookies,
+                user_id=user.id,
+                update_cookies_uc=update_cookies_uc,
+            )
             print(f"[app] Чатов без отказа: {len(filtered_chat_list.items)}", flush=True)
 
             # Берем первые 3 чата из отфильтрованного списка (или все, если меньше 3)
@@ -111,46 +125,154 @@ class Application:
 
             # Анализируем чаты и генерируем ответы
             try:
-                # Получаем первое резюме пользователя для контекста
-                resumes = await uow.resume_repository.list_by_user_id(user.id)
-                if not resumes:
-                    print("[app] У пользователя нет резюме, пропускаем анализ чатов", flush=True)
-                else:
-                    resume = resumes[0]
-                    print(f"[app] Используется резюме {resume.id} для анализа чатов", flush=True)
+                # Группируем чаты по RESUME из resources
+                chats_by_resume: Dict[str, List[HHChatDetailed]] = {}
+                chats_without_resume: List[HHChatDetailed] = []
 
-                    # Создаем агента
-                    messages_agent = MessagesAgent(self._config.openai)
+                for chat in chats_details:
+                    resume_ids = None
+                    if chat.resources and "RESUME" in chat.resources:
+                        resume_ids = chat.resources["RESUME"]
+                    
+                    if resume_ids and len(resume_ids) > 0:
+                        # Берем первый RESUME ID (обычно их один)
+                        resume_id = resume_ids[0]
+                        if resume_id not in chats_by_resume:
+                            chats_by_resume[resume_id] = []
+                        chats_by_resume[resume_id].append(chat)
+                    else:
+                        chats_without_resume.append(chat)
 
-                    # Создаем use case
-                    analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)
+                print(f"[app] Чаты сгруппированы: {len(chats_by_resume)} групп по резюме, {len(chats_without_resume)} чатов без резюме", flush=True)
 
-                    # Анализируем чаты и генерируем ответы
-                    actions = await analyze_chats_uc.execute(
-                        chats=chats_details,
-                        resume=resume.content,
+                # Создаем агента
+                messages_agent = MessagesAgent(self._config.openai)
+
+                # Создаем use case
+                analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)
+
+                all_actions: List[AgentAction] = []
+
+                # Обрабатываем каждую группу чатов с соответствующим резюме
+                for resume_id, group_chats in chats_by_resume.items():
+                    print(f"[app] Обрабатываю группу из {len(group_chats)} чатов для резюме external_id={resume_id}", flush=True)
+                    
+                    # Ищем резюме по external_id
+                    resume = await uow.resume_repository.get_by_external_id(
+                        external_id=resume_id,
+                        user_id=user.id,
                     )
+                    
+                    if resume is None:
+                        print(f"[app] Резюме с external_id={resume_id} не найдено, пропускаем группу чатов", flush=True)
+                        continue
+                    
+                    print(f"[app] Используется резюме {resume.id} (external_id={resume_id}) для анализа {len(group_chats)} чатов", flush=True)
 
-                    print(f"[app] Сгенерировано {len(actions)} действий для ответов", flush=True)
-                    for action in actions:
-                        dialog_id = action.data.get("dialog_id")
-                        if action.type == "send_message":
-                            message_text = action.data.get("message_text", "")
-                            message_to = action.data.get("message_to")
-                            preview = message_text[:100] + "..." if len(message_text) > 100 else message_text
-                            message_to_str = f" (ответ на сообщение {message_to})" if message_to else ""
-                            print(
-                                f"[app] Действие: отправить сообщение в чат {dialog_id}{message_to_str}: {preview}",
-                                flush=True,
-                            )
-                        elif action.type == "create_event":
-                            event_type = action.data.get("event_type", "")
-                            message = action.data.get("message", "")
-                            preview = message[:100] + "..." if len(message) > 100 else message
-                            print(
-                                f"[app] Действие: создать событие в чате {dialog_id}, тип: {event_type}: {preview}",
-                                flush=True,
-                            )
+                    # Анализируем чаты этой группы с соответствующим резюме
+                    actions = await analyze_chats_uc.execute(
+                        chats=group_chats,
+                        resume=resume.content,
+                        user_id=user.id,
+                        user_parameters=resume.user_parameters,
+                        resume_hash=resume.headhunter_hash,
+                    )
+                    
+                    all_actions.extend(actions)
+                    print(f"[app] Сгенерировано {len(actions)} действий для группы резюме {resume_id}", flush=True)
+
+                # Обрабатываем чаты без резюме (используем первое доступное резюме или пропускаем)
+                if chats_without_resume:
+                    print(f"[app] Обрабатываю {len(chats_without_resume)} чатов без резюме", flush=True)
+                    resumes = await uow.resume_repository.list_by_user_id(user.id)
+                    if resumes:
+                        resume = resumes[0]
+                        print(f"[app] Используется первое резюме {resume.id} для чатов без резюме", flush=True)
+                        actions = await analyze_chats_uc.execute(
+                            chats=chats_without_resume,
+                            resume=resume.content,
+                            user_id=user.id,
+                            user_parameters=resume.user_parameters,
+                            resume_hash=resume.headhunter_hash,
+                        )
+                        all_actions.extend(actions)
+                        print(f"[app] Сгенерировано {len(actions)} действий для чатов без резюме", flush=True)
+                    else:
+                        print("[app] Нет резюме для обработки чатов без резюме, пропускаем", flush=True)
+
+                print(f"[app] Всего сгенерировано {len(all_actions)} действий для ответов", flush=True)
+                
+                # Сохраняем действия в БД
+                if all_actions:
+                    create_action_uc = CreateAgentActionUseCase(uow.agent_action_repository)
+                    saved_count = 0
+                    for action in all_actions:
+                        try:
+                            saved_action = await create_action_uc.execute(action)
+                            saved_count += 1
+                            dialog_id = action.data.get("dialog_id")
+                            if action.type == "send_message":
+                                message_text = action.data.get("message_text", "")
+                                message_to = action.data.get("message_to")
+                                preview = message_text[:100] + "..." if len(message_text) > 100 else message_text
+                                message_to_str = f" (ответ на сообщение {message_to})" if message_to else ""
+                                print(
+                                    f"[app] Сохранено действие: отправить сообщение в чат {dialog_id}{message_to_str}: {preview}",
+                                    flush=True,
+                                )
+                            elif action.type == "create_event":
+                                event_type = action.data.get("event_type", "")
+                                message = action.data.get("message", "")
+                                preview = message[:100] + "..." if len(message) > 100 else message
+                                print(
+                                    f"[app] Сохранено действие: создать событие в чате {dialog_id}, тип: {event_type}: {preview}",
+                                    flush=True,
+                                )
+                        except Exception as exc:
+                            print(f"[app] Ошибка при сохранении действия {action.id}: {exc}", flush=True)
+                            import traceback
+                            print(f"[app] Traceback: {traceback.format_exc()}", flush=True)
+                            # Продолжаем сохранять остальные действия
+                    
+                    print(f"[app] Сохранено {saved_count} из {len(all_actions)} действий в БД", flush=True)
+                else:
+                    print("[app] Нет действий для сохранения", flush=True)
+
+                # Помечаем все чаты, которые были отправлены в агента, как прочитанные
+                print(f"[app] Помечаю {len(chats_details)} чатов как прочитанные...", flush=True)
+                mark_read_tasks = []
+                for chat in chats_details:
+                    # Берем последнее сообщение из чата
+                    if chat.messages and chat.messages.items:
+                        last_message = chat.messages.items[-1]
+                        if last_message and last_message.id:
+                            async def mark_read_wrapper(chat_id: int, message_id: int) -> None:
+                                try:
+                                    await self._mark_chat_message_read_uc.execute(
+                                        chat_id=chat_id,
+                                        message_id=message_id,
+                                        headers=auth_data.headers,
+                                        cookies=auth_data.cookies,
+                                        user_id=user.id,
+                                        update_cookies_uc=update_cookies_uc,
+                                    )
+                                    print(f"[app] Успешно помечено как прочитанное: chat_id={chat_id}, message_id={message_id}", flush=True)
+                                except Exception as exc:
+                                    print(f"[app] Ошибка при пометке чата {chat_id}, сообщения {message_id} как прочитанного: {exc}", flush=True)
+                            
+                            task = asyncio.create_task(mark_read_wrapper(chat.id, last_message.id))
+                            mark_read_tasks.append(task)
+                        else:
+                            print(f"[app] Не удалось пометить чат {chat.id} как прочитанный: отсутствует last_message или message_id", flush=True)
+                    else:
+                        print(f"[app] Чат {chat.id} не имеет сообщений для пометки как прочитанного", flush=True)
+
+                if mark_read_tasks:
+                    results = await asyncio.gather(*mark_read_tasks, return_exceptions=True)
+                    for result in results:
+                        if isinstance(result, Exception):
+                            print(f"[app] Ошибка при пометке чата как прочитанного: {result}", flush=True)
+                    print(f"[app] Помечено {len([r for r in results if not isinstance(r, Exception)])} из {len(mark_read_tasks)} чатов как прочитанные", flush=True)
             except Exception as exc:
                 print(f"[app] Ошибка при анализе чатов: {exc}", flush=True)
                 # Не прерываем выполнение, продолжаем работу

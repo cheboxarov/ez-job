@@ -352,6 +352,30 @@ export interface ChatListItem {
   display_info?: ChatDisplayInfo | null;
 }
 
+// Типы для действий агента
+export interface AgentAction {
+  id: string;
+  type: string;
+  entity_type: string;
+  entity_id: number;
+  created_by: string;
+  user_id: string;
+  resume_hash: string | null;
+  data: {
+    dialog_id: number;
+    message_to?: number;
+    message_text?: string;
+    event_type?: string;
+    message?: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentActionsListResponse {
+  items: AgentAction[];
+}
+
 export interface ChatListResponse {
   count: number;
   items: ChatListItem[];

@@ -1,0 +1,56 @@
+import { Flex } from 'antd';
+
+export const Logo = () => {
+  return (
+    <Flex align="center" gap={8}>
+      {/* SVG Иконка из logo.svg */}
+      <div style={{ 
+        width: 80,
+        height: 80,
+        flexShrink: 0,
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'flex-start',
+      }}>
+        <img 
+          src="/logo.svg" 
+          alt="AutoOffer" 
+          style={{ 
+            width: 96,
+            height: 96,
+            objectFit: 'cover',
+            objectPosition: 'left top',
+            display: 'block',
+          }} 
+        />
+      </div>
+
+      {/* Текст */}
+      <div style={{ display: 'flex', alignItems: 'center', lineHeight: 1, userSelect: 'none' }}>
+        <span
+          style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: '26px',
+            fontWeight: 700,
+            color: '#2563eb',
+            letterSpacing: '-0.03em',
+          }}
+        >
+          Auto
+        </span>
+        <span
+          style={{
+            fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+            fontSize: '26px',
+            fontWeight: 700,
+            color: '#0f172a',
+            letterSpacing: '-0.03em',
+          }}
+        >
+          Offer
+        </span>
+      </div>
+    </Flex>
+  );
+};
