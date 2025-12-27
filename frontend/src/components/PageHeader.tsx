@@ -38,9 +38,9 @@ export const PageHeader = ({
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
-        marginBottom: 24,
-        padding: '20px 24px',
+        gap: 12,
+        marginBottom: 20,
+        padding: '16px 20px',
         background: '#ffffff',
         borderRadius: 16,
         border: '1px solid #e5e7eb',
@@ -71,24 +71,6 @@ export const PageHeader = ({
         gap: 16 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {icon && (
-            <div
-              style={{
-                width: 48,
-                height: 48,
-                background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
-                borderRadius: 12,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: 22,
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.25)',
-              }}
-            >
-              {icon}
-            </div>
-          )}
           <div>
             <Title level={2} style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#0f172a' }}>
               {title}

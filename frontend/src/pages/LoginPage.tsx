@@ -48,13 +48,11 @@ const BentoCard = ({
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-      e.currentTarget.style.transform = 'translateY(-2px)';
-      e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.15)';
+      e.currentTarget.style.borderColor = '#2563eb';
     }}
     onMouseLeave={(e) => {
       e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-      e.currentTarget.style.transform = 'translateY(0)';
-      e.currentTarget.style.boxShadow = 'none';
+      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
     }}
   >
     <div style={{ 
@@ -310,7 +308,7 @@ export const LoginPage = () => {
                   borderRadius: 8,
                   background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
                   border: 'none',
-                  boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+                  border: '1px solid #2563eb'
                 }}
               >
                 {step === 'phone' ? 'Получить код' : 'Войти'}

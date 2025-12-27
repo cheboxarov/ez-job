@@ -257,7 +257,7 @@ export const VacanciesPage = () => {
               maxHeight: 'calc(100vh - 48px)', 
               overflowY: 'auto',
               borderRadius: 16,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              border: '1px solid #e5e7eb',
             }}
           >
             <Form

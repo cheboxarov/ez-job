@@ -228,9 +228,7 @@ export const ChatDetailPage = () => {
                       ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                       : '#ffffff',
                     color: isUser ? '#ffffff' : '#0f172a',
-                    boxShadow: isUser
-                      ? '0 4px 12px rgba(37, 99, 235, 0.3)'
-                      : '0 1px 3px rgba(0,0,0,0.08)',
+                    border: isUser ? '1px solid #2563eb' : '1px solid #e5e7eb',
                     position: 'relative',
                   }}
                 >
@@ -307,7 +305,6 @@ export const ChatDetailPage = () => {
             background: '#ffffff',
             borderRadius: 16,
             padding: '16px 20px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
             border: '1px solid #e5e7eb',
           }}
         >
@@ -343,9 +340,7 @@ export const ChatDetailPage = () => {
                 background: messageText.trim()
                   ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
                   : undefined,
-                boxShadow: messageText.trim()
-                  ? '0 4px 12px rgba(37, 99, 235, 0.3)'
-                  : undefined,
+                border: messageText.trim() ? '1px solid #2563eb' : undefined,
               }}
             />
           </div>

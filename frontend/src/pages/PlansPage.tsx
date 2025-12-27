@@ -173,6 +173,7 @@ export const PlansPage = () => {
                     flexDirection: 'column',
                     background: isCurrentPlan ? planConfig.lightBg : 'white',
                     transition: 'all 0.2s ease',
+                    boxShadow: 'none',
                   }}
                   styles={{ body: { padding: 0, flex: 1, display: 'flex', flexDirection: 'column' } }}
                 >

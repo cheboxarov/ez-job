@@ -170,13 +170,12 @@ export const ProfilePage = () => {
             {/* Hero Card - User + Subscription */}
             <Card
               bordered={true}
-              style={{
-                borderRadius: 24,
-                overflow: 'hidden',
-                marginBottom: 24,
-                border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-              }}
+                    style={{
+                      borderRadius: 24,
+                      overflow: 'hidden',
+                      marginBottom: 24,
+                      border: '1px solid #e5e7eb',
+                    }}
               styles={{ body: { padding: 0 } }}
             >
               {/* Top gradient section */}
@@ -223,7 +222,6 @@ export const ProfilePage = () => {
                         fontWeight: 700,
                         color: 'white',
                         border: '3px solid rgba(255,255,255,0.3)',
-                        boxShadow: 'none',
                       }}
                       >
                       {getInitials(user.phone, user.email)}
@@ -248,17 +246,13 @@ export const ProfilePage = () => {
                         {planConfig.badge}
                       </div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>
-                        <MailOutlined style={{ marginRight: 8 }} />
-                        {user.email}
-                      </Text>
-                      {user.hh_user_id && (
+                    {user.hh_user_id && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                         <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
                           ID HH: {user.hh_user_id}
                         </Text>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </Col>
                 </Row>
               </div>
@@ -267,12 +261,11 @@ export const ProfilePage = () => {
               <div style={{ padding: '0 32px', marginTop: -48 }}>
                 <Card
                   bordered={true}
-                  style={{
-                    borderRadius: 20,
-                    border: '1px solid #e5e7eb',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-                    background: 'white',
-                  }}
+                    style={{
+                      borderRadius: 20,
+                      border: '1px solid #e5e7eb',
+                      background: 'white',
+                    }}
                 >
                   <Row gutter={[32, 24]} align="middle">
                     <Col xs={24} md={8}>
@@ -288,7 +281,6 @@ export const ProfilePage = () => {
                             justifyContent: 'center',
                             fontSize: 24,
                             color: 'white',
-                            boxShadow: 'none',
                           }}
                         >
                           {planConfig.icon}
@@ -346,18 +338,18 @@ export const ProfilePage = () => {
                     style={{
                       borderRadius: 20,
                       border: '1px solid #e5e7eb',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                       height: '100%',
                       cursor: 'default',
                       transition: 'all 0.2s ease',
+                      boxShadow: 'none',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                      e.currentTarget.style.borderColor = '#2563eb';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ textAlign: 'center' }}>
@@ -392,18 +384,18 @@ export const ProfilePage = () => {
                     style={{
                       borderRadius: 20,
                       border: '1px solid #e5e7eb',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                       height: '100%',
                       cursor: 'default',
                       transition: 'all 0.2s ease',
+                      boxShadow: 'none',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                      e.currentTarget.style.borderColor = '#2563eb';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ textAlign: 'center' }}>
@@ -438,18 +430,18 @@ export const ProfilePage = () => {
                     style={{
                       borderRadius: 20,
                       border: '1px solid #e5e7eb',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                       height: '100%',
                       cursor: 'default',
                       transition: 'all 0.2s ease',
+                      boxShadow: 'none',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                      e.currentTarget.style.borderColor = '#2563eb';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ textAlign: 'center' }}>
@@ -484,18 +476,18 @@ export const ProfilePage = () => {
                     style={{
                       borderRadius: 20,
                       border: '1px solid #e5e7eb',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                       height: '100%',
                       cursor: 'default',
                       transition: 'all 0.2s ease',
+                      boxShadow: 'none',
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = '#cbd5e1';
-                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)';
+                      e.currentTarget.style.borderColor = '#2563eb';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                     onMouseLeave={(e) => {
                       e.currentTarget.style.borderColor = '#e5e7eb';
-                      e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
+                      e.currentTarget.style.boxShadow = 'none';
                     }}
                   >
                     <div style={{ textAlign: 'center' }}>
@@ -529,7 +521,6 @@ export const ProfilePage = () => {
               style={{
                 borderRadius: 20,
                 border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
               }}
             >
               <div style={{ marginBottom: 16 }}>

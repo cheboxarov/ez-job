@@ -16,7 +16,7 @@ export const themeConfig: ThemeConfig = {
     Card: {
       borderRadius: 20,
       paddingLG: 24,
-      boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03)',
+      boxShadow: 'none',
     },
     Button: {
       borderRadius: 12,

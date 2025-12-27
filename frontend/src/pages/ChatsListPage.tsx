@@ -110,17 +110,16 @@ export const ChatsListPage = () => {
                   cursor: 'pointer',
                   borderRadius: 16,
                   background: '#ffffff',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                  border: '1px solid #e5e7eb',
                   overflow: 'hidden',
                   transition: 'all 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.12)';
-                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  const stripColor = chat.unread_count > 0 ? '#2563eb' : '#2563eb';
+                  e.currentTarget.style.borderColor = stripColor;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
-                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.borderColor = '#e5e7eb';
                 }}
               >
                 {/* Left gradient strip */}

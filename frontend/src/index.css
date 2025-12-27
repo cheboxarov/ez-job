@@ -1,0 +1,8 @@
+/* Убираем тени у всех Card компонентов */
+.ant-card-hoverable:hover {
+  box-shadow: none !important;
+}
+
+.ant-card {
+  box-shadow: none !important;
+}

@@ -72,24 +72,21 @@ export const VacancyCard = ({ vacancy, resumeId, onRespondSuccess }: VacancyCard
       onClick={hasLink ? handleCardClick : undefined}
       style={{
         marginBottom: 16,
-        border: 'none',
+        border: '1px solid #e5e7eb',
         borderRadius: 16,
         cursor: hasLink ? 'pointer' : 'default',
         transition: 'all 0.2s ease',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
         overflow: 'hidden',
       }}
       styles={{ body: { padding: 0 } }}
       hoverable={hasLink}
       onMouseEnter={(e) => {
         if (hasLink) {
-          e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.12)';
-          e.currentTarget.style.transform = 'translateY(-2px)';
+          e.currentTarget.style.borderColor = isHighMatch ? '#22c55e' : '#2563eb';
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.08)';
-        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = '#e5e7eb';
       }}
     >
       <div style={{ display: 'flex' }}>
@@ -223,8 +220,7 @@ export const VacancyCard = ({ vacancy, resumeId, onRespondSuccess }: VacancyCard
                   height: 40,
                   fontWeight: 600,
                   background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  border: 'none',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                  border: '1px solid #2563eb',
                 }}
               >
                 Откликнуться

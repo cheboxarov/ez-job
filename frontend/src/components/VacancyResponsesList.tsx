@@ -104,7 +104,7 @@ export const VacancyResponsesList = ({ resumeHash }: VacancyResponsesListProps) 
         bordered={false}
         style={{
           borderRadius: borderRadiusLG,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+          border: '1px solid #e5e7eb',
         }}
       >
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
@@ -129,7 +129,7 @@ export const VacancyResponsesList = ({ resumeHash }: VacancyResponsesListProps) 
             bordered={false}
             style={{
               borderRadius: borderRadiusLG,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              border: '1px solid #e5e7eb',
             }}
             actions={[
               response.vacancy_url ? (

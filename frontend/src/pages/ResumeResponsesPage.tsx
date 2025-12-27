@@ -105,7 +105,7 @@ export const ResumeResponsesPage = () => {
             bordered={false}
             style={{
               borderRadius: 16,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+              border: '1px solid #e5e7eb',
             }}
           >
             <div style={{ textAlign: 'center', padding: '60px 20px' }}>

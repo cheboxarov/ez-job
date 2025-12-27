@@ -141,8 +141,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       >
         <div
           style={{
-            padding: '16px 20px',
-            marginBottom: 8,
+            padding: '16px 20px 0 20px',
+            marginBottom: 0,
           }}
         >
           <Logo />
@@ -152,7 +152,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(100vh - 100px)',
+            height: 'calc(100vh - 84px)',
           }}
         >
           <Menu
@@ -188,7 +188,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </div>
       </Sider>
       <Layout style={{ marginLeft: 260, background: '#fafbfc' }}>
-        <Content style={{ padding: '32px 32px', width: '100%' }}>
+        <Content style={{ padding: '20px 24px', width: '100%' }}>
           {children}
         </Content>
       </Layout>

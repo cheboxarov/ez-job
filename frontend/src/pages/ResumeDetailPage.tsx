@@ -336,9 +336,6 @@ export const ResumeDetailPage = () => {
                 border: resume?.is_auto_reply 
                   ? '2px solid #86efac'
                   : '1px solid #e5e7eb',
-                boxShadow: resume?.is_auto_reply 
-                  ? '0 4px 20px rgba(34, 197, 94, 0.15)'
-                  : '0 2px 8px rgba(0,0,0,0.06)',
                 background: resume?.is_auto_reply 
                   ? 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)'
                   : 'linear-gradient(135deg, #ffffff 0%, #fafafa 100%)',
@@ -383,9 +380,7 @@ export const ResumeDetailPage = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: resume?.is_auto_reply 
-                        ? '0 4px 12px rgba(34, 197, 94, 0.35)'
-                        : '0 2px 6px rgba(100, 116, 139, 0.2)',
+                      border: resume?.is_auto_reply ? '1px solid #22c55e' : '1px solid #64748b',
                       flexShrink: 0,
                     }}
                   >
@@ -481,7 +476,6 @@ export const ResumeDetailPage = () => {
               style={{ 
                 borderRadius: 20, 
                 border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 height: '100%',
                 display: 'flex',
                 flexDirection: 'column'
@@ -585,7 +579,6 @@ export const ResumeDetailPage = () => {
               style={{ 
                 borderRadius: 20, 
                 border: '1px solid #e5e7eb',
-                boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
                 height: '100%',
               }}
               styles={{ 

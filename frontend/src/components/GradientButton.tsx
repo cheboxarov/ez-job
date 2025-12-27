@@ -16,18 +16,15 @@ export const GradientButton = ({ children, style, ...props }: GradientButtonProp
         fontWeight: 600,
         borderRadius: 10,
         background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-        border: 'none',
-        boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+        border: '1px solid #2563eb',
         transition: 'all 0.2s ease',
         ...style,
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-1px)';
-        e.currentTarget.style.boxShadow = '0 6px 20px rgba(37, 99, 235, 0.4)';
+        e.currentTarget.style.borderColor = '#1d4ed8';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)';
-        e.currentTarget.style.boxShadow = '0 4px 12px rgba(37, 99, 235, 0.3)';
+        e.currentTarget.style.borderColor = '#2563eb';
       }}
     >
       {children}

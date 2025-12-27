@@ -111,9 +111,12 @@
   transition: all 0.2s;
 }
 
+.headerButton {
+  border: 1px solid var(--landing-text);
+}
+
 .headerButton:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-color: #2563eb;
 }
 
 /* ========================================
@@ -159,7 +162,7 @@
   font-weight: 500;
   color: var(--landing-text);
   margin-bottom: 32px;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.05);
+  border: 1px solid rgba(37, 99, 235, 0.2);
   backdrop-filter: blur(8px);
 }
 
@@ -168,7 +171,6 @@
   height: 8px;
   background: #22c55e;
   border-radius: 50%;
-  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.2);
   animation: pulse 2s infinite;
 }
 
@@ -294,12 +296,11 @@
   cursor: pointer;
   transition: all 0.3s ease;
   text-decoration: none;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
+  border: 1px solid var(--landing-text);
 }
 
 .primaryButton:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+  border-color: #2563eb;
 }
 
 .secondaryButton {
@@ -321,7 +322,6 @@
 
 .secondaryButton:hover {
   background: rgba(255, 255, 255, 0.8);
-  transform: translateY(-2px);
 }
 
 /* ========================================
@@ -387,13 +387,11 @@
   transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
   overflow: hidden;
-  box-shadow: var(--landing-glass-shadow);
+  border: 1px solid var(--landing-glass-border);
 }
 
 .featureCard:hover {
-  transform: translateY(-8px);
-  box-shadow: var(--landing-glass-shadow-hover);
-  border-color: rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
 }
 
 .featureNumber {
@@ -452,13 +450,12 @@
   backdrop-filter: blur(16px);
   border: 1px solid var(--landing-glass-border);
   border-radius: 24px;
-  box-shadow: var(--landing-glass-shadow);
+  border: 1px solid var(--landing-glass-border);
   transition: all 0.3s ease;
 }
 
 .statItem:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--landing-glass-shadow-hover);
+  border-color: #2563eb;
 }
 
 .statValue {
@@ -515,8 +512,7 @@
 
 .step:hover {
   background: rgba(255, 255, 255, 0.9);
-  border-color: var(--landing-glass-border);
-  box-shadow: var(--landing-glass-shadow);
+  border-color: #2563eb;
 }
 
 .stepLine {
@@ -596,9 +592,7 @@
 }
 
 .pricingCard:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.1);
-  border-color: rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
 }
 
 .pricingCard:hover::before {
@@ -616,7 +610,7 @@
 }
 
 .pricingCardPopular:hover {
-  transform: scale(1.02) translateY(-8px);
+  transform: scale(1.02);
 }
 
 .pricingBadge {
@@ -797,12 +791,11 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+  border: 1px solid #2563eb;
 }
 
 .pricingButtonPrimary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35);
+  border-color: #1d4ed8;
 }
 
 /* ========================================

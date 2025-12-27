@@ -26,7 +26,6 @@ export const LimitReachedAlert = ({ limit, count }: LimitReachedAlertProps) => {
         border: '1px solid #fcd34d',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 4px 20px rgba(251, 191, 36, 0.15)',
       }}
     >
       {/* Decorative background elements */}
@@ -64,7 +63,7 @@ export const LimitReachedAlert = ({ limit, count }: LimitReachedAlertProps) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+            border: '1px solid #f59e0b',
             flexShrink: 0,
           }}
         >
@@ -110,10 +109,9 @@ export const LimitReachedAlert = ({ limit, count }: LimitReachedAlertProps) => {
             height: 48,
             borderRadius: 12,
             background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-            border: 'none',
+            border: '1px solid #f59e0b',
             fontWeight: 600,
             fontSize: 15,
-            boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
             paddingLeft: 20,
             paddingRight: 20,
           }}
