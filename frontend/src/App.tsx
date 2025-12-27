@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResumesListPage } from './pages/ResumesListPage';
@@ -22,8 +23,13 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Landing page - публичная */}
+        <Route path="/" element={<LandingPage />} />
+        
+        {/* Auth pages */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        
         {/* Новые маршруты для резюме */}
         <Route
           path="/resumes"
@@ -138,10 +144,9 @@ function App() {
         {/* Редиректы со старых маршрутов */}
         <Route path="/vacancies" element={<Navigate to="/resumes" replace />} />
         <Route path="/vacancies/:id" element={<Navigate to="/resumes" replace />} />
-        <Route
-          path="/"
-          element={<Navigate to={token ? '/resumes' : '/login'} replace />}
-        />
+        
+        {/* Fallback */}
+        <Route path="*" element={<Navigate to={token ? '/resumes' : '/'} replace />} />
       </Routes>
     </BrowserRouter>
   );

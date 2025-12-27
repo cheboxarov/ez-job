@@ -97,11 +97,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           icon: <CrownOutlined />,
           label: 'Планы',
         },
-        {
-          key: '/settings/hh-auth',
-          icon: <SettingOutlined />,
-          label: 'Настройки',
-        },
+        // Страница настроек HH сейчас не используется
       ]
     }
   ];

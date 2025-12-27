@@ -279,10 +279,11 @@ class RateLimitedHHHttpClient(HHHttpClient):
         internal_api_base_url: str = "https://novosibirsk.hh.ru",
         login_trust_flags: Optional[str] = None,
         return_cookies: bool = False,
+        captcha: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
         await self._limiter.acquire()
         return await super().generate_otp(
-            phone, headers, cookies, internal_api_base_url=internal_api_base_url, login_trust_flags=login_trust_flags, return_cookies=return_cookies
+            phone, headers, cookies, internal_api_base_url=internal_api_base_url, login_trust_flags=login_trust_flags, return_cookies=return_cookies, captcha=captcha
         )
 
     async def login_by_code(

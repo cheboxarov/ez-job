@@ -97,13 +97,11 @@ async def get_unit_of_work() -> AsyncGenerator[UnitOfWorkPort, None]:
 
 async def get_headers(
     current_user: UserModel = Depends(get_current_active_user),
-    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
 ) -> Dict[str, str]:
     """Возвращает заголовки для запросов к HH API из БД пользователя.
 
     Args:
         current_user: Текущий авторизованный пользователь.
-        unit_of_work: UnitOfWork для работы с БД.
 
     Returns:
         Словарь headers для HH API.
@@ -111,15 +109,13 @@ async def get_headers(
     Raises:
         HTTPException: 400 если HH auth data не заполнено у пользователя.
     """
-    auth_data = await unit_of_work.user_hh_auth_data_repository.get_by_user_id(
-        current_user.id
-    )
-    if auth_data is None:
+    headers = current_user.hh_headers
+    if not headers:
         raise HTTPException(
             status_code=400,
             detail="HH auth data not set",
         )
-    return auth_data.headers
+    return headers
 
 
 # Dependency для получения текущего авторизованного пользователя (модель)
@@ -153,13 +149,11 @@ async def get_current_user_domain(
 
 async def get_cookies(
     current_user: UserModel = Depends(get_current_active_user),
-    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
 ) -> Dict[str, str]:
     """Возвращает cookies для запросов к HH API из БД пользователя.
 
     Args:
         current_user: Текущий авторизованный пользователь.
-        unit_of_work: UnitOfWork для работы с БД.
 
     Returns:
         Словарь cookies для HH API.
@@ -167,15 +161,13 @@ async def get_cookies(
     Raises:
         HTTPException: 400 если HH auth data не заполнено у пользователя.
     """
-    auth_data = await unit_of_work.user_hh_auth_data_repository.get_by_user_id(
-        current_user.id
-    )
-    if auth_data is None:
+    cookies = current_user.hh_cookies
+    if not cookies:
         raise HTTPException(
             status_code=400,
             detail="HH auth data not set",
         )
-    return auth_data.cookies
+    return cookies
 
 
 async def get_vacancy_responses_service(

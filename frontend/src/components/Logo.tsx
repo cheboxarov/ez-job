@@ -5,22 +5,20 @@ export const Logo = () => {
     <Flex align="center" gap={8}>
       {/* SVG Иконка из logo.svg */}
       <div style={{ 
-        width: 80,
-        height: 80,
+        width: 96,
+        height: 96,
         flexShrink: 0,
-        overflow: 'hidden',
         display: 'flex',
-        alignItems: 'flex-start',
-        justifyContent: 'flex-start',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}>
         <img 
           src="/logo.svg" 
           alt="AutoOffer" 
           style={{ 
-            width: 96,
-            height: 96,
-            objectFit: 'cover',
-            objectPosition: 'left top',
+            width: '70%',
+            height: '70%',
+            objectFit: 'contain',
             display: 'block',
           }} 
         />

@@ -55,8 +55,34 @@ class CheckAndUpdateSubscriptionUseCase:
         user_subscription = await self._user_subscription_repository.get_by_user_id(
             user_id
         )
+        # Если подписки ещё нет — создаём FREE по умолчанию (get or create).
         if user_subscription is None:
-            raise ValueError(f"Подписка для пользователя {user_id} не найдена")
+            now = datetime.now(timezone.utc)
+            free_plan = await self._subscription_plan_repository.get_by_name("FREE")
+            if free_plan is None:
+                raise ValueError("FREE план не найден в БД")
+
+            user_subscription = UserSubscription(
+                user_id=user_id,
+                subscription_plan_id=free_plan.id,
+                responses_count=0,
+                # Старт периода и подписки ставим на сейчас,
+                # чтобы корректно работали расчёты лимитов.
+                period_started_at=now,
+                started_at=now,
+                expires_at=None,
+            )
+            user_subscription = await self._user_subscription_repository.create(
+                user_subscription
+            )
+
+            logger.info(
+                "Создана новая подписка FREE для пользователя {user_id}. "
+                "response_limit={response_limit}",
+                user_id=user_id,
+                response_limit=free_plan.response_limit,
+            )
+            return user_subscription, free_plan
 
         # Получаем текущий план
         plan = await self._subscription_plan_repository.get_by_id(

@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import asynccontextmanager
+from loguru import logger
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer
 
+from config import load_config
 from infrastructure.auth.fastapi_users_setup import auth_backend, fastapi_users
 from infrastructure.auth.schemas import UserCreate, UserRead, UserUpdate
 from presentation.routers.dictionaries_router import router as dictionaries_router
@@ -11,15 +16,71 @@ from presentation.routers.hh_auth_router import router as hh_auth_router
 from presentation.routers.resumes_router import router as resumes_router
 from presentation.routers.users_router import router as users_router
 from presentation.routers.vacancies_router import router
+from workers.auto_reply_worker import run_worker as run_auto_reply_worker
+from workers.chat_analysis_worker import run_worker as run_chat_analysis_worker
 
 # Настраиваем кастомную схему безопасности для Swagger
 # Используем HTTPBearer вместо OAuth2 для простого поля ввода токена
 security = HTTPBearer()
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle manager для запуска и остановки воркеров."""
+    # Startup: запускаем воркеры
+    logger.info("Запуск воркеров в lifecycle FastAPI...")
+    config = load_config()
+    
+    # Создаем события для управления остановкой воркеров
+    chat_analysis_shutdown = asyncio.Event()
+    auto_reply_shutdown = asyncio.Event()
+    
+    worker_shutdown_events = [chat_analysis_shutdown, auto_reply_shutdown]
+    
+    # Запускаем воркеры как фоновые задачи
+    chat_analysis_task = asyncio.create_task(
+        run_chat_analysis_worker(config, chat_analysis_shutdown)
+    )
+    auto_reply_task = asyncio.create_task(
+        run_auto_reply_worker(config, auto_reply_shutdown)
+    )
+    
+    worker_tasks = [chat_analysis_task, auto_reply_task]
+    
+    logger.info("Воркеры запущены")
+    
+    yield
+    
+    # Shutdown: останавливаем воркеры
+    logger.info("Остановка воркеров...")
+    # Устанавливаем события для остановки воркеров
+    for event in worker_shutdown_events:
+        event.set()
+    
+    # Ждем завершения всех задач (с таймаутом)
+    if worker_tasks:
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(*worker_tasks, return_exceptions=True),
+                timeout=30.0,  # 30 секунд на завершение
+            )
+            logger.info("Все воркеры успешно остановлены")
+        except asyncio.TimeoutError:
+            logger.warning("Таймаут при остановке воркеров, отменяем задачи...")
+            # Если таймаут, отменяем задачи
+            for task in worker_tasks:
+                if not task.done():
+                    task.cancel()
+            # Ждем завершения отмены
+            await asyncio.gather(*worker_tasks, return_exceptions=True)
+            logger.info("Воркеры остановлены принудительно")
+
+
 app = FastAPI(
     title="Вкатился API",
     description="API для получения релевантных вакансий с сопроводительными письмами",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 # Переопределяем OpenAPI схему для использования HTTPBearer вместо OAuth2

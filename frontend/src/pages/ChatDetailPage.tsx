@@ -100,7 +100,8 @@ export const ChatDetailPage = () => {
   };
 
   const isUserMessage = (message: ChatMessage) => {
-    return message.participant_display?.is_bot === true;
+    if (!chat) return false;
+    return message.participant_id === chat.current_participant_id;
   };
 
   useEffect(() => {
@@ -158,7 +159,11 @@ export const ChatDetailPage = () => {
         ]}
       />
 
-      <div style={{ maxWidth: 900, margin: '0 auto' }}>
+      <div
+        style={{
+          width: '100%',
+        }}
+      >
         {/* Messages area */}
         <div
           style={{
@@ -185,6 +190,9 @@ export const ChatDetailPage = () => {
           >
             {chat.messages && chat.messages.items.length > 0 ? (
               chat.messages.items.map((message: ChatMessage) => {
+            if (!message.text?.trim()) {
+              return null;
+            }
             const isUser = isUserMessage(message);
             return (
               <div

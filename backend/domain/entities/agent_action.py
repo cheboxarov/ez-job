@@ -46,7 +46,8 @@ class AgentAction:
     - event_type: str - тип события:
       * "call_request" - запрос на созвон/встречу/собеседование
       * "external_action_request" - когда требуется действие вне чата HH (анкета, форма и т.д.)
-    - message: str - краткое описание от LLM, что требуется сделать или куда нас зовут
+      * "question_answered" - когда работодатель отвечает на вопрос, заданный пользователем
+    - message: str - краткое описание от LLM, что требуется сделать или куда нас зовут (для call_request и external_action_request), или краткое описание ответа работодателя (для question_answered)
     """
 
     created_at: datetime
@@ -54,7 +55,7 @@ class AgentAction:
 
     updated_at: datetime
     """Время последнего обновления действия."""
-
+    
     resume_hash: str | None = None
     """Hash резюме, использованного при создании действия (опционально)."""
 

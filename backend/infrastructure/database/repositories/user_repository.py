@@ -56,6 +56,18 @@ class UserRepository(UserRepositoryPort):
 
         return self._to_domain(model)
 
+    async def list_all(self) -> list[User]:
+        """Получить всех пользователей из БД.
+
+        Returns:
+            Список доменных сущностей User.
+        """
+        stmt = select(UserModel).order_by(UserModel.id)
+        result = await self._session.execute(stmt)
+        models = result.scalars().all()
+
+        return [self._to_domain(model) for model in models]
+
     async def update(self, user: User) -> User:
         """Обновить пользователя.
 

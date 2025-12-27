@@ -2,17 +2,48 @@
 
 from __future__ import annotations
 
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.sql import func
 
 from domain.entities.user_hh_auth_data import UserHhAuthData
 from domain.interfaces.user_hh_auth_data_repository_port import (
     UserHhAuthDataRepositoryPort,
 )
-from infrastructure.database.models.user_hh_auth_data_model import UserHhAuthDataModel
+from infrastructure.database.models.user_model import UserModel
+
+
+# region agent log
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        Path("/Users/apple/dev/hh/.cursor/debug.log").open("a", encoding="utf-8").write(
+            json.dumps(
+                {
+                    "sessionId": "hh-deadlock",
+                    "runId": "pre-fix",
+                    "hypothesisId": hypothesis_id,
+                    "location": location,
+                    "message": message,
+                    "data": data,
+                    "pid": os.getpid(),
+                    "process": sys.argv[0] if sys.argv else None,
+                    "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+    except Exception:
+        pass
+# endregion
 
 
 class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
@@ -29,7 +60,7 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
     async def get_by_user_id(
         self, user_id: UUID, *, with_for_update: bool = False
     ) -> UserHhAuthData | None:
-        """Получить HH auth data по user_id.
+        """Получить HH auth data по user_id из таблицы users.
 
         Args:
             user_id: UUID пользователя.
@@ -38,9 +69,46 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         Returns:
             Доменная сущность UserHhAuthData или None, если не найдено.
         """
-        stmt = select(UserHhAuthDataModel).where(
-            UserHhAuthDataModel.user_id == user_id
+        _debug_log(
+            "H2",
+            "user_hh_auth_data_repository.get_by_user_id:enter",
+            "select user row",
+            {"user_id": str(user_id), "with_for_update": with_for_update, "session_id": id(self._session)},
         )
+
+        # Межпроцессная синхронизация обновления HH cookies:
+        # когда мы хотим блокировать строку пользователя (FOR UPDATE), дополнительно берём
+        # advisory lock на время транзакции. Это предотвращает дедлоки между API-сервером и воркерами,
+        # которые одновременно обновляют hh_cookies/hh_headers для одного user_id.
+        if with_for_update:
+            u = user_id.int
+            k1 = (u >> 96) & 0xFFFFFFFF
+            k2 = u & 0xFFFFFFFF
+
+            # Приводим к signed int32, чтобы гарантированно влазило в Postgres int4
+            if k1 >= 2**31:
+                k1 -= 2**32
+            if k2 >= 2**31:
+                k2 -= 2**32
+
+            _debug_log(
+                "H5",
+                "user_hh_auth_data_repository.get_by_user_id:before_advisory_lock",
+                "acquiring pg_advisory_xact_lock",
+                {"user_id": str(user_id), "k1": k1, "k2": k2, "session_id": id(self._session)},
+            )
+            await self._session.execute(
+                text("SELECT pg_advisory_xact_lock(:k1, :k2)"),
+                {"k1": k1, "k2": k2},
+            )
+            _debug_log(
+                "H5",
+                "user_hh_auth_data_repository.get_by_user_id:after_advisory_lock",
+                "pg_advisory_xact_lock acquired",
+                {"user_id": str(user_id), "session_id": id(self._session)},
+            )
+
+        stmt = select(UserModel).where(UserModel.id == user_id)
 
         if with_for_update:
             stmt = stmt.with_for_update()
@@ -59,7 +127,7 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         headers: dict[str, str],
         cookies: dict[str, str],
     ) -> UserHhAuthData:
-        """Создать или обновить HH auth data для пользователя.
+        """Создать или обновить HH auth data для пользователя в таблице users.
 
         Args:
             user_id: UUID пользователя.
@@ -69,57 +137,55 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         Returns:
             Сохраненная доменная сущность UserHhAuthData.
         """
-        # Используем PostgreSQL INSERT ... ON CONFLICT для upsert
-        stmt = (
-            insert(UserHhAuthDataModel)
-            .values(
-                user_id=user_id,
-                headers=headers,
-                cookies=cookies,
-            )
-            .on_conflict_do_update(
-                constraint="uq_user_hh_auth_data_user_id",
-                set_={
-                    "headers": headers,
-                    "cookies": cookies,
-                },
-            )
-            .returning(UserHhAuthDataModel)
+        _debug_log(
+            "H3",
+            "user_hh_auth_data_repository.upsert:enter",
+            "update user hh cookies/headers",
+            {"user_id": str(user_id), "session_id": id(self._session)},
         )
-
+        stmt = (
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(
+                hh_headers=headers,
+                hh_cookies=cookies,
+                hh_cookies_updated_at=func.now(),
+            )
+            .returning(UserModel)
+        )
         result = await self._session.execute(stmt)
-        model = result.scalar_one()
+        model = result.scalar_one_or_none()
+        if model is None:
+            raise ValueError(f"User with id={user_id} not found for HH auth update")
         await self._session.flush()
-
         return self._to_domain(model)
 
     async def delete(self, user_id: UUID) -> None:
-        """Удалить HH auth data для пользователя.
+        """Удалить HH auth data для пользователя (очистить HH поля в users).
 
         Args:
             user_id: UUID пользователя.
         """
-        stmt = select(UserHhAuthDataModel).where(
-            UserHhAuthDataModel.user_id == user_id
+        stmt = (
+            update(UserModel)
+            .where(UserModel.id == user_id)
+            .values(hh_headers=None, hh_cookies=None)
         )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        await self._session.execute(stmt)
+        await self._session.flush()
 
-        if model is not None:
-            await self._session.delete(model)
-            await self._session.flush()
-
-    def _to_domain(self, model: UserHhAuthDataModel) -> UserHhAuthData:
-        """Преобразовать SQLAlchemy модель в доменную сущность.
+    def _to_domain(self, model: UserModel) -> UserHhAuthData:
+        """Преобразовать UserModel в доменную сущность HH auth data.
 
         Args:
-            model: SQLAlchemy модель UserHhAuthDataModel.
+            model: SQLAlchemy модель UserModel.
 
         Returns:
             Доменная сущность UserHhAuthData.
         """
         return UserHhAuthData(
-            user_id=model.user_id,
-            headers=model.headers,
-            cookies=model.cookies,
+            user_id=model.id,
+            headers=model.hh_headers or {},
+            cookies=model.hh_cookies or {},
+            cookies_updated_at=model.hh_cookies_updated_at,
         )

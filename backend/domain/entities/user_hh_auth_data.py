@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from uuid import UUID
 
 
@@ -16,3 +17,4 @@ class UserHhAuthData:
     user_id: UUID
     headers: dict[str, str]
     cookies: dict[str, str]
+    cookies_updated_at: datetime | None = None

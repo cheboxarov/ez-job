@@ -235,19 +235,6 @@ export const EventsPage = () => {
                   gap: 12, 
                   marginBottom: 16 
                 }}>
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      background: 'linear-gradient(135deg, #2563eb 0%, #7c3aed 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <ClockCircleOutlined style={{ color: '#fff', fontSize: 16 }} />
-                  </div>
                   <Title level={4} style={{ margin: 0, color: '#0f172a', fontSize: 18, fontWeight: 600 }}>
                     {group.label}
                   </Title>

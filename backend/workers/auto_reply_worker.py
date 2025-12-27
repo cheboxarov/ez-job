@@ -43,7 +43,7 @@ logger.add(
 shutdown_event = asyncio.Event()
 
 
-def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
+def setup_signal_handlers(loop: asyncio.AbstractEventLoop, shutdown_event: asyncio.Event) -> None:
     """Настройка обработчиков сигналов для корректного завершения."""
     def signal_handler(signum: int) -> None:
         """Обработчик сигналов для корректного завершения."""
@@ -60,12 +60,16 @@ def setup_signal_handlers(loop: asyncio.AbstractEventLoop) -> None:
         signal.signal(signal.SIGTERM, lambda s, f: signal_handler(s))
 
 
-async def run_worker(config: AppConfig) -> None:
+async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = None) -> None:
     """Запустить воркер для обработки автооткликов.
 
     Args:
         config: Конфигурация приложения.
+        shutdown_event: Событие для управления остановкой воркера. Если None, используется глобальное.
     """
+    if shutdown_event is None:
+        shutdown_event = globals()["shutdown_event"]
+    
     logger.info("Запуск воркера автооткликов")
 
     # Создаем зависимости, которые не требуют UnitOfWork
@@ -215,18 +219,18 @@ async def run_worker(config: AppConfig) -> None:
 
 
 async def main() -> None:
-    """Главная функция воркера."""
+    """Главная функция воркера (используется при запуске как отдельного процесса)."""
     # Получаем текущий event loop
     loop = asyncio.get_running_loop()
     
     # Регистрируем обработчики сигналов
-    setup_signal_handlers(loop)
+    setup_signal_handlers(loop, shutdown_event)
 
     # Загружаем конфигурацию
     config = load_config()
 
     try:
-        await run_worker(config)
+        await run_worker(config, shutdown_event)
     except Exception as exc:
         logger.error(f"Критическая ошибка: {exc}", exc_info=True)
         sys.exit(1)

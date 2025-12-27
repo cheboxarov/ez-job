@@ -75,7 +75,10 @@ export const ProfilePage = () => {
 
   if (!user) return null;
 
-  const getInitials = (email: string) => email.substring(0, 2).toUpperCase();
+  const getInitials = (phone: string | undefined | null, email: string) => {
+    const source = phone && phone.length >= 4 ? phone.replace('+', '') : email;
+    return source.substring(0, 2).toUpperCase();
+  };
 
   const getPlanConfig = (planName: string) => {
     const configs: Record<string, { name: string; gradient: string; icon: React.ReactNode; badge: string }> = {
@@ -118,6 +121,28 @@ export const ProfilePage = () => {
     : 0;
 
   const planConfig = subscriptionData ? getPlanConfig(subscriptionData.plan_name) : getPlanConfig('FREE');
+
+  // Вычисляем период обновления лимита в днях
+  const getResetPeriodText = () => {
+    if (!subscriptionData) return 'Лимит/день';
+    const days = Math.floor(subscriptionData.reset_period_seconds / 86400);
+    if (days === 1) {
+      return 'Лимит/день';
+    }
+    // Правильное склонение для дней
+    const daysText = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
+    return `Лимит/${days} ${daysText}`;
+  };
+
+  const getLimitText = () => {
+    if (!subscriptionData) return 'откликов/день';
+    const days = Math.floor(subscriptionData.reset_period_seconds / 86400);
+    if (days === 1) {
+      return 'откликов/день';
+    }
+    const daysText = days === 1 ? 'день' : days < 5 ? 'дня' : 'дней';
+    return `откликов/${days} ${daysText}`;
+  };
 
   return (
     <div>
@@ -200,14 +225,14 @@ export const ProfilePage = () => {
                         border: '3px solid rgba(255,255,255,0.3)',
                         boxShadow: 'none',
                       }}
-                    >
-                      {getInitials(user.email)}
+                      >
+                      {getInitials(user.phone, user.email)}
                     </div>
                   </Col>
                   <Col flex="auto">
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                       <Title level={2} style={{ margin: 0, color: 'white', fontWeight: 700 }}>
-                        {user.email}
+                        {user.phone ?? 'Телефон не указан'}
                       </Title>
                       <div
                         style={{
@@ -223,10 +248,17 @@ export const ProfilePage = () => {
                         {planConfig.badge}
                       </div>
                     </div>
-                    <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 16 }}>
-                      <MailOutlined style={{ marginRight: 8 }} />
-                      Пользователь AutoOffer
-                    </Text>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>
+                        <MailOutlined style={{ marginRight: 8 }} />
+                        {user.email}
+                      </Text>
+                      {user.hh_user_id && (
+                        <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
+                          ID HH: {user.hh_user_id}
+                        </Text>
+                      )}
+                    </div>
                   </Col>
                 </Row>
               </div>
@@ -292,7 +324,7 @@ export const ProfilePage = () => {
                         <div>
                           <Text type="secondary" style={{ fontSize: 13, display: 'block' }}>Лимит</Text>
                           <Text strong style={{ fontSize: 15 }}>
-                            {subscriptionData.response_limit} откликов/день
+                            {subscriptionData.response_limit} {getLimitText()}
                           </Text>
                         </div>
                       </div>
@@ -346,7 +378,7 @@ export const ProfilePage = () => {
                       <Title level={2} style={{ margin: '0 0 4px', fontWeight: 800, color: '#2563eb' }}>
                         {dailyResponses.count}
                       </Title>
-                      <Text type="secondary" style={{ fontSize: 14 }}>Откликов сегодня</Text>
+                      <Text type="secondary" style={{ fontSize: 14 }}>Откликов отправлено</Text>
                     </div>
                   </Card>
                 </Tooltip>
@@ -438,7 +470,7 @@ export const ProfilePage = () => {
                       <Title level={2} style={{ margin: '0 0 4px', fontWeight: 800, color: '#9333ea' }}>
                         {subscriptionData.response_limit}
                       </Title>
-                      <Text type="secondary" style={{ fontSize: 14 }}>Лимит/день</Text>
+                      <Text type="secondary" style={{ fontSize: 14 }}>{getResetPeriodText()}</Text>
                     </div>
                   </Card>
                 </Tooltip>

@@ -1,17 +1,19 @@
-import { Form, Input, Button, Typography, message, Row, Col, Checkbox, Divider } from 'antd';
+import React, { useState, useRef } from 'react';
+import { Form, Input, Button, Typography, message, Row, Col, Divider } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
+import { ThreeBackgroundContainer } from '../components/landing/ThreeBackgroundContainer';
+import { Logo } from '../components/Logo';
 import { 
   RocketOutlined, 
-  MailOutlined, 
-  LockOutlined, 
-  GoogleOutlined,
+  PhoneOutlined,
   SearchOutlined,
   FileTextOutlined,
   BarChartOutlined,
   UserOutlined,
   ThunderboltOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ArrowLeftOutlined
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
@@ -105,16 +107,90 @@ const StatItem = ({ value, label }: { value: string; label: string }) => (
 
 export const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, loading, token } = useAuthStore();
+  const { loginWithHhOtp, loading, token } = useAuthStore();
+  const [form] = Form.useForm();
+  const [step, setStep] = useState<'phone' | 'code'>('phone');
+  const [intermediateCookies, setIntermediateCookies] = useState<Record<string, string> | null>(null);
+  const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const threeContainerRef = useRef<HTMLDivElement>(null);
 
   if (token) {
     navigate('/resumes');
     return null;
   }
 
-  const onFinish = async (values: { email: string; password: string }) => {
+  const formatPhoneInput = (value: string): string => {
+    // Удаляем все символы кроме цифр, +, -, (, ), пробелов
+    let cleaned = value.replace(/[^\d+\-()\s]/g, '');
+    
+    // Если начинается с 8, заменяем на +7
+    if (cleaned.startsWith('8')) {
+      cleaned = '+7' + cleaned.slice(1);
+    }
+    
+    // Если начинается с 7, добавляем +
+    if (cleaned.startsWith('7') && !cleaned.startsWith('+7')) {
+      cleaned = '+' + cleaned;
+    }
+    
+    // Если не начинается с +7, добавляем +7
+    if (!cleaned.startsWith('+7') && cleaned.length > 0) {
+      // Если уже есть +, но не +7, заменяем
+      if (cleaned.startsWith('+')) {
+        cleaned = '+7' + cleaned.slice(1);
+      } else {
+        cleaned = '+7' + cleaned;
+      }
+    }
+    
+    return cleaned;
+  };
+
+  const cleanPhoneNumber = (phone: string): string => {
+    // Удаляем все символы кроме цифр и +
+    return phone.replace(/[^\d+]/g, '');
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const formatted = formatPhoneInput(value);
+    form.setFieldsValue({ phone: formatted });
+  };
+
+  const handlePhoneSubmit = async (values: { phone: string }) => {
     try {
-      await login(values.email, values.password);
+      // Очищаем номер от всех символов кроме цифр и +
+      const cleanedPhone = cleanPhoneNumber(values.phone);
+      
+      if (!cleanedPhone.startsWith('+7') || cleanedPhone.length !== 12) {
+        message.error('Номер телефона должен быть в формате +7XXXXXXXXXX');
+        return;
+      }
+      // Запрашиваем OTP через backend (используем тот же роутер, что и в настройках)
+      const { generateOtp } = await import('../api/hhAuth');
+      const response = await generateOtp(cleanedPhone);
+      setIntermediateCookies(response.cookies);
+      setPhoneNumber(cleanedPhone);
+      setStep('code');
+      message.success('Код отправлен на ваш телефон');
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка при запросе кода');
+    }
+  };
+
+  const handleCodeSubmit = async (values: { code: string }) => {
+    try {
+      if (!intermediateCookies || !phoneNumber) {
+        message.error('Ошибка: промежуточные данные не найдены. Начните заново.');
+        return;
+      }
+      const code = values.code.trim();
+      if (!code || code.length < 4) {
+        message.error('Код должен содержать не менее 4 символов');
+        return;
+      }
+
+      await loginWithHhOtp({ phone: phoneNumber, code, cookies: intermediateCookies });
       message.success('Успешный вход');
       navigate('/resumes');
     } catch (error: any) {
@@ -128,25 +204,28 @@ export const LoginPage = () => {
       <Col xs={24} md={12} lg={10} xl={8} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ maxWidth: 440, width: '100%', margin: '0 auto', padding: '40px 24px' }}>
           
+          {/* Кнопка назад */}
+          <Button
+            type="text"
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate('/')}
+            style={{
+              color: '#64748b',
+              padding: '4px 8px',
+              marginBottom: 24,
+              fontSize: 14,
+              height: 'auto',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            Назад
+          </Button>
+          
           {/* Логотип */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 40 }}>
-            <div
-              style={{
-                width: 36,
-                height: 36,
-                background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)',
-              }}
-            >
-              <RocketOutlined style={{ color: 'white', fontSize: 18 }} />
-            </div>
-            <Title level={4} style={{ margin: 0, color: '#0f172a', fontWeight: 700, lineHeight: 1 }}>
-              AutoOffer
-            </Title>
+          <div style={{ marginBottom: 40 }}>
+            <Logo />
           </div>
 
           <Title level={2} style={{ marginBottom: 8, color: '#1e293b' }}>
@@ -157,47 +236,66 @@ export const LoginPage = () => {
           </Text>
 
           <Form
+            form={form}
             name="login"
-            onFinish={onFinish}
+            onFinish={step === 'phone' ? handlePhoneSubmit : handleCodeSubmit}
             layout="vertical"
             requiredMark={false}
             size="large"
           >
-            <Form.Item
-              name="email"
-              label={<span style={{ fontWeight: 500 }}>Email</span>}
-              rules={[
-                { required: true, message: 'Пожалуйста, введите email' },
-                { type: 'email', message: 'Некорректный email' },
-              ]}
-            >
-              <Input 
-                prefix={<MailOutlined style={{ color: '#94a3b8' }} />} 
-                placeholder="name@example.com" 
-                style={{ borderRadius: 8, padding: '10px 12px' }}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="password"
-              label={<span style={{ fontWeight: 500 }}>Пароль</span>}
-              rules={[{ required: true, message: 'Пожалуйста, введите пароль' }]}
-            >
-              <Input.Password 
-                prefix={<LockOutlined style={{ color: '#94a3b8' }} />} 
-                placeholder="••••••••" 
-                style={{ borderRadius: 8, padding: '10px 12px' }}
-              />
-            </Form.Item>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 24, alignItems: 'center' }}>
-              <Form.Item name="remember" valuePropName="checked" noStyle>
-                <Checkbox>Запомнить меня</Checkbox>
-              </Form.Item>
-              <a href="#" onClick={(e) => e.preventDefault()} style={{ color: '#2563eb', fontWeight: 500 }}>
-                Забыли пароль?
-              </a>
-            </div>
+            {step === 'phone' ? (
+              <>
+                <Form.Item
+                  name="phone"
+                  label={
+                    <span style={{ fontWeight: 500 }}>
+                      Номер телефона{' '}
+                      <span style={{ color: '#2563eb' }}>HeadHunter</span>
+                    </span>
+                  }
+                  rules={[
+                    { required: true, message: 'Пожалуйста, введите номер телефона' },
+                    {
+                      validator: (_, value) => {
+                        if (!value) {
+                          return Promise.resolve();
+                        }
+                        const cleaned = cleanPhoneNumber(value);
+                        if (cleaned.startsWith('+7') && cleaned.length === 12) {
+                          return Promise.resolve();
+                        }
+                        return Promise.reject(new Error('Номер должен быть в формате +7XXXXXXXXXX'));
+                      },
+                    },
+                  ]}
+                >
+                  <Input 
+                    prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />} 
+                    placeholder="+7 ХХХ ХХХ ХХ ХХ" 
+                    style={{ borderRadius: 8, padding: '10px 12px' }}
+                    onChange={handlePhoneChange}
+                    maxLength={20}
+                  />
+                </Form.Item>
+              </>
+            ) : (
+              <>
+                <Form.Item
+                  name="code"
+                  label={<span style={{ fontWeight: 500 }}>Код из SMS</span>}
+                  rules={[
+                    { required: true, message: 'Пожалуйста, введите код' },
+                    { min: 4, message: 'Код должен содержать не менее 4 символов' },
+                  ]}
+                >
+                  <Input
+                    prefix={<ThunderboltOutlined style={{ color: '#94a3b8' }} />}
+                    placeholder="Введите код"
+                    style={{ borderRadius: 8, padding: '10px 12px' }}
+                  />
+                </Form.Item>
+              </>
+            )}
 
             <Form.Item>
               <Button 
@@ -215,49 +313,55 @@ export const LoginPage = () => {
                   boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
                 }}
               >
-                Войти
+                {step === 'phone' ? 'Получить код' : 'Войти'}
               </Button>
             </Form.Item>
 
-            <div style={{ position: 'relative', margin: '32px 0', textAlign: 'center' }}>
-              <Divider style={{ margin: 0, color: '#94a3b8', fontSize: 14 }}>или</Divider>
-            </div>
-
-            <Button 
-              block 
-              icon={<GoogleOutlined />} 
-              style={{ 
-                height: 48, 
-                borderRadius: 8, 
-                fontWeight: 500,
-                borderColor: '#e2e8f0',
-                color: '#475569'
-              }}
-              onClick={() => message.info('Авторизация через Google скоро будет доступна')}
-            >
-              Войти через Google
-            </Button>
-
-            <div style={{ textAlign: 'center', marginTop: 32, color: '#64748b' }}>
-              Нет аккаунта?{' '}
-              <a href="/register" style={{ color: '#2563eb', fontWeight: 600 }}>
-                Зарегистрироваться
-              </a>
-            </div>
+            {step === 'code' && (
+              <div style={{ textAlign: 'center', marginTop: 16 }}>
+                <a
+                  onClick={(e) => {
+                    e.preventDefault();
+                    form.resetFields();
+                    setStep('phone');
+                    setIntermediateCookies(null);
+                    setPhoneNumber('');
+                  }}
+                  style={{ color: '#2563eb', fontWeight: 500 }}
+                >
+                  Изменить номер телефона
+                </a>
+              </div>
+            )}
           </Form>
         </div>
       </Col>
 
       {/* Правая часть - Bento Grid */}
       <Col xs={0} md={12} lg={14} xl={16} style={{ position: 'relative', overflow: 'hidden' }}>
+        {/* 3D Background - контейнер */}
+        <div 
+          ref={threeContainerRef}
+          style={{ 
+            position: 'absolute', 
+            top: 0, 
+            left: 0, 
+            width: '100%', 
+            height: '100%',
+            zIndex: 0,
+            overflow: 'hidden'
+          }}
+        >
+          <ThreeBackgroundContainer containerRef={threeContainerRef} />
+        </div>
+        
         <div
           style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
+            position: 'relative',
+            zIndex: 1,
             width: '100%',
             height: '100%',
-            background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1e40af 100%)',
+            background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.7) 0%, rgba(30, 58, 95, 0.7) 50%, rgba(30, 64, 175, 0.7) 100%)',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'center',

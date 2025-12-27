@@ -3,6 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import json
+import os
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from uuid import UUID
 
@@ -16,6 +21,31 @@ from domain.entities.vacancy_test import VacancyTest
 from domain.interfaces.hh_client_port import HHClientPort
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 from loguru import logger
+
+
+# region agent log
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        Path("/Users/apple/dev/hh/.cursor/debug.log").open("a", encoding="utf-8").write(
+            json.dumps(
+                {
+                    "sessionId": "hh-deadlock",
+                    "runId": "pre-fix",
+                    "hypothesisId": hypothesis_id,
+                    "location": location,
+                    "message": message,
+                    "data": data,
+                    "pid": os.getpid(),
+                    "process": sys.argv[0] if sys.argv else None,
+                    "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                },
+                ensure_ascii=False,
+            )
+            + "\n"
+        )
+    except Exception:
+        pass
+# endregion
 
 
 class HHHttpClientWithCookieUpdate(HHClientPort):
@@ -52,7 +82,19 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         Args:
             updated_cookies: Обновленные cookies из ответа HH API.
         """
+        _debug_log(
+            "H1",
+            "hh_client_with_cookie_update._update_cookies:before_lock",
+            "waiting for per-instance cookie lock",
+            {"user_id": str(self._user_id), "updated_cookie_keys_count": len(updated_cookies)},
+        )
         async with self._cookies_lock:
+            _debug_log(
+                "H1",
+                "hh_client_with_cookie_update._update_cookies:after_lock",
+                "acquired per-instance cookie lock",
+                {"user_id": str(self._user_id)},
+            )
             try:
                 await self._update_cookies_uc.execute(
                     user_id=self._user_id,
@@ -63,6 +105,12 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
                     f"Cookies keys: {list(updated_cookies.keys())}"
                 )
             except Exception as exc:
+                _debug_log(
+                    "H4",
+                    "hh_client_with_cookie_update._update_cookies:exception",
+                    "cookie update failed",
+                    {"user_id": str(self._user_id), "exc_type": exc.__class__.__name__},
+                )
                 # Логируем ошибку, но не прерываем выполнение основного запроса
                 logger.warning(
                     f"Failed to update cookies for user_id={self._user_id}: {exc}",
@@ -80,6 +128,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_vacancy_list(
             headers, cookies, query, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -97,6 +146,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_vacancy_list_front(
             headers, cookies, query, internal_api_base_url=internal_api_base_url, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -113,6 +163,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_vacancy_detail(
             vacancy_id, headers, cookies, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -128,6 +179,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_areas(
             headers, cookies, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -149,6 +201,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             internal_api_base_url=internal_api_base_url,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -194,6 +247,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             test_metadata=test_metadata,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -210,6 +264,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_resumes(
             headers, cookies, internal_api_base_url=internal_api_base_url, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -227,6 +282,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_resume_detail(
             resume_hash, headers, cookies, internal_api_base_url=internal_api_base_url, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -245,6 +301,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_chat_list(
             chat_ids, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=True, filter_unread=filter_unread
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -262,6 +319,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         result, updated_cookies = await self._hh_client.fetch_chat_detail(
             chat_id, headers, cookies, chatik_api_base_url=chatik_api_base_url, return_cookies=True
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -285,6 +343,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             undirectable=undirectable,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -299,6 +358,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
         internal_api_base_url: str = "https://novosibirsk.hh.ru",
         login_trust_flags: Optional[str] = None,
         return_cookies: bool = False,
+        captcha: Optional[Dict[str, str]] = None,
     ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
         result, updated_cookies = await self._hh_client.generate_otp(
             phone,
@@ -306,8 +366,10 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             cookies,
             internal_api_base_url=internal_api_base_url,
             login_trust_flags=login_trust_flags,
+            captcha=captcha,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -337,6 +399,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             login_trust_flags=login_trust_flags,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -366,6 +429,7 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             hhtm_source_label=hhtm_source_label,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies
@@ -393,6 +457,69 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             hhtm_source_label=hhtm_source_label,
             return_cookies=True,
         )
+        cookies.update(updated_cookies)
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def get_initial_cookies(
+        self,
+        *,
+        backurl: str = "",
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Dict[str, str] | tuple[Dict[str, str], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.get_initial_cookies(
+            backurl=backurl,
+            internal_api_base_url=internal_api_base_url,
+            return_cookies=True,
+        )
+        # Для get_initial_cookies обновление cookies в БД не требуется,
+        # так как это начальные куки, которые еще не привязаны к пользователю
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def get_captcha_key(
+        self,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        lang: str = "RU",
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.get_captcha_key(
+            headers,
+            cookies,
+            lang=lang,
+            internal_api_base_url=internal_api_base_url,
+            return_cookies=True,
+        )
+        cookies.update(updated_cookies)
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
+    async def get_captcha_picture(
+        self,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        captcha_key: str,
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.get_captcha_picture(
+            headers,
+            cookies,
+            captcha_key=captcha_key,
+            internal_api_base_url=internal_api_base_url,
+            return_cookies=True,
+        )
+        cookies.update(updated_cookies)
         await self._update_cookies(updated_cookies)
         if return_cookies:
             return result, updated_cookies

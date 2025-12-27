@@ -33,8 +33,9 @@ class GenerateOtpUseCase:
         phone: str,
         headers: Dict[str, str],
         cookies: Dict[str, str],
-        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        internal_api_base_url: str = "https://hh.ru",
         login_trust_flags: Optional[str] = None,
+        captcha: Optional[Dict[str, str]] = None,
     ) -> tuple[Dict[str, Any], Dict[str, str]]:
         """Запросить OTP код на телефон.
 
@@ -64,6 +65,7 @@ class GenerateOtpUseCase:
                 cookies=cookies,
                 internal_api_base_url=internal_api_base_url,
                 login_trust_flags=login_trust_flags,
+                captcha=captcha,
                 return_cookies=True,
             )
             logger.info(f"Успешно запрошен OTP код для телефона {phone}")

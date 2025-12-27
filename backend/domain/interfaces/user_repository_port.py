@@ -34,6 +34,14 @@ class UserRepositoryPort(ABC):
         """
 
     @abstractmethod
+    async def list_all(self) -> list[User]:
+        """Получить всех пользователей из БД.
+
+        Returns:
+            Список доменных сущностей User.
+        """
+
+    @abstractmethod
     async def update(self, user: User) -> User:
         """Обновить пользователя.
 

@@ -304,9 +304,10 @@ class HHClientPort(ABC):
         headers: Dict[str, str],
         cookies: Dict[str, str],
         *,
-        internal_api_base_url: str = "https://novosibirsk.hh.ru",
+        internal_api_base_url: str = "https://hh.ru",
         login_trust_flags: Optional[str] = None,
         return_cookies: bool = False,
+        captcha: Optional[Dict[str, str]] = None,
     ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
         """Запросить код OTP на телефон по /account/otp_generate.
         
@@ -318,6 +319,52 @@ class HHClientPort(ABC):
             login_trust_flags: Флаги доверия логина.
             return_cookies: Если True, возвращает tuple (result, updated_cookies).
         
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def get_captcha_key(
+        self,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        lang: str = "RU",
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Получить ключ капчи HH через /captcha?lang=RU.
+
+        Args:
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            lang: Язык капчи (по умолчанию RU).
+            internal_api_base_url: Базовый URL HH.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+
+        Returns:
+            Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def get_captcha_picture(
+        self,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        captcha_key: str,
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Получить картинку капчи HH через /captcha/picture?key=...
+
+        Args:
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            captcha_key: Ключ капчи.
+            internal_api_base_url: Базовый URL HH.
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+
         Returns:
             Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
         """
@@ -411,5 +458,24 @@ class HHClientPort(ABC):
         
         Returns:
             Dict[str, Any] или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
+    async def get_initial_cookies(
+        self,
+        *,
+        backurl: str = "",
+        internal_api_base_url: str = "https://hh.ru",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, str], tuple[Dict[str, str], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Получить начальные куки через GET запрос на /account/login?role=applicant&backurl=...
+        
+        Args:
+            backurl: URL для редиректа после входа (опционально).
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            return_cookies: Если True, возвращает tuple (cookies, updated_cookies).
+        
+        Returns:
+            Dict[str, str] с начальными куки или tuple[Dict[str, str], Dict[str, str]] если return_cookies=True.
         """
 

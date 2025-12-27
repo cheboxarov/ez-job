@@ -39,11 +39,14 @@ class FetchUserChatsUseCase:
             client = HHHttpClientWithCookieUpdate(self._hh_client, user_id, update_cookies_uc)
         else:
             client = self._hh_client
+        
         # Вызываем fetch_chat_list с пустым списком ID для получения всех чатов
-        return await client.fetch_chat_list(
+        result = await client.fetch_chat_list(
             chat_ids=[],
             headers=headers,
             cookies=cookies,
             filter_unread=True,
         )
+        
+        return result
 
