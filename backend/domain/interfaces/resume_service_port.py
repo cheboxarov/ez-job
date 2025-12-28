@@ -5,7 +5,7 @@ from __future__ import annotations
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Dict
+from typing import Any, Dict, List
 from uuid import UUID
 
 from domain.entities.resume import Resume
@@ -127,4 +127,62 @@ class ResumeServicePort(ABC):
 
         Returns:
             Список созданных резюме в БД.
+        """
+
+    @abstractmethod
+    async def edit_hh_resume(
+        self,
+        user_id: UUID,
+        resume_hash: str,
+        experience: List[Dict[str, Any]],
+        hh_client: HHClientPort,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+    ) -> Dict[str, Any]:
+        """Редактировать резюме на HeadHunter.
+
+        Args:
+            user_id: UUID пользователя.
+            resume_hash: Hash резюме для редактирования.
+            experience: Список объектов опыта работы для обновления.
+            hh_client: Клиент для работы с HeadHunter API.
+            headers: Заголовки для запроса к HH API.
+            cookies: Куки для запроса к HH API.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+
+        Returns:
+            Dict[str, Any] с результатом редактирования.
+        """
+
+    @abstractmethod
+    async def touch_hh_resume_edit(
+        self,
+        user_id: UUID,
+        resume_hash: str,
+        hh_client: HHClientPort,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+    ) -> Dict:
+        """Отправить пустой запрос на редактирование резюме на HeadHunter.
+
+        Используется для "касания" резюме через edit endpoint без изменения данных.
+
+        Args:
+            user_id: UUID пользователя.
+            resume_hash: Hash резюме.
+            hh_client: Клиент для работы с HeadHunter API.
+            headers: Заголовки для запроса к HH API.
+            cookies: Куки для запроса к HH API.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+
+        Returns:
+            Dict с результатом запроса.
         """

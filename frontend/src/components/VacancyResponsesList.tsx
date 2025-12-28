@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Card, Typography, Spin, Alert, Pagination, Space, Button, Divider, theme } from 'antd';
 import { LinkOutlined, FileTextOutlined, CalendarOutlined } from '@ant-design/icons';
-import { getVacancyResponses } from '../api/vacancies';
-import type { VacancyResponseItem, VacancyResponsesListResponse } from '../types/api';
+import { useVacancyResponsesStore } from '../stores/vacancyResponsesStore';
+import type { VacancyResponseItem } from '../types/api';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -11,58 +11,36 @@ interface VacancyResponsesListProps {
 }
 
 export const VacancyResponsesList = ({ resumeHash }: VacancyResponsesListProps) => {
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [responses, setResponses] = useState<VacancyResponseItem[]>([]);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    offset: 0,
-    limit: 50,
-    current: 1,
-  });
-
   const {
     token: { colorBgContainer, borderRadiusLG },
   } = theme.useToken();
 
-  const loadResponses = async (page: number = 1) => {
-    if (!resumeHash) return;
-
-    setLoading(true);
-    setError(null);
-
-    const offset = (page - 1) * pagination.limit;
-
-    try {
-      const data: VacancyResponsesListResponse = await getVacancyResponses({
-        resume_hash: resumeHash,
-        offset,
-        limit: pagination.limit,
-      });
-
-      setResponses(data.items);
-      setPagination({
-        total: data.total,
-        offset: data.offset,
-        limit: data.limit,
-        current: page,
-      });
-    } catch (err: any) {
-      const errorMessage =
-        err.response?.data?.detail || 'Ошибка при загрузке откликов';
-      setError(errorMessage);
-      setResponses([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    responses,
+    pagination,
+    loading,
+    fetchResponses,
+  } = useVacancyResponsesStore();
 
   useEffect(() => {
-    loadResponses(1);
-  }, [resumeHash]);
+    const loadResponses = async () => {
+      if (!resumeHash) return;
+      setError(null);
+      try {
+        await fetchResponses(resumeHash, 1);
+      } catch (err: any) {
+        const errorMessage =
+          err.response?.data?.detail || 'Ошибка при загрузке откликов';
+        setError(errorMessage);
+      }
+    };
+    loadResponses();
+  }, [resumeHash, fetchResponses]);
 
   const handlePageChange = (page: number) => {
-    loadResponses(page);
+    if (!resumeHash) return;
+    fetchResponses(resumeHash, page);
   };
 
   const formatDate = (dateString: string) => {

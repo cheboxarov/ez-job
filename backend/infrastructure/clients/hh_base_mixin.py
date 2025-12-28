@@ -8,6 +8,7 @@ import re
 import time
 
 import httpx
+from loguru import logger
 
 
 @lru_cache(maxsize=1)
@@ -112,7 +113,7 @@ class HHBaseMixin:
             xsrf_token = cookies.get("_xsrf") or headers.get("x-xsrftoken") or headers.get("X-Xsrftoken") or ""
             if xsrf_token:
                 enhanced.setdefault("X-Xsrftoken", xsrf_token)
-        print(enhanced)
+        logger.debug(f"Enhanced headers: {enhanced}")
         return enhanced
 
     def _enhance_headers_for_html(self, headers: Dict[str, str], cookies: Dict[str, str] | None = None) -> Dict[str, str]:

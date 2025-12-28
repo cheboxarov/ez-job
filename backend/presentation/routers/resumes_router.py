@@ -14,9 +14,11 @@ from infrastructure.auth.fastapi_users_setup import get_current_active_user
 from infrastructure.clients.hh_client import HHHttpClient
 from infrastructure.database.models.user_model import UserModel
 from presentation.dependencies import (
+    get_evaluate_resume_use_case,
     get_filter_settings_generation_service,
     get_unit_of_work,
 )
+from presentation.dto.resume_evaluation_response import ResumeEvaluationResponse
 from presentation.dto.resume_request import CreateResumeRequest, UpdateResumeRequest
 from presentation.dto.resume_response import ResumeResponse, ResumesListResponse
 from presentation.dto.resume_filter_settings_dto import (
@@ -124,6 +126,7 @@ async def update_resume(
             content=request.content,
             user_parameters=request.user_parameters,
             is_auto_reply=request.is_auto_reply,
+            autolike_threshold=request.autolike_threshold,
         )
         return ResumeResponse.from_entity(resume)
     except PermissionError as exc:
@@ -379,6 +382,41 @@ async def suggest_resume_filter_settings(
         raise HTTPException(
             status_code=500,
             detail="Внутренняя ошибка при генерации настроек фильтров",
+        ) from exc
+
+
+@router.post("/{resume_id}/evaluate", response_model=ResumeEvaluationResponse)
+async def evaluate_resume(
+    resume_id: UUID,
+    current_user: UserModel = Depends(get_current_active_user),
+    service: ResumeServicePort = Depends(get_resumes_service),
+    evaluate_uc=Depends(get_evaluate_resume_use_case),
+) -> ResumeEvaluationResponse:
+    """Оценить резюме на основе правил."""
+    try:
+        # Проверяем принадлежность резюме
+        resume = await service.get_resume(resume_id=resume_id, user_id=current_user.id)
+        if resume is None:
+            raise HTTPException(
+                status_code=404, detail=f"Резюме с ID {resume_id} не найдено"
+            )
+
+        if not resume.content:
+            raise HTTPException(
+                status_code=400, detail="Текст резюме пуст"
+            )
+
+        result = await evaluate_uc.execute(resume.content)
+        return ResumeEvaluationResponse(**result)
+    except PermissionError as exc:
+        logger.warning(f"Попытка оценить чужое резюме: {exc}")
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Ошибка при оценке резюме: {exc}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail="Внутренняя ошибка при оценке резюме"
         ) from exc
 
 

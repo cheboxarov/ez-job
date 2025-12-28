@@ -27,6 +27,7 @@ class UpdateResumeUseCase:
         content: str | None = None,
         user_parameters: str | None = None,
         is_auto_reply: bool | None = None,
+        autolike_threshold: int | None = None,
     ) -> Resume:
         """Обновить резюме.
 
@@ -38,6 +39,7 @@ class UpdateResumeUseCase:
             content: Новый текст резюме (опционально).
             user_parameters: Новые параметры фильтрации (опционально).
             is_auto_reply: Включен ли автоматический отклик (опционально).
+            autolike_threshold: Порог автолика в процентах (0-100) (опционально).
 
         Returns:
             Обновленная доменная сущность Resume.
@@ -72,6 +74,11 @@ class UpdateResumeUseCase:
             headhunter_hash=existing_resume.headhunter_hash,
             is_auto_reply=(
                 is_auto_reply if is_auto_reply is not None else existing_resume.is_auto_reply
+            ),
+            autolike_threshold=(
+                autolike_threshold
+                if autolike_threshold is not None
+                else existing_resume.autolike_threshold
             ),
         )
 

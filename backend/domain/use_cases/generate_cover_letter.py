@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from loguru import logger
+
 from domain.entities.filtered_vacancy import FilteredVacancyDetail
 from domain.interfaces.cover_letter_service_port import CoverLetterServicePort
 
@@ -37,5 +39,5 @@ class GenerateCoverLetterUseCase:
             cover_letter = await self._service.generate(vacancy, resume)
             return cover_letter
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[usecase] ошибка при генерации письма: {exc}", flush=True)
+            logger.error(f"[usecase] ошибка при генерации письма: {exc}", exc_info=True)
             return ""

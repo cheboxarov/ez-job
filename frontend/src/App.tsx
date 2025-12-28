@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -7,6 +8,7 @@ import { ResumeDetailPage } from './pages/ResumeDetailPage';
 import { ResumeVacanciesPage } from './pages/ResumeVacanciesPage';
 import { ResumeResponsesPage } from './pages/ResumeResponsesPage';
 import { HhAuthSettingsPage } from './pages/HhAuthSettingsPage';
+import { TelegramSettingsPage } from './pages/TelegramSettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PlansPage } from './pages/PlansPage';
 import { StatisticsPage } from './pages/StatisticsPage';
@@ -16,12 +18,34 @@ import { EventsPage } from './pages/EventsPage';
 import { MainLayout } from './components/Layout/MainLayout';
 import { ProtectedRoute } from './components/Layout/ProtectedRoute';
 import { useAuthStore } from './stores/authStore';
+import { trackPageView } from './utils/yandex-metrika';
+
+// ID счетчика Яндекс.Метрики
+const YANDEX_METRIKA_ID = 106056695;
+
+// Компонент для отслеживания навигации в SPA
+function PageTracker() {
+  const location = useLocation();
+
+  useEffect(() => {
+    // Отслеживаем просмотр страницы при изменении маршрута
+    trackPageView(YANDEX_METRIKA_ID, location.pathname + location.search);
+  }, [location]);
+
+  return null;
+}
 
 function App() {
-  const { token } = useAuthStore();
+  const { token, initialize } = useAuthStore();
+
+  // Инициализируем приложение при монтировании
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
 
   return (
     <BrowserRouter>
+      <PageTracker />
       <Routes>
         {/* Landing page - публичная */}
         <Route path="/" element={<LandingPage />} />
@@ -77,6 +101,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <HhAuthSettingsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings/telegram"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <TelegramSettingsPage />
               </MainLayout>
             </ProtectedRoute>
           }

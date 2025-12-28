@@ -9,7 +9,7 @@ import {
   LockOutlined
 } from '@ant-design/icons';
 import { listResumes, importResumesFromHH } from '../api/resumes';
-import { getDailyResponses } from '../api/subscription';
+import { useDailyResponsesStore } from '../stores/dailyResponsesStore';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { LimitReachedAlert } from '../components/LimitReachedAlert';
@@ -21,7 +21,7 @@ export const ResumesListPage = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [dailyResponses, setDailyResponses] = useState<{ count: number; limit: number } | null>(null);
+  const { count, limit, fetchDailyResponses } = useDailyResponsesStore();
 
   useEffect(() => {
     const initializePage = async () => {
@@ -32,11 +32,11 @@ export const ResumesListPage = () => {
       // И снова загружаем резюме
       await loadResumes();
       // Загружаем лимиты
-      await loadDailyResponses();
+      await fetchDailyResponses();
     };
     
     initializePage();
-  }, []);
+  }, [fetchDailyResponses]);
 
   const loadResumes = async () => {
     setError(null);
@@ -48,15 +48,6 @@ export const ResumesListPage = () => {
     }
   };
 
-  const loadDailyResponses = async () => {
-    try {
-      const response = await getDailyResponses();
-      setDailyResponses({ count: response.count, limit: response.limit });
-    } catch (err) {
-      // Игнорируем ошибки загрузки лимитов
-      setDailyResponses(null);
-    }
-  };
 
   const importFromHH = async () => {
     try {
@@ -99,12 +90,10 @@ export const ResumesListPage = () => {
       )}
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        {dailyResponses && 
-         dailyResponses.count >= dailyResponses.limit && 
-         dailyResponses.limit < 200 && (
+        {count >= limit && limit < 200 && (
           <LimitReachedAlert 
-            limit={dailyResponses.limit} 
-            count={dailyResponses.count} 
+            limit={limit} 
+            count={count} 
           />
         )}
 
@@ -132,10 +121,8 @@ export const ResumesListPage = () => {
                 boxShadow: 'none',
               }}
               styles={{ body: { padding: 0 } }}
-              onMouseEnter={(e) => {
-                const stripColor = dailyResponses && 
-                                 dailyResponses.count >= dailyResponses.limit && 
-                                 dailyResponses.limit < 200
+                onMouseEnter={(e) => {
+                const stripColor = count >= limit && limit < 200
                   ? '#f59e0b'
                   : resume.is_auto_reply 
                     ? '#22c55e'
@@ -151,9 +138,7 @@ export const ResumesListPage = () => {
                 <div
                   style={{
                     width: 6,
-                    background: dailyResponses && 
-                               dailyResponses.count >= dailyResponses.limit && 
-                               dailyResponses.limit < 200
+                    background: count >= limit && limit < 200
                       ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'
                       : resume.is_auto_reply 
                         ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)'
@@ -169,9 +154,7 @@ export const ResumesListPage = () => {
                         style={{
                           width: 44,
                           height: 44,
-                          background: dailyResponses && 
-                                     dailyResponses.count >= dailyResponses.limit && 
-                                     dailyResponses.limit < 200
+                          background: count >= limit && limit < 200
                             ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
                             : resume.is_auto_reply 
                               ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
@@ -182,9 +165,7 @@ export const ResumesListPage = () => {
                           justifyContent: 'center',
                         }}
                       >
-                        {dailyResponses && 
-                         dailyResponses.count >= dailyResponses.limit && 
-                         dailyResponses.limit < 200 ? (
+                        {count >= limit && limit < 200 ? (
                           <LockOutlined style={{ fontSize: 20, color: '#d97706' }} />
                         ) : (
                           <FileTextOutlined style={{ 
@@ -207,9 +188,7 @@ export const ResumesListPage = () => {
                               Автоотклик активен
                             </Tag>
                           )}
-                          {dailyResponses && 
-                           dailyResponses.count >= dailyResponses.limit && 
-                           dailyResponses.limit < 200 && (
+                          {count >= limit && limit < 200 && (
                             <Tag 
                               icon={<LockOutlined />}
                               style={{ 

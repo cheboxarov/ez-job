@@ -12,9 +12,10 @@ import {
   FireOutlined
 } from '@ant-design/icons';
 import { useAuthStore } from '../stores/authStore';
-import { getMySubscriptionPlan, getDailyResponses } from '../api/subscription';
+import { useDailyResponsesStore } from '../stores/dailyResponsesStore';
+import { getMySubscriptionPlan } from '../api/subscription';
 import { PageHeader } from '../components/PageHeader';
-import type { UserSubscriptionResponse, DailyResponsesResponse } from '../types/api';
+import type { UserSubscriptionResponse } from '../types/api';
 
 const { Text, Title } = Typography;
 
@@ -50,19 +51,17 @@ const formatDateTime = (dateString: string | null): string => {
 export const ProfilePage = () => {
   const { user } = useAuthStore();
   const [subscriptionData, setSubscriptionData] = useState<UserSubscriptionResponse | null>(null);
-  const [dailyResponses, setDailyResponses] = useState<DailyResponsesResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const { count, limit, remaining, secondsUntilReset, fetchDailyResponses } = useDailyResponsesStore();
 
   useEffect(() => {
     const loadSubscriptionData = async () => {
       setLoading(true);
       try {
-        const [subscription, responses] = await Promise.all([
-          getMySubscriptionPlan(),
-          getDailyResponses(),
-        ]);
+        const subscription = await getMySubscriptionPlan();
         setSubscriptionData(subscription);
-        setDailyResponses(responses);
+        // Загружаем daily responses через store
+        await fetchDailyResponses();
       } catch (error: any) {
         message.error(error.response?.data?.detail || 'Ошибка при загрузке данных подписки');
       } finally {
@@ -71,7 +70,7 @@ export const ProfilePage = () => {
     };
 
     loadSubscriptionData();
-  }, []);
+  }, [fetchDailyResponses]);
 
   if (!user) return null;
 
@@ -165,7 +164,7 @@ export const ProfilePage = () => {
           }}>
             <Spin size="large" />
           </div>
-        ) : subscriptionData && dailyResponses ? (
+        ) : subscriptionData ? (
           <>
             {/* Hero Card - User + Subscription */}
             <Card
@@ -368,7 +367,7 @@ export const ProfilePage = () => {
                         <ThunderboltOutlined style={{ fontSize: 28, color: '#2563eb' }} />
                       </div>
                       <Title level={2} style={{ margin: '0 0 4px', fontWeight: 800, color: '#2563eb' }}>
-                        {dailyResponses.count}
+                        {count}
                       </Title>
                       <Text type="secondary" style={{ fontSize: 14 }}>Откликов отправлено</Text>
                     </div>
@@ -414,7 +413,7 @@ export const ProfilePage = () => {
                         <CheckCircleOutlined style={{ fontSize: 28, color: '#16a34a' }} />
                       </div>
                       <Title level={2} style={{ margin: '0 0 4px', fontWeight: 800, color: '#16a34a' }}>
-                        {dailyResponses.remaining}
+                        {remaining}
                       </Title>
                       <Text type="secondary" style={{ fontSize: 14 }}>Осталось</Text>
                     </div>
@@ -506,7 +505,7 @@ export const ProfilePage = () => {
                         <ClockCircleOutlined style={{ fontSize: 28, color: '#d97706' }} />
                       </div>
                       <Title level={2} style={{ margin: '0 0 4px', fontWeight: 800, color: '#d97706' }}>
-                        {formatTimeUntilReset(dailyResponses.seconds_until_reset)}
+                        {formatTimeUntilReset(secondsUntilReset)}
                       </Title>
                       <Text type="secondary" style={{ fontSize: 14 }}>До обновления</Text>
                     </div>

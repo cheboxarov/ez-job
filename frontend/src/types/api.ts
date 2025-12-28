@@ -132,6 +132,7 @@ export interface Resume {
   external_id?: string | null;
   headhunter_hash?: string | null;
   is_auto_reply: boolean;
+  autolike_threshold: number;
 }
 
 export interface ResumesListResponse {
@@ -148,6 +149,7 @@ export interface UpdateResumeRequest {
   content?: string | null;
   user_parameters?: string | null;
   is_auto_reply?: boolean | null;
+  autolike_threshold?: number | null;
 }
 
 // Типы для ResumeFilterSettings
@@ -411,6 +413,41 @@ export interface ChatDetailedResponse {
   participants_ids?: string[] | null;
   online_until_time?: string | null;
   block_chat_info?: Record<string, unknown>[] | null;
+}
+
+// Типы для Telegram уведомлений
+export interface TelegramNotificationSettings {
+  id: string;
+  user_id: string;
+  telegram_chat_id: number | null;
+  telegram_username: string | null;
+  is_enabled: boolean;
+  notify_call_request: boolean;
+  notify_external_action: boolean;
+  notify_question_answered: boolean;
+  notify_message_suggestion: boolean;
+  notify_vacancy_response: boolean;
+  linked_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateTelegramNotificationSettingsRequest {
+  is_enabled?: boolean | null;
+  notify_call_request?: boolean | null;
+  notify_external_action?: boolean | null;
+  notify_question_answered?: boolean | null;
+  notify_message_suggestion?: boolean | null;
+  notify_vacancy_response?: boolean | null;
+}
+
+export interface GenerateTelegramLinkTokenResponse {
+  link: string;
+  expires_at: string;
+}
+
+export interface SendTestNotificationResponse {
+  success: boolean;
 }
 
 

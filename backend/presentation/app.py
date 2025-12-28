@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import signal
 from contextlib import asynccontextmanager
 from loguru import logger
 
@@ -18,6 +19,7 @@ from presentation.routers.users_router import router as users_router
 from presentation.routers.vacancies_router import router
 from workers.auto_reply_worker import run_worker as run_auto_reply_worker
 from workers.chat_analysis_worker import run_worker as run_chat_analysis_worker
+from workers.telegram_bot_worker import run_worker as run_telegram_bot_worker
 
 # Настраиваем кастомную схему безопасности для Swagger
 # Используем HTTPBearer вместо OAuth2 для простого поля ввода токена
@@ -34,8 +36,9 @@ async def lifespan(app: FastAPI):
     # Создаем события для управления остановкой воркеров
     chat_analysis_shutdown = asyncio.Event()
     auto_reply_shutdown = asyncio.Event()
+    telegram_bot_shutdown = asyncio.Event()
     
-    worker_shutdown_events = [chat_analysis_shutdown, auto_reply_shutdown]
+    worker_shutdown_events = [chat_analysis_shutdown, auto_reply_shutdown, telegram_bot_shutdown]
     
     # Запускаем воркеры как фоновые задачи
     chat_analysis_task = asyncio.create_task(
@@ -43,37 +46,37 @@ async def lifespan(app: FastAPI):
     )
     auto_reply_task = asyncio.create_task(
         run_auto_reply_worker(config, auto_reply_shutdown)
+    ) 
+    telegram_bot_task = asyncio.create_task(
+        run_telegram_bot_worker(config, telegram_bot_shutdown)
     )
     
-    worker_tasks = [chat_analysis_task, auto_reply_task]
+    worker_tasks = [chat_analysis_task, auto_reply_task, telegram_bot_task]
     
     logger.info("Воркеры запущены")
     
     yield
     
-    # Shutdown: останавливаем воркеры
+    # Shutdown: останавливаем воркеры немедленно
     logger.info("Остановка воркеров...")
+    
     # Устанавливаем события для остановки воркеров
     for event in worker_shutdown_events:
         event.set()
     
-    # Ждем завершения всех задач (с таймаутом)
+    # Немедленно отменяем все задачи воркеров
     if worker_tasks:
+        logger.info("Отменяем все задачи воркеров...")
+        for task in worker_tasks:
+            if not task.done():
+                task.cancel()
+        
+        # Ждем завершения отмены (немедленно, без таймаута)
         try:
-            await asyncio.wait_for(
-                asyncio.gather(*worker_tasks, return_exceptions=True),
-                timeout=30.0,  # 30 секунд на завершение
-            )
-            logger.info("Все воркеры успешно остановлены")
-        except asyncio.TimeoutError:
-            logger.warning("Таймаут при остановке воркеров, отменяем задачи...")
-            # Если таймаут, отменяем задачи
-            for task in worker_tasks:
-                if not task.done():
-                    task.cancel()
-            # Ждем завершения отмены
             await asyncio.gather(*worker_tasks, return_exceptions=True)
-            logger.info("Воркеры остановлены принудительно")
+            logger.info("Все воркеры остановлены")
+        except Exception as exc:
+            logger.warning(f"Ошибка при остановке воркеров: {exc}")
 
 
 app = FastAPI(
@@ -176,6 +179,16 @@ app.include_router(chats_router)
 from presentation.routers.agent_actions_router import router as agent_actions_router
 
 app.include_router(agent_actions_router)
+
+# WebSocket router
+from presentation.routers.websocket_router import router as websocket_router
+
+app.include_router(websocket_router)
+
+# Telegram router
+from presentation.routers.telegram_router import router as telegram_router
+
+app.include_router(telegram_router)
 
 
 @app.get("/")

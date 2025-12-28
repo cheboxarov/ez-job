@@ -93,6 +93,11 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           label: 'Профиль',
         },
         {
+          key: '/settings/telegram',
+          icon: <SettingOutlined />,
+          label: 'Настройки',
+        },
+        {
           key: '/plans',
           icon: <CrownOutlined />,
           label: 'Планы',
@@ -160,6 +165,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             selectedKeys={[
               location.pathname === '/statistics' ? 'statistics' : 
               location.pathname === '/events' ? 'events' : 
+              location.pathname.startsWith('/settings') ? '/settings/telegram' :
               location.pathname
             ]}
             items={menuItems}

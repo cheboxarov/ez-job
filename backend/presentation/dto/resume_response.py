@@ -27,6 +27,9 @@ class ResumeResponse(BaseModel):
     is_auto_reply: bool = Field(
         False, description="Включен ли автоматический отклик на вакансии"
     )
+    autolike_threshold: int = Field(
+        50, description="Порог автолика в процентах (0-100)"
+    )
 
     @classmethod
     def from_entity(cls, resume: Resume) -> "ResumeResponse":
@@ -46,6 +49,7 @@ class ResumeResponse(BaseModel):
             external_id=resume.external_id,
             headhunter_hash=resume.headhunter_hash,
             is_auto_reply=resume.is_auto_reply,
+            autolike_threshold=resume.autolike_threshold,
         )
 
 

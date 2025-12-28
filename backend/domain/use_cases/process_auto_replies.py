@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from typing import Dict
+from typing import Dict, List
 
 from loguru import logger
 
@@ -39,7 +39,7 @@ class ProcessAutoRepliesUseCase:
 
     Для каждого резюме с включенным автооткликом:
     1. Получает подходящие вакансии (до 200 штук)
-    2. Фильтрует вакансии с confidence >= 0.5 (50%)
+    2. Фильтрует вакансии с confidence >= порог из резюме (autolike_threshold)
     3. Сортирует по confidence (сначала самые подходящие)
     4. Для каждой вакансии генерирует письмо и отправляет отклик
     5. Для вакансий с тестами получает тест, генерирует ответы и отправляет их с откликом
@@ -219,10 +219,11 @@ class ProcessAutoRepliesUseCase:
             )
             return
 
-        # 4. Фильтруем вакансии: с confidence >= 0.5 (50%)
+        # 4. Фильтруем вакансии: с confidence >= порог из резюме
+        threshold = resume.autolike_threshold / 100.0
         suitable_vacancies = [
             v for v in vacancies 
-            if (v.confidence or 0.0) >= 0.5
+            if (v.confidence or 0.0) >= threshold
         ]
 
         # Ограничиваем количество вакансий
@@ -234,7 +235,7 @@ class ProcessAutoRepliesUseCase:
 
         logger.info(
             f"Для резюме {resume.id} найдено {len(suitable_vacancies)} подходящих вакансий "
-            f"(confidence >= 50%, из {len(vacancies)} всего)"
+            f"(confidence >= {resume.autolike_threshold}%, из {len(vacancies)} всего)"
         )
 
         # 6. Проверяем наличие headhunter_hash
@@ -480,11 +481,22 @@ class ProcessAutoRepliesUseCase:
             updated_cookies_from_hh = None
             async with unit_of_work:
                 from domain.use_cases.create_vacancy_response import CreateVacancyResponseUseCase
+                from domain.use_cases.create_vacancy_response_with_notification import (
+                    CreateVacancyResponseWithNotificationUseCase,
+                )
                 from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
                 
-                # Создаем Use Case для сохранения откликов в БД
-                create_vacancy_response_uc = CreateVacancyResponseUseCase(
+                # Создаём Event Publisher для уведомлений через WebSocket
+                from application.factories.event_factory import create_event_publisher
+                event_publisher = create_event_publisher()
+                
+                # Создаем Use Case для сохранения откликов в БД с уведомлениями
+                create_vacancy_response_base_uc = CreateVacancyResponseUseCase(
                     vacancy_response_repository=unit_of_work.vacancy_response_repository,
+                )
+                create_vacancy_response_uc = CreateVacancyResponseWithNotificationUseCase(
+                    create_vacancy_response_uc=create_vacancy_response_base_uc,
+                    event_publisher=event_publisher,
                 )
 
                 # НЕ передаем update_cookies_uc в транзакцию - обновим cookies после коммита

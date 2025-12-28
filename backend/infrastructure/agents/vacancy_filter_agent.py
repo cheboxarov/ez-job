@@ -4,6 +4,7 @@ import json
 from typing import List, Sequence
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from config import OpenAIConfig
 from domain.entities.vacancy_detail import VacancyDetail
@@ -44,9 +45,8 @@ class VacancyFilterAgent(VacancyFilterServicePort):
 
         try:
             prompt = self._build_prompt(vacancies, resume, user_filter_params)
-            print(
-                f"[ai] filtering {len(vacancies)} vacancies model={self._config.model}",
-                flush=True,
+            logger.info(
+                f"[ai] filtering {len(vacancies)} vacancies model={self._config.model}"
             )
 
             response = await self._client.chat.completions.create(
@@ -112,16 +112,16 @@ class VacancyFilterAgent(VacancyFilterServicePort):
 
             content = response.choices[0].message.content if response.choices else None
             if not content:
-                print("[ai] пустой ответ от модели", flush=True)
+                logger.warning("[ai] пустой ответ от модели")
                 return []
 
             # Логируем «сырое» содержимое ответа для диагностики
             preview = content[:1000]
-            print(f"[ai] raw content preview: {preview}", flush=True)
+            logger.debug(f"[ai] raw content preview: {preview}")
 
             return self._parse_response(content, vacancies)
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[ai] ошибка при фильтрации вакансий: {exc}", flush=True)
+            logger.error(f"[ai] ошибка при фильтрации вакансий: {exc}", exc_info=True)
             return []
 
     def _build_prompt(
@@ -192,11 +192,11 @@ class VacancyFilterAgent(VacancyFilterServicePort):
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            print(f"[ai] не удалось распарсить JSON от модели: {exc}", flush=True)
+            logger.error(f"[ai] не удалось распарсить JSON от модели: {exc}")
             return []
 
         if not isinstance(data, list):
-            print("[ai] ответ модели не является списком", flush=True)
+            logger.warning("[ai] ответ модели не является списком")
             return []
 
         # Список id вакансий из текущего батча для валидации

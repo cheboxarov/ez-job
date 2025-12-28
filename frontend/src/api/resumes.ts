@@ -37,3 +37,8 @@ export const importResumesFromHH = async (): Promise<ResumesListResponse> => {
   const response = await apiClient.post<ResumesListResponse>('/api/resumes/import-from-hh');
   return response.data;
 };
+
+export const evaluateResume = async (resumeId: string): Promise<any> => {
+  const response = await apiClient.post<any>(`/api/resumes/${resumeId}/evaluate`);
+  return response.data;
+};

@@ -3,6 +3,7 @@ import type { User } from '../types/user';
 import { login as apiLogin, register as apiRegister } from '../api/auth';
 import { getCurrentUser } from '../api/users';
 import { loginByCode as hhLoginByCode } from '../api/hhAuth';
+import { wsClient } from '../api/websocket';
 
 interface AuthState {
   token: string | null;
@@ -36,6 +37,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem('auth_token', token);
       set({ token, loading: false });
       await get().fetchCurrentUser();
+      // Подключаемся к WebSocket после успешного логина
+      wsClient.connect();
+      useWebSocketStore.getState().connect();
     } catch (error) {
       set({ loading: false });
       throw error;
@@ -50,6 +54,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       localStorage.setItem('auth_token', token);
       set({ token, loading: false });
       await get().fetchCurrentUser();
+      // Подключаемся к WebSocket после успешного логина
+      wsClient.connect();
     } catch (error) {
       set({ loading: false });
       throw error;
@@ -72,6 +78,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user');
     set({ token: null, user: null });
+    // Отключаемся от WebSocket при logout
+    wsClient.disconnect();
   },
 
   fetchCurrentUser: async () => {
@@ -95,6 +103,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ token });
       try {
         await get().fetchCurrentUser();
+        // Подключаемся к WebSocket если пользователь уже авторизован
+        wsClient.connect();
       } catch (error) {
         // Если токен невалидный, просто очищаем его
         get().logout();

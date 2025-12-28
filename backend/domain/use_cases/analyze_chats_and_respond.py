@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import List
 from uuid import UUID
+from loguru import logger
 
 from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.entities.agent_action import AgentAction
@@ -52,7 +53,7 @@ class AnalyzeChatsAndRespondUseCase:
             return []
 
         if not resume or not resume.strip():
-            print("[usecase] Резюме не предоставлено, пропускаем анализ чатов", flush=True)
+            logger.warning("[usecase] Резюме не предоставлено, пропускаем анализ чатов")
             return []
 
         try:
@@ -65,6 +66,6 @@ class AnalyzeChatsAndRespondUseCase:
             )
             return actions
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[usecase] Ошибка при анализе чатов: {exc}", flush=True)
+            logger.error(f"[usecase] Ошибка при анализе чатов: {exc}", exc_info=True)
             return []
 

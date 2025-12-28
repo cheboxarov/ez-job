@@ -7,6 +7,7 @@ from typing import List
 from uuid import UUID
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from config import OpenAIConfig
 from domain.entities.hh_chat_detailed import HHChatDetailed
@@ -70,9 +71,8 @@ class MessagesAgent(MessagesAgentServicePort):
 
         try:
             prompt = self._build_prompt(chats, resume, user_parameters)
-            print(
-                f"[messages_agent] Анализирую {len(chats)} чатов, model={self._config.model}",
-                flush=True,
+            logger.info(
+                f"[messages_agent] Анализирую {len(chats)} чатов, model={self._config.model}"
             )
 
             response = await self._client.chat.completions.create(
@@ -193,16 +193,16 @@ create_event - используй когда:
 
             content = response.choices[0].message.content if response.choices else None
             if not content:
-                print("[messages_agent] Пустой ответ от модели", flush=True)
+                logger.warning("[messages_agent] Пустой ответ от модели")
                 return []
 
             # Логируем превью ответа для диагностики
             preview = content
-            print(f"[messages_agent] Raw content preview: {preview}", flush=True)
+            logger.debug(f"[messages_agent] Raw content preview: {preview}")
 
             return self._parse_response(content, chats, user_id, resume_hash)
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[messages_agent] Ошибка при анализе чатов: {exc}", flush=True)
+            logger.error(f"[messages_agent] Ошибка при анализе чатов: {exc}", exc_info=True)
             return []
 
     def _build_prompt(
@@ -300,12 +300,12 @@ create_event - используй когда:
 
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            print(f"[messages_agent] Ошибка парсинга JSON: {exc}", flush=True)
-            print(f"[messages_agent] Content: {content[:500]}", flush=True)
+            logger.error(f"[messages_agent] Ошибка парсинга JSON: {exc}")
+            logger.debug(f"[messages_agent] Content: {content[:500]}")
             return []
 
         if not isinstance(data, list):
-            print("[messages_agent] Ответ не является массивом", flush=True)
+            logger.warning("[messages_agent] Ответ не является массивом")
             return []
 
         # Валидируем и создаем действия
@@ -326,11 +326,11 @@ create_event - используй когда:
 
             # Валидируем dialog_id
             if not isinstance(dialog_id, int):
-                print(f"[messages_agent] Неверный dialog_id: {dialog_id}", flush=True)
+                logger.warning(f"[messages_agent] Неверный dialog_id: {dialog_id}")
                 continue
 
             if dialog_id not in chat_ids:
-                print(f"[messages_agent] dialog_id {dialog_id} не найден в списке чатов", flush=True)
+                logger.warning(f"[messages_agent] dialog_id {dialog_id} не найден в списке чатов")
                 continue
 
             # Обрабатываем send_message
@@ -339,13 +339,13 @@ create_event - используй когда:
                 message_to = action_data.get("message_to")
 
                 if not isinstance(message_text, str) or not message_text.strip():
-                    print(f"[messages_agent] Неверный message_text для dialog_id {dialog_id}", flush=True)
+                    logger.warning(f"[messages_agent] Неверный message_text для dialog_id {dialog_id}")
                     continue
 
                 # Валидируем message_to
                 if message_to is not None:
                     if not isinstance(message_to, int):
-                        print(f"[messages_agent] Неверный message_to для dialog_id {dialog_id}: {message_to}", flush=True)
+                        logger.warning(f"[messages_agent] Неверный message_to для dialog_id {dialog_id}: {message_to}")
                         continue
                     
                     # Проверяем, что message_to существует в сообщениях чата
@@ -353,10 +353,10 @@ create_event - используй когда:
                     if chat and chat.messages and chat.messages.items:
                         message_ids = {msg.id for msg in chat.messages.items}
                         if message_to not in message_ids:
-                            print(f"[messages_agent] message_to {message_to} не найден в сообщениях чата {dialog_id}", flush=True)
+                            logger.warning(f"[messages_agent] message_to {message_to} не найден в сообщениях чата {dialog_id}")
                             # Не прерываем выполнение, просто логируем
                     else:
-                        print(f"[messages_agent] Нет сообщений в чате {dialog_id} для проверки message_to", flush=True)
+                        logger.warning(f"[messages_agent] Нет сообщений в чате {dialog_id} для проверки message_to")
 
                 action_data_dict = {
                     "dialog_id": dialog_id,
@@ -386,11 +386,11 @@ create_event - используй когда:
                 message = action_data.get("message")
 
                 if not isinstance(event_type, str) or not event_type.strip():
-                    print(f"[messages_agent] Неверный event_type для dialog_id {dialog_id}", flush=True)
+                    logger.warning(f"[messages_agent] Неверный event_type для dialog_id {dialog_id}")
                     continue
 
                 if not isinstance(message, str) or not message.strip():
-                    print(f"[messages_agent] Неверный message для create_event dialog_id {dialog_id}", flush=True)
+                    logger.warning(f"[messages_agent] Неверный message для create_event dialog_id {dialog_id}")
                     continue
 
                 actions.append(
@@ -412,7 +412,7 @@ create_event - используй когда:
                     )
                 )
             else:
-                print(f"[messages_agent] Неизвестный тип действия: {action_type}", flush=True)
+                logger.warning(f"[messages_agent] Неизвестный тип действия: {action_type}")
                 continue
 
         return actions

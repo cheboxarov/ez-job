@@ -20,6 +20,9 @@ from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.entities.hh_list_chat import HHListChat
 from domain.use_cases.analyze_chats_and_respond import AnalyzeChatsAndRespondUseCase
 from domain.use_cases.create_agent_action import CreateAgentActionUseCase
+from domain.use_cases.create_agent_action_with_notification import (
+    CreateAgentActionWithNotificationUseCase,
+)
 from domain.use_cases.fetch_chats_details import FetchChatsDetailsUseCase
 from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
 from domain.use_cases.filter_chats_without_rejection_and_mark_read import (
@@ -266,7 +269,17 @@ async def process_chats_cycle(config: AppConfig) -> None:
                 
                 # Сохраняем действия в БД
                 if all_actions:
-                    create_action_uc = CreateAgentActionUseCase(uow.agent_action_repository)
+                    # Создаём Event Publisher для уведомлений через WebSocket
+                    from application.factories.event_factory import create_event_publisher
+                    event_publisher = create_event_publisher()
+                    
+                    # Используем use case с уведомлениями
+                    create_action_base_uc = CreateAgentActionUseCase(uow.agent_action_repository)
+                    create_action_uc = CreateAgentActionWithNotificationUseCase(
+                        create_agent_action_uc=create_action_base_uc,
+                        event_publisher=event_publisher,
+                    )
+                    
                     saved_count = 0
                     for action in all_actions:
                         try:

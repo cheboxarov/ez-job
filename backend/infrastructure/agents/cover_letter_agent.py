@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from config import OpenAIConfig
 from domain.entities.filtered_vacancy import FilteredVacancyDetail
@@ -51,10 +52,9 @@ class CoverLetterAgent(CoverLetterServicePort):
 
         try:
             prompt = self._build_prompt(vacancy, resume)
-            print(
+            logger.info(
                 f"[ai] генерирую сопроводительное письмо для вакансии {vacancy.vacancy_id} "
-                f"model={self._config.model}",
-                flush=True,
+                f"model={self._config.model}"
             )
 
             response = await self._client.chat.completions.create(
@@ -115,7 +115,7 @@ class CoverLetterAgent(CoverLetterServicePort):
 
             content = response.choices[0].message.content if response.choices else None
             if not content:
-                print("[ai] пустой ответ от модели при генерации письма", flush=True)
+                logger.warning("[ai] пустой ответ от модели при генерации письма")
                 return ""
 
             # Очищаем возможные markdown-артефакты
@@ -128,7 +128,7 @@ class CoverLetterAgent(CoverLetterServicePort):
 
             return cover_letter
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[ai] ошибка при генерации сопроводительного письма: {exc}", flush=True)
+            logger.error(f"[ai] ошибка при генерации сопроводительного письма: {exc}", exc_info=True)
             return ""
 
     def _build_prompt(

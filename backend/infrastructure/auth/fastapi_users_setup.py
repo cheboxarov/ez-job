@@ -6,6 +6,7 @@ from typing import AsyncGenerator
 from uuid import UUID
 
 from fastapi import Depends
+from loguru import logger
 from fastapi_users import BaseUserManager, FastAPIUsers, UUIDIDMixin
 from fastapi_users.authentication import (
     AuthenticationBackend,
@@ -36,7 +37,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserModel, UUID]):
 
     async def on_after_register(self, user: UserModel, request=None):
         """Вызывается после регистрации пользователя."""
-        print(f"User {user.id} has registered.")
+        logger.info(f"User {user.id} has registered.")
         
         # Создаем подписку для нового пользователя (FREE план)
         from datetime import datetime, timezone
@@ -51,7 +52,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserModel, UUID]):
             # Получаем FREE план
             free_plan = await unit_of_work.subscription_plan_repository.get_by_name("FREE")
             if free_plan is None:
-                print(f"WARNING: FREE план не найден при регистрации пользователя {user.id}")
+                logger.warning(f"FREE план не найден при регистрации пользователя {user.id}")
                 return
             
             # Проверяем, не создана ли уже подписка
@@ -59,7 +60,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserModel, UUID]):
                 user.id
             )
             if existing_subscription is not None:
-                print(f"Подписка для пользователя {user.id} уже существует")
+                logger.info(f"Подписка для пользователя {user.id} уже существует")
                 return
             
             # Создаем подписку
@@ -73,19 +74,19 @@ class UserManager(UUIDIDMixin, BaseUserManager[UserModel, UUID]):
             )
             await unit_of_work.user_subscription_repository.create(user_subscription)
             await unit_of_work.commit()
-            print(f"Создана подписка FREE для пользователя {user.id}")
+            logger.info(f"Создана подписка FREE для пользователя {user.id}")
 
     async def on_after_forgot_password(
         self, user: UserModel, token: str, request=None
     ):
         """Вызывается после запроса восстановления пароля."""
-        print(f"User {user.id} has forgot their password. Reset token: {token}")
+        logger.info(f"User {user.id} has forgot their password. Reset token: {token}")
 
     async def on_after_request_verify(
         self, user: UserModel, token: str, request=None
     ):
         """Вызывается после запроса верификации."""
-        print(f"Verification requested for user {user.id}. Verification token: {token}")
+        logger.info(f"Verification requested for user {user.id}. Verification token: {token}")
 
 
 async def get_user_db(

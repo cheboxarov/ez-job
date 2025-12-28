@@ -21,3 +21,4 @@ class Resume:
     external_id: str | None = None
     headhunter_hash: str | None = None
     is_auto_reply: bool = False
+    autolike_threshold: int = 50

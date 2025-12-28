@@ -42,6 +42,7 @@ class ResumeRepository(ResumeRepositoryPort):
             external_id=resume.external_id,
             headhunter_hash=resume.headhunter_hash,
             is_auto_reply=resume.is_auto_reply,
+            autolike_threshold=resume.autolike_threshold,
         )
         self._session.add(model)
         await self._session.flush()
@@ -71,6 +72,7 @@ class ResumeRepository(ResumeRepositoryPort):
         model.user_parameters = resume.user_parameters
         model.headhunter_hash = resume.headhunter_hash
         model.is_auto_reply = resume.is_auto_reply
+        model.autolike_threshold = resume.autolike_threshold
         # external_id не обновляем через API (store_only)
 
         await self._session.flush()
@@ -247,4 +249,5 @@ class ResumeRepository(ResumeRepositoryPort):
             external_id=model.external_id,
             headhunter_hash=model.headhunter_hash,
             is_auto_reply=model.is_auto_reply,
+            autolike_threshold=model.autolike_threshold,
         )

@@ -108,9 +108,9 @@ class SearchAndGenerateCoverLettersUseCase:
                 )
                 return (vacancy, cover_letter if cover_letter else None)
             except Exception as exc:
-                print(
+                logger.error(
                     f"[usecase] ошибка при генерации письма для вакансии {vacancy.vacancy_id}: {exc}",
-                    flush=True,
+                    exc_info=True
                 )
                 return (vacancy, None)
 

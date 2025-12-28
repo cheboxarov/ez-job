@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 import httpx
+from loguru import logger
 
 from domain.entities.hh_chat_detailed import HHChatDetailed, HHChatMessages
 from domain.entities.hh_chat_message import (
@@ -58,7 +59,7 @@ class HHChatClient(HHBaseMixin):
         if chat_ids:
             params["ids"] = ",".join(str(chat_id) for chat_id in chat_ids)
 
-        print(f"[chat_list] GET {url} params={params}", flush=True)
+        logger.debug(f"[chat_list] GET {url} params={params}")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -68,26 +69,24 @@ class HHChatClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[chat_list] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[chat_list] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[chat_list] Content-Type: {ct}", flush=True)
+                logger.debug(f"[chat_list] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[chat_list] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[chat_list] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[chat_list] Не удалось распарсить JSON: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[chat_list] Не удалось распарсить JSON: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа /chatik/api/chats: {exc}; body_len={len(text)}"
@@ -135,7 +134,7 @@ class HHChatClient(HHBaseMixin):
                 chat_item = self._map_chat_list_item(raw)
                 items.append(chat_item)
             except Exception as exc:
-                print(f"[chat_list] Ошибка маппинга чата: {exc}", flush=True)
+                logger.warning(f"[chat_list] Ошибка маппинга чата: {exc}")
                 continue
 
         result = HHListChat(items=items, display_info=display_info)
@@ -170,7 +169,7 @@ class HHChatClient(HHBaseMixin):
             "do_not_track_session_events": "true",
         }
 
-        print(f"[chat_detail] GET {url} chat_id={chat_id}", flush=True)
+        logger.debug(f"[chat_detail] GET {url} chat_id={chat_id}")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -178,16 +177,15 @@ class HHChatClient(HHBaseMixin):
             try:
                 resp = await client.get(url, params=params)
             except httpx.HTTPError as exc:
-                print(f"[chat_detail] chat_id={chat_id}: HTTP ошибка {exc}", flush=True)
+                logger.error(f"[chat_detail] chat_id={chat_id}: HTTP ошибка {exc}")
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
                     return None, updated_cookies
                 return None
 
             if resp.status_code != 200:
-                print(
-                    f"[chat_detail] chat_id={chat_id}: неожиданный статус HTTP {resp.status_code}",
-                    flush=True,
+                logger.warning(
+                    f"[chat_detail] chat_id={chat_id}: неожиданный статус HTTP {resp.status_code}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -198,9 +196,8 @@ class HHChatClient(HHBaseMixin):
                 payload = resp.json()
             except json.JSONDecodeError:
                 text = resp.text
-                print(
-                    f"[chat_detail] chat_id={chat_id}: ответ не JSON, длина={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[chat_detail] chat_id={chat_id}: ответ не JSON, длина={len(text)}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -213,7 +210,7 @@ class HHChatClient(HHBaseMixin):
         # Парсим ответ
         chat_data = payload.get("chat")
         if not isinstance(chat_data, dict):
-            print(f"[chat_detail] chat_id={chat_id}: chat отсутствует или не является словарем", flush=True)
+            logger.warning(f"[chat_detail] chat_id={chat_id}: chat отсутствует или не является словарем")
             if return_cookies:
                 return None, updated_cookies
             return None
@@ -224,7 +221,7 @@ class HHChatClient(HHBaseMixin):
                 return result, updated_cookies
             return result
         except Exception as exc:
-            print(f"[chat_detail] chat_id={chat_id}: ошибка маппинга детального чата: {exc}", flush=True)
+            logger.error(f"[chat_detail] chat_id={chat_id}: ошибка маппинга детального чата: {exc}")
             if return_cookies:
                 return None, updated_cookies
             return None
@@ -273,7 +270,7 @@ class HHChatClient(HHBaseMixin):
         # Анти-бот заголовки и XSRF токен добавляются через _enhance_headers
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
 
-        print(f"[send_message] POST {url} chat_id={chat_id} text={text[:50]}...", flush=True)
+        logger.debug(f"[send_message] POST {url} chat_id={chat_id} text={text[:50]}...")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -283,26 +280,24 @@ class HHChatClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[send_message] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[send_message] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[send_message] Content-Type: {ct}", flush=True)
+                logger.debug(f"[send_message] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[send_message] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[send_message] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text_resp = resp.text
-                print(
-                    f"[send_message] Не удалось распарсить JSON ответа: {exc}; body_len={len(text_resp)}",
-                    flush=True,
+                logger.error(
+                    f"[send_message] Не удалось распарсить JSON ответа: {exc}; body_len={len(text_resp)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа отправки сообщения: {exc}; body_len={len(text_resp)}"
@@ -347,9 +342,8 @@ class HHChatClient(HHBaseMixin):
         # Анти-бот заголовки и XSRF токен добавляются через _enhance_headers
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
 
-        print(
-            f"[mark_read] POST {url} chat_id={chat_id} message_id={message_id}",
-            flush=True,
+        logger.debug(
+            f"[mark_read] POST {url} chat_id={chat_id} message_id={message_id}"
         )
 
         async with httpx.AsyncClient(
@@ -360,26 +354,24 @@ class HHChatClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[mark_read] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[mark_read] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[mark_read] Content-Type: {ct}", flush=True)
+                logger.debug(f"[mark_read] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[mark_read] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[mark_read] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text_resp = resp.text
-                print(
-                    f"[mark_read] Не удалось распарсить JSON ответа: {exc}; body_len={len(text_resp)}",
-                    flush=True,
+                logger.error(
+                    f"[mark_read] Не удалось распарсить JSON ответа: {exc}; body_len={len(text_resp)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа пометки сообщения как прочитанного: {exc}; body_len={len(text_resp)}"

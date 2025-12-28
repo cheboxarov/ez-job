@@ -24,6 +24,12 @@ from domain.interfaces.user_subscription_repository_port import (
 from domain.interfaces.agent_action_repository_port import (
     AgentActionRepositoryPort,
 )
+from domain.interfaces.telegram_notification_settings_repository_port import (
+    TelegramNotificationSettingsRepositoryPort,
+)
+from domain.interfaces.telegram_link_token_repository_port import (
+    TelegramLinkTokenRepositoryPort,
+)
 
 
 class UnitOfWorkPort(ABC):
@@ -76,6 +82,16 @@ class UnitOfWorkPort(ABC):
     @abstractmethod
     def agent_action_repository(self) -> AgentActionRepositoryPort:
         """Получить репозиторий действий агента."""
+
+    @property
+    @abstractmethod
+    def telegram_notification_settings_repository(self) -> TelegramNotificationSettingsRepositoryPort:
+        """Получить репозиторий настроек Telegram уведомлений."""
+
+    @property
+    @abstractmethod
+    def telegram_link_token_repository(self) -> TelegramLinkTokenRepositoryPort:
+        """Получить репозиторий токенов привязки Telegram."""
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWorkPort":

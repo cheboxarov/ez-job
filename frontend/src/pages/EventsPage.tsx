@@ -2,11 +2,10 @@ import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Typography, Spin, Alert, Select, Tag, Button } from 'antd';
 import { CalendarOutlined, MessageOutlined, ArrowRightOutlined, ClockCircleOutlined } from '@ant-design/icons';
-import { getAgentActions } from '../api/agentActions';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
-import type { AgentAction } from '../types/api';
 import { useAgentActionsStore } from '../stores/agentActionsStore';
+import { useEventsStore } from '../stores/eventsStore';
 
 const { Text, Title, Paragraph } = Typography;
 const { Option } = Select;
@@ -108,15 +107,22 @@ const getEventSubtypeColor = (eventType?: string): string => {
 
 export const EventsPage = () => {
   const navigate = useNavigate();
-  const [events, setEvents] = useState<AgentAction[]>([]);
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterType, setFilterType] = useState<string>('all');
   const { markAllAsRead, fetchUnreadCount } = useAgentActionsStore();
+  const { events, loading, fetchEvents } = useEventsStore();
 
   useEffect(() => {
+    const loadEvents = async () => {
+      setError(null);
+      try {
+        await fetchEvents(filterType);
+      } catch (err: any) {
+        setError(err.response?.data?.detail || 'Ошибка при загрузке событий');
+      }
+    };
     loadEvents();
-  }, [filterType]);
+  }, [filterType, fetchEvents]);
 
   useEffect(() => {
     const markAndRefresh = async () => {
@@ -125,20 +131,6 @@ export const EventsPage = () => {
     };
     markAndRefresh();
   }, [markAllAsRead, fetchUnreadCount]);
-
-  const loadEvents = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = filterType !== 'all' ? { type: filterType } : undefined;
-      const response = await getAgentActions(params);
-      setEvents(response.items);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Ошибка при загрузке событий');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const groupedEvents = useMemo<GroupedEvents[]>(() => {
     const groups: Record<EventGroup, AgentAction[]> = {

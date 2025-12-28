@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from typing import Dict
+from typing import Any, Dict, List
 
 from domain.entities.resume import Resume
 from domain.interfaces.hh_client_port import HHClientPort
@@ -12,10 +12,13 @@ from domain.interfaces.resume_service_port import ResumeServicePort
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from domain.use_cases.create_resume import CreateResumeUseCase
 from domain.use_cases.delete_resume import DeleteResumeUseCase
+from domain.use_cases.edit_hh_resume import EditHHResumeUseCase
 from domain.use_cases.get_resume import GetResumeUseCase
 from domain.use_cases.import_resume_from_hh import ImportResumeFromHHUseCase
 from domain.use_cases.list_user_resumes import ListUserResumesUseCase
+from domain.use_cases.touch_hh_resume_edit import TouchHHResumeEditUseCase
 from domain.use_cases.update_resume import UpdateResumeUseCase
+from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
 
 
 class ResumesService(ResumeServicePort):
@@ -94,6 +97,7 @@ class ResumesService(ResumeServicePort):
         content: str | None = None,
         user_parameters: str | None = None,
         is_auto_reply: bool | None = None,
+        autolike_threshold: int | None = None,
     ) -> Resume:
         """Обновить резюме.
 
@@ -105,6 +109,7 @@ class ResumesService(ResumeServicePort):
             content: Новый текст резюме (опционально).
             user_parameters: Новые параметры фильтрации (опционально).
             is_auto_reply: Включен ли автоматический отклик (опционально).
+            autolike_threshold: Порог автолика в процентах (0-100) (опционально).
 
         Returns:
             Обновленная доменная сущность Resume.
@@ -121,6 +126,7 @@ class ResumesService(ResumeServicePort):
                 content=content,
                 user_parameters=user_parameters,
                 is_auto_reply=is_auto_reply,
+                autolike_threshold=autolike_threshold,
             )
             await self._unit_of_work.commit()
             return resume
@@ -174,3 +180,96 @@ class ResumesService(ResumeServicePort):
             )
             await self._unit_of_work.commit()
             return resumes
+
+    async def edit_hh_resume(
+        self,
+        user_id: UUID,
+        resume_hash: str,
+        experience: List[Dict[str, Any]],
+        hh_client: HHClientPort,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+    ) -> Dict[str, Any]:
+        """Редактировать резюме на HeadHunter.
+
+        Args:
+            user_id: UUID пользователя.
+            resume_hash: Hash резюме для редактирования.
+            experience: Список объектов опыта работы для обновления.
+            hh_client: Клиент для работы с HeadHunter API.
+            headers: Заголовки для запроса к HH API.
+            cookies: Куки для запроса к HH API.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+
+        Returns:
+            Dict[str, Any] с результатом редактирования.
+        """
+        async with self._unit_of_work:
+            # Создаем use case для обновления cookies
+            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
+                self._unit_of_work.user_hh_auth_data_repository
+            )
+
+            use_case = EditHHResumeUseCase(hh_client=hh_client)
+            result = await use_case.execute(
+                resume_hash=resume_hash,
+                experience=experience,
+                headers=headers,
+                cookies=cookies,
+                internal_api_base_url=internal_api_base_url,
+                hhtm_source=hhtm_source,
+                user_id=user_id,
+                update_cookies_uc=update_cookies_uc,
+            )
+            await self._unit_of_work.commit()
+            return result
+
+    async def touch_hh_resume_edit(
+        self,
+        user_id: UUID,
+        resume_hash: str,
+        hh_client: HHClientPort,
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+    ) -> Dict:
+        """Отправить пустой запрос на редактирование резюме на HeadHunter.
+
+        Используется для "касания" резюме через edit endpoint без изменения данных.
+
+        Args:
+            user_id: UUID пользователя.
+            resume_hash: Hash резюме.
+            hh_client: Клиент для работы с HeadHunter API.
+            headers: Заголовки для запроса к HH API.
+            cookies: Куки для запроса к HH API.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+
+        Returns:
+            Dict с результатом запроса.
+        """
+        async with self._unit_of_work:
+            # Создаем use case для обновления cookies
+            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
+                self._unit_of_work.user_hh_auth_data_repository
+            )
+
+            use_case = TouchHHResumeEditUseCase(hh_client=hh_client)
+            result = await use_case.execute(
+                resume_hash=resume_hash,
+                headers=headers,
+                cookies=cookies,
+                internal_api_base_url=internal_api_base_url,
+                hhtm_source=hhtm_source,
+                user_id=user_id,
+                update_cookies_uc=update_cookies_uc,
+            )
+            await self._unit_of_work.commit()
+            return result

@@ -41,19 +41,38 @@ logger.add(
 
 # Флаг для корректного завершения
 shutdown_event = asyncio.Event()
+# Счетчик для отслеживания повторных нажатий Ctrl+C
+_sigint_count = 0
 
 
 def setup_signal_handlers(loop: asyncio.AbstractEventLoop, shutdown_event: asyncio.Event) -> None:
     """Настройка обработчиков сигналов для корректного завершения."""
+    global _sigint_count
+    
     def signal_handler(signum: int) -> None:
         """Обработчик сигналов для корректного завершения."""
-        logger.info(f"Получен сигнал {signum}, завершаем работу...")
-        shutdown_event.set()
+        global _sigint_count
+        if signum == signal.SIGINT:
+            _sigint_count += 1
+            if _sigint_count == 1:
+                logger.info(f"Получен сигнал {signum}, завершаем работу...")
+                shutdown_event.set()
+            elif _sigint_count >= 2:
+                logger.warning("Принудительное завершение работы (второе нажатие Ctrl+C)...")
+                sys.exit(1)
+        else:
+            logger.info(f"Получен сигнал {signum}, завершаем работу...")
+            shutdown_event.set()
     
     # Используем add_signal_handler для правильной работы с asyncio
     if sys.platform != "win32":
-        loop.add_signal_handler(signal.SIGINT, signal_handler, signal.SIGINT)
-        loop.add_signal_handler(signal.SIGTERM, signal_handler, signal.SIGTERM)
+        try:
+            loop.add_signal_handler(signal.SIGINT, lambda: signal_handler(signal.SIGINT))
+            loop.add_signal_handler(signal.SIGTERM, lambda: signal_handler(signal.SIGTERM))
+        except NotImplementedError:
+            # Если add_signal_handler не поддерживается, используем обычный signal
+            signal.signal(signal.SIGINT, lambda s, f: signal_handler(s))
+            signal.signal(signal.SIGTERM, lambda s, f: signal_handler(s))
     else:
         # На Windows используем signal.signal
         signal.signal(signal.SIGINT, lambda s, f: signal_handler(s))
@@ -97,10 +116,20 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
             resume_data: Данные резюме.
         """
         try:
+            # Проверяем shutdown_event перед началом обработки
+            if shutdown_event.is_set():
+                logger.info(f"Получен сигнал завершения, пропускаем обработку резюме {resume_id}")
+                return
+            
             # Создаем UnitOfWork для обработки этого резюме
             unit_of_work = create_unit_of_work(config.database)
 
             async with unit_of_work:
+                # Проверяем shutdown_event еще раз перед созданием use case
+                if shutdown_event.is_set():
+                    logger.info(f"Получен сигнал завершения, прерываем обработку резюме {resume_id}")
+                    return
+                
                 # Создаем Use Case с репозиториями из текущего UnitOfWork
                 process_auto_replies_uc = ProcessAutoRepliesUseCase(
                     resume_repository=unit_of_work.resume_repository,
@@ -118,6 +147,9 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
                 
                 # Обрабатываем только это резюме
                 await process_auto_replies_uc.process_single_resume(resume_data)
+        except asyncio.CancelledError:
+            logger.info(f"Задача для резюме {resume_id} отменена")
+            raise
         except Exception as exc:
             logger.error(
                 f"Ошибка при обработке резюме {resume_id}: {exc}",
@@ -150,9 +182,17 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
                         active_tasks.pop(resume_id, None)
                         logger.debug(f"Удалена завершенная задача для резюме {resume_id}")
 
+                    # Проверяем shutdown_event перед запуском новых задач
+                    if shutdown_event.is_set():
+                        logger.info("Получен сигнал завершения, не запускаем новые задачи")
+                        break
+
                     # Запускаем задачи только для резюме, у которых еще нет активной задачи
                     new_tasks_count = 0
                     for resume in resumes:
+                        if shutdown_event.is_set():
+                            logger.info("Получен сигнал завершения, прерываем запуск задач")
+                            break
                         if resume.id not in active_tasks:
                             # Создаем новую задачу для этого резюме
                             task = asyncio.create_task(process_resume_task(resume.id, resume))
@@ -197,24 +237,35 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
         logger.error(f"Критическая ошибка воркера: {exc}", exc_info=True)
         raise
     finally:
-        logger.info("Воркер завершает работу. Ожидание завершения активных задач...")
-        # Ожидаем завершения всех активных задач (с таймаутом)
-        if active_tasks:
-            logger.info(f"Ожидание завершения {len(active_tasks)} активных задач...")
-            try:
-                await asyncio.wait_for(
-                    asyncio.gather(*active_tasks.values(), return_exceptions=True),
-                    timeout=300,  # 5 минут максимум
-                )
-                logger.info("Все активные задачи завершены")
-            except asyncio.TimeoutError:
-                logger.warning(
-                    "Таймаут ожидания завершения задач. Некоторые задачи могут быть прерваны."
-                )
-                # Отменяем оставшиеся задачи
-                for task in active_tasks.values():
-                    if not task.done():
-                        task.cancel()
+        logger.info("Воркер завершает работу. Отмена всех задач...")
+        
+        try:
+            current_task = asyncio.current_task()
+            all_tasks = asyncio.all_tasks()
+            tasks_to_cancel = [t for t in all_tasks if t is not current_task]
+
+            if tasks_to_cancel:
+                logger.info(f"Отмена {len(tasks_to_cancel)} незавершенных задач...")
+                for task in tasks_to_cancel:
+                    task.cancel()
+                
+                # Ждем завершения отмененных задач с коротким таймаутом
+                logger.info("Ожидание завершения отмененных задач...")
+                try:
+                    await asyncio.wait_for(
+                        asyncio.gather(*tasks_to_cancel, return_exceptions=True),
+                        timeout=5,  # 5 секунд максимум
+                    )
+                    logger.info("Все задачи завершены")
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "Таймаут ожидания завершения задач. Некоторые задачи могут быть прерваны принудительно."
+                    )
+            else:
+                logger.info("Нет активных задач для отмены")
+        except Exception as exc:
+            logger.error(f"Ошибка при завершении воркера: {exc}", exc_info=True)
+            
         logger.info("Воркер завершил работу")
 
 

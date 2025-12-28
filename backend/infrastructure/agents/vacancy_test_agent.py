@@ -6,6 +6,7 @@ import json
 from typing import Dict, List
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from config import OpenAIConfig
 from domain.entities.vacancy_test import VacancyTest
@@ -63,10 +64,9 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
 
         try:
             prompt = self._build_prompt(test, resume, user_params)
-            print(
+            logger.info(
                 f"[ai] генерирую ответы на тест вакансии ({len(test.questions)} вопросов) "
-                f"model={self._config.model}",
-                flush=True,
+                f"model={self._config.model}"
             )
 
             response = await self._client.chat.completions.create(
@@ -125,16 +125,16 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
 
             content = response.choices[0].message.content if response.choices else None
             if not content:
-                print("[ai] пустой ответ от модели при генерации ответов на тест", flush=True)
+                logger.warning("[ai] пустой ответ от модели при генерации ответов на тест")
                 return {}
 
             # Логируем превью ответа для диагностики
             preview = content[:500]
-            print(f"[ai] raw content preview: {preview}", flush=True)
+            logger.debug(f"[ai] raw content preview: {preview}")
 
             return self._parse_response(content, test)
         except Exception as exc:  # pragma: no cover - диагностический путь
-            print(f"[ai] ошибка при генерации ответов на тест: {exc}", flush=True)
+            logger.error(f"[ai] ошибка при генерации ответов на тест: {exc}", exc_info=True)
             return {}
 
     def _build_prompt(
@@ -234,12 +234,12 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
         try:
             data = json.loads(content_cleaned)
         except json.JSONDecodeError as exc:
-            print(f"[ai] не удалось распарсить JSON от модели: {exc}", flush=True)
-            print(f"[ai] content: {content_cleaned[:500]}", flush=True)
+            logger.error(f"[ai] не удалось распарсить JSON от модели: {exc}")
+            logger.debug(f"[ai] content: {content_cleaned[:500]}")
             return {}
 
         if not isinstance(data, dict):
-            print("[ai] ответ модели не является объектом (dict)", flush=True)
+            logger.warning("[ai] ответ модели не является объектом (dict)")
             return {}
 
         # Валидируем field_name - должны соответствовать вопросам из теста
@@ -249,7 +249,7 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
         result: Dict[str, str | List[str]] = {}
         for field_name, answer in data.items():
             if field_name not in allowed_field_names:
-                print(f"[ai] неизвестный field_name в ответе: {field_name}", flush=True)
+                logger.warning(f"[ai] неизвестный field_name в ответе: {field_name}")
                 continue
 
             question = question_map.get(field_name)
@@ -260,9 +260,8 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
             if question.question_type == "multiselect":
                 if not isinstance(answer, list):
                     # Если не массив, пытаемся преобразовать или создаем пустой массив
-                    print(
-                        f"[ai] для multiselect вопроса {field_name} ожидался массив, получен {type(answer)}",
-                        flush=True,
+                    logger.warning(
+                        f"[ai] для multiselect вопроса {field_name} ожидался массив, получен {type(answer)}"
                     )
                     if isinstance(answer, str):
                         # Может быть JSON строка
@@ -280,10 +279,9 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
                     allowed_values = {opt.value for opt in question.options}
                     validated_values = [v for v in answer if str(v) in allowed_values]
                     if not validated_values:
-                        print(
+                        logger.warning(
                             f"[ai] для multiselect вопроса {field_name} ни одно значение не соответствует "
-                            f"допустимым вариантам {allowed_values}, выбираю первый вариант",
-                            flush=True,
+                            f"допустимым вариантам {allowed_values}, выбираю первый вариант"
                         )
                         validated_values = [question.options[0].value] if question.options else []
                     answer = [str(v) for v in validated_values]
@@ -300,10 +298,9 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
                 if question.options:
                     allowed_values = {opt.value for opt in question.options}
                     if answer not in allowed_values:
-                        print(
+                        logger.warning(
                             f"[ai] для select вопроса {field_name} значение {answer} не соответствует "
-                            f"допустимым вариантам {allowed_values}, выбираю первый вариант",
-                            flush=True,
+                            f"допустимым вариантам {allowed_values}, выбираю первый вариант"
                         )
                         answer = question.options[0].value
                 
@@ -316,7 +313,7 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
                 # Обрезаем слишком длинные ответы
                 if len(answer) > 2000:
                     answer = answer[:2000]
-                    print(f"[ai] обрезан ответ для {field_name} до 2000 символов", flush=True)
+                    logger.debug(f"[ai] обрезан ответ для {field_name} до 2000 символов")
                 
                 result[field_name] = answer.strip()
 

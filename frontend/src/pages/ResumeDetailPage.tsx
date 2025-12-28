@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Form,
@@ -13,8 +13,8 @@ import {
   Switch,
   Row,
   Col,
-  Tooltip,
   Divider,
+  Slider,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -22,28 +22,29 @@ import {
   RobotOutlined,
   SettingOutlined,
   FileTextOutlined,
-  QuestionCircleOutlined,
   SendOutlined,
   ThunderboltOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
+  ExperimentOutlined,
 } from '@ant-design/icons';
-import { getResume, updateResume } from '../api/resumes';
+import { getResume, updateResume, evaluateResume } from '../api/resumes';
 import {
   getResumeFilterSettings,
   updateResumeFilterSettings,
   suggestResumeFilterSettings,
 } from '../api/resumeFilterSettings';
 import { getAreas, type HhArea } from '../api/dictionaries';
-import { getDailyResponses } from '../api/subscription';
+import { useDailyResponsesStore } from '../stores/dailyResponsesStore';
 import { FilterSettingsForm } from '../components/FilterSettingsForm';
 import { PageHeader } from '../components/PageHeader';
 import { GradientButton } from '../components/GradientButton';
 import { LimitReachedAlert } from '../components/LimitReachedAlert';
 import { ResumeContent } from '../components/ResumeContent';
+import { ResumeEvaluationModal } from '../components/ResumeEvaluationModal';
 import type { Resume, ResumeFilterSettings, ResumeFilterSettingsUpdate } from '../types/api';
 
-const { Text, Paragraph, Title } = Typography;
+const { Text, Title } = Typography;
 
 const FILTER_COMPARE_KEYS: (keyof ResumeFilterSettings)[] = [
   'text',
@@ -70,21 +71,33 @@ export const ResumeDetailPage = () => {
   const [savingResumeParams, setSavingResumeParams] = useState(false);
   const [savingFilters, setSavingFilters] = useState(false);
   const [savingAutoReply, setSavingAutoReply] = useState(false);
+  const [savingAutolikeThreshold, setSavingAutolikeThreshold] = useState(false);
+  const [localAutolikeThreshold, setLocalAutolikeThreshold] = useState<number | null>(null);
+  const autolikeThresholdTimeoutRef = useRef<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isEvaluationModalVisible, setIsEvaluationModalVisible] = useState(false);
+  const [evaluationResult, setEvaluationResult] = useState<any | null>(null);
+  const [evaluationLoading, setEvaluationLoading] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [resumeParamsDirty, setResumeParamsDirty] = useState(false);
   const [initialFilterValues, setInitialFilterValues] = useState<Record<string, unknown> | null>(
     null,
   );
-  const [dailyResponses, setDailyResponses] = useState<{ count: number; limit: number } | null>(null);
+  const { count, limit, remaining, fetchDailyResponses } = useDailyResponsesStore();
 
   useEffect(() => {
     if (resumeId) {
       loadData();
       loadAreas();
-      loadDailyResponses();
+      fetchDailyResponses();
     }
-  }, [resumeId]);
+  }, [resumeId, fetchDailyResponses]);
+
+  useEffect(() => {
+    if (resume?.autolike_threshold !== undefined) {
+      setLocalAutolikeThreshold(null);
+    }
+  }, [resume?.autolike_threshold]);
 
   const loadData = async () => {
     if (!resumeId) return;
@@ -143,14 +156,6 @@ export const ResumeDetailPage = () => {
     }
   };
 
-  const loadDailyResponses = async () => {
-    try {
-      const response = await getDailyResponses();
-      setDailyResponses({ count: response.count, limit: response.limit });
-    } catch (err) {
-      setDailyResponses(null);
-    }
-  };
 
   const handleResumeParamsSave = async () => {
     if (!resumeId) return;
@@ -192,6 +197,43 @@ export const ResumeDetailPage = () => {
       setSavingAutoReply(false);
     }
   };
+
+  const saveAutolikeThreshold = async (value: number) => {
+    if (!resumeId) return;
+    setSavingAutolikeThreshold(true);
+    try {
+      const updated = await updateResume(resumeId, {
+        autolike_threshold: value,
+      });
+      setResume(updated);
+      setLocalAutolikeThreshold(null);
+      message.success(`Порог автолика установлен: ${value}%`);
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || 'Ошибка при обновлении порога автолика');
+    } finally {
+      setSavingAutolikeThreshold(false);
+    }
+  };
+
+  const handleAutolikeThresholdChange = (value: number) => {
+    setLocalAutolikeThreshold(value);
+    
+    if (autolikeThresholdTimeoutRef.current) {
+      clearTimeout(autolikeThresholdTimeoutRef.current);
+    }
+    
+    autolikeThresholdTimeoutRef.current = setTimeout(() => {
+      saveAutolikeThreshold(value);
+    }, 500);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (autolikeThresholdTimeoutRef.current) {
+        clearTimeout(autolikeThresholdTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleFilterSave = async (values: ResumeFilterSettingsUpdate) => {
     if (!resumeId) return;
@@ -248,6 +290,21 @@ export const ResumeDetailPage = () => {
     setResumeParamsDirty(current !== initial);
   };
 
+  const handleEvaluateResume = async () => {
+    if (!resumeId) return;
+    setIsEvaluationModalVisible(true);
+    setEvaluationLoading(true);
+    try {
+      const result = await evaluateResume(resumeId);
+      setEvaluationResult(result);
+    } catch (err: any) {
+      message.error(err.response?.data?.detail || 'Ошибка при анализе резюме');
+      setIsEvaluationModalVisible(false);
+    } finally {
+      setEvaluationLoading(false);
+    }
+  };
+
 
   if (loading) {
     return (
@@ -299,6 +356,15 @@ export const ResumeDetailPage = () => {
         actions={
           <Space size="middle">
             <Button
+              icon={<ExperimentOutlined />}
+              size="large"
+              onClick={handleEvaluateResume}
+              disabled={!resume?.content}
+              style={{ borderRadius: 10, height: 44, border: '1px solid #e5e7eb' }}
+            >
+              Проверить резюме
+            </Button>
+            <Button
               icon={<SendOutlined />}
               size="large"
               onClick={() => navigate(`/resumes/${resumeId}/responses`)}
@@ -318,12 +384,10 @@ export const ResumeDetailPage = () => {
       />
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        {dailyResponses && 
-         dailyResponses.count >= dailyResponses.limit && 
-         dailyResponses.limit < 200 && (
+        {count >= limit && limit < 200 && (
           <LimitReachedAlert 
-            limit={dailyResponses.limit} 
-            count={dailyResponses.count} 
+            limit={limit} 
+            count={count} 
           />
         )}
 
@@ -422,9 +486,33 @@ export const ResumeDetailPage = () => {
                 />
               </div>
 
-              {resume?.is_auto_reply && dailyResponses && (
+              {resume?.is_auto_reply && (
                 <>
                   <Divider style={{ margin: '20px 0 16px', borderColor: 'rgba(34, 197, 94, 0.2)' }} />
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ marginBottom: 8 }}>
+                      <Text style={{ fontSize: 13, color: '#64748b', fontWeight: 500 }}>
+                        Порог автолика
+                      </Text>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={100}
+                      value={localAutolikeThreshold ?? resume?.autolike_threshold ?? 50}
+                      onChange={handleAutolikeThresholdChange}
+                      disabled={savingAutolikeThreshold}
+                      marks={{
+                        0: '0%',
+                        50: '50%',
+                        100: '100%',
+                      }}
+                      tooltip={{ formatter: (value) => `${value}%` }}
+                      style={{ marginBottom: 8 }}
+                    />
+                    <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 12, display: 'block' }}>
+                      Отклики будут отправляться только на вакансии с оценкой {localAutolikeThreshold ?? resume?.autolike_threshold ?? 50}% и выше
+                    </Text>
+                  </div>
                   <div style={{ display: 'flex', gap: 12 }}>
                     <div
                       style={{
@@ -439,7 +527,7 @@ export const ResumeDetailPage = () => {
                         <CheckCircleOutlined style={{ color: '#16a34a', fontSize: 16 }} />
                         <div>
                           <Text style={{ fontSize: 18, fontWeight: 700, color: '#16a34a', display: 'block', lineHeight: 1 }}>
-                            {dailyResponses.count}
+                            {count}
                           </Text>
                           <Text style={{ fontSize: 11, color: '#64748b' }}>сегодня</Text>
                         </div>
@@ -458,7 +546,7 @@ export const ResumeDetailPage = () => {
                         <ClockCircleOutlined style={{ color: '#64748b', fontSize: 16 }} />
                         <div>
                           <Text style={{ fontSize: 18, fontWeight: 700, color: '#0f172a', display: 'block', lineHeight: 1 }}>
-                            {dailyResponses.limit - dailyResponses.count}
+                            {remaining}
                           </Text>
                           <Text style={{ fontSize: 11, color: '#64748b' }}>осталось</Text>
                         </div>
@@ -656,6 +744,13 @@ export const ResumeDetailPage = () => {
           </Col>
         </Row>
       </div>
+
+      <ResumeEvaluationModal
+        visible={isEvaluationModalVisible}
+        loading={evaluationLoading}
+        result={evaluationResult}
+        onCancel={() => setIsEvaluationModalVisible(false)}
+      />
     </div>
   );
 };

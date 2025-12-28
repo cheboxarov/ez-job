@@ -9,6 +9,7 @@ interface AgentActionsState {
   loading: boolean;
   fetchUnreadCount: () => Promise<void>;
   markAllAsRead: () => Promise<void>;
+  incrementUnreadCount: () => void;
 }
 
 export const useAgentActionsStore = create<AgentActionsState>((set) => ({
@@ -33,6 +34,10 @@ export const useAgentActionsStore = create<AgentActionsState>((set) => ({
     } catch {
       set({ loading: false });
     }
+  },
+
+  incrementUnreadCount: () => {
+    set((state) => ({ unreadCount: state.unreadCount + 1 }));
   },
 }));
 

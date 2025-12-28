@@ -52,10 +52,19 @@ class DatabaseConfig:
 
 
 @dataclass(slots=True)
+class TelegramConfig:
+    bot_token: str | None = "1938283998:AAH3ESJMT5hIyuzBBM5_CeKxiyGEZTrBtH0"
+    bot_username: str | None = "wlovembot"
+    link_token_ttl_seconds: int = 600
+    frontend_url: str = "http://localhost:5173"
+
+
+@dataclass(slots=True)
 class AppConfig:
     hh: HHConfig
     openai: OpenAIConfig
     database: DatabaseConfig
+    telegram: TelegramConfig
 
 
 def _get_env_int(name: str, default: int) -> int:
@@ -149,4 +158,16 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
         db_url=db_url,
     )
 
-    return AppConfig(hh=hh_cfg, openai=openai_cfg, database=db_cfg)
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN") or "8586542877:AAExU-pQjY47W4AEwTjR7O4gFhX_HFJdsGk"
+    telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME") or "autoofferai_bot"
+    telegram_link_token_ttl = _get_env_int("TELEGRAM_LINK_TOKEN_TTL_SECONDS", 600)
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+    telegram_cfg = TelegramConfig(
+        bot_token=telegram_bot_token,
+        bot_username=telegram_bot_username,
+        link_token_ttl_seconds=telegram_link_token_ttl,
+        frontend_url=frontend_url,
+    )
+
+    return AppConfig(hh=hh_cfg, openai=openai_cfg, database=db_cfg, telegram=telegram_cfg)

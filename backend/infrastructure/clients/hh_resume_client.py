@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import httpx
+from loguru import logger
 
 from domain.entities.hh_resume import HHResume
 from domain.entities.hh_resume_detailed import HHResumeDetailed, HHWorkExperience
@@ -27,7 +28,7 @@ class HHResumeClient(HHBaseMixin):
         base_url = internal_api_base_url.rstrip("/")
         url = f"{base_url}/applicant/resumes"
 
-        print(f"[resumes] GET {url}", flush=True)
+        logger.debug(f"[resumes] GET {url}")
 
         enhanced_headers = self._enhance_headers(headers, cookies)
         async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
@@ -36,26 +37,24 @@ class HHResumeClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[resumes] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[resumes] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[resumes] Content-Type: {ct}", flush=True)
+                logger.debug(f"[resumes] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[resumes] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[resumes] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[resumes] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[resumes] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа списка резюме: {exc}; body_len={len(text)}"
@@ -78,7 +77,7 @@ class HHResumeClient(HHBaseMixin):
                 resume = self._map_resume_view_to_entity(raw)
                 resumes.append(resume)
             except Exception as exc:
-                print(f"[resumes] Ошибка маппинга резюме: {exc}", flush=True)
+                logger.warning(f"[resumes] Ошибка маппинга резюме: {exc}")
                 continue
 
         if return_cookies:
@@ -98,23 +97,22 @@ class HHResumeClient(HHBaseMixin):
         base_url = internal_api_base_url.rstrip("/")
         url = f"{base_url}/resume/{resume_hash}"
 
-        print(f"[resume_detail] GET {url} hash={resume_hash}", flush=True)
+        logger.debug(f"[resume_detail] GET {url} hash={resume_hash}")
 
         enhanced_headers = self._enhance_headers(headers, cookies)
         async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
             try:
                 resp = await client.get(url)
             except httpx.HTTPError as exc:
-                print(f"[resume_detail] hash={resume_hash}: HTTP ошибка {exc}", flush=True)
+                logger.error(f"[resume_detail] hash={resume_hash}: HTTP ошибка {exc}")
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
                     return None, updated_cookies
                 return None
 
             if resp.status_code != 200:
-                print(
-                    f"[resume_detail] hash={resume_hash}: неожиданный статус HTTP {resp.status_code}",
-                    flush=True,
+                logger.warning(
+                    f"[resume_detail] hash={resume_hash}: неожиданный статус HTTP {resp.status_code}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -125,9 +123,8 @@ class HHResumeClient(HHBaseMixin):
                 payload = resp.json()
             except json.JSONDecodeError:
                 text = resp.text
-                print(
-                    f"[resume_detail] hash={resume_hash}: ответ не JSON, длина={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[resume_detail] hash={resume_hash}: ответ не JSON, длина={len(text)}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -140,7 +137,7 @@ class HHResumeClient(HHBaseMixin):
         # Данные резюме находятся в applicantResume
         applicant_resume = payload.get("applicantResume")
         if not isinstance(applicant_resume, dict):
-            print(f"[resume_detail] hash={resume_hash}: applicantResume отсутствует или не является словарем", flush=True)
+            logger.warning(f"[resume_detail] hash={resume_hash}: applicantResume отсутствует или не является словарем")
             if return_cookies:
                 return None, updated_cookies
             return None
@@ -151,7 +148,7 @@ class HHResumeClient(HHBaseMixin):
                 return result, updated_cookies
             return result
         except Exception as exc:
-            print(f"[resume_detail] hash={resume_hash}: ошибка маппинга детального резюме: {exc}", flush=True)
+            logger.error(f"[resume_detail] hash={resume_hash}: ошибка маппинга детального резюме: {exc}")
             if return_cookies:
                 return None, updated_cookies
             return None
@@ -185,24 +182,22 @@ class HHResumeClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[touch] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[touch] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[touch] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[touch] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[touch] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[touch] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа touch: {exc}; body_len={len(text)}"
@@ -214,6 +209,84 @@ class HHResumeClient(HHBaseMixin):
         if return_cookies:
             return payload, updated_cookies
         return payload
+
+    async def edit_resume(
+        self,
+        resume_hash: str,
+        experience: List[Dict[str, Any]],
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        """Редактировать резюме на HeadHunter по /applicant/resume/edit.
+        
+        Args:
+            resume_hash: Hash резюме для редактирования.
+            experience: Список объектов опыта работы для обновления.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] с результатом редактирования или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+        base_url = internal_api_base_url.rstrip("/")
+        url = f"{base_url}/applicant/resume/edit"
+        
+        params = {
+            "resume": resume_hash,
+            "hhtmSource": hhtm_source,
+        }
+        
+        payload = {
+            "experience": experience,
+        }
+        
+        logger.debug(f"[edit_resume] POST {url} params={params} resume_hash={resume_hash}")
+        
+        enhanced_headers = self._enhance_headers(headers, cookies)
+        enhanced_headers["content-type"] = "application/json"
+        enhanced_headers["x-hhtmfrom"] = "resume_view_block"
+        enhanced_headers["x-hhtmsource"] = hhtm_source
+        
+        async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
+            try:
+                resp = await client.post(url, params=params, json=payload)
+                resp.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                response = exc.response
+                logger.error(
+                    f"[edit_resume] HTTP {response.status_code} for {response.request.url}"
+                )
+                try:
+                    body_preview = response.text[:500]
+                except Exception:
+                    body_preview = "<unavailable>"
+                logger.debug(f"[edit_resume] Body preview: {body_preview}")
+                raise
+            
+            try:
+                result = resp.json()
+            except json.JSONDecodeError as exc:
+                text = resp.text
+                logger.error(
+                    f"[edit_resume] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
+                )
+                raise RuntimeError(
+                    f"Не удалось распарсить JSON ответа edit_resume: {exc}; body_len={len(text)}"
+                ) from exc
+            
+            # Извлечь обновленные cookies после запроса
+            updated_cookies = self._extract_cookies(client)
+        
+        if return_cookies:
+            return result, updated_cookies
+        return result
 
     @staticmethod
     def _map_resume_view_to_entity(r: Dict[str, object]) -> HHResume:
@@ -516,7 +589,7 @@ class HHResumeClient(HHBaseMixin):
                         )
                     )
                 except Exception as exc:
-                    print(f"[resume_detail] Ошибка парсинга опыта работы: {exc}", flush=True)
+                    logger.warning(f"[resume_detail] Ошибка парсинга опыта работы: {exc}")
                     continue
 
         # О себе (из skills, первый элемент)

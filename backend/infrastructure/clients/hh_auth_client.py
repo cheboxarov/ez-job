@@ -7,6 +7,7 @@ import json
 from typing import Any, Dict, Optional, Union
 
 import httpx
+from loguru import logger
 
 from infrastructure.clients.hh_base_mixin import HHBaseMixin
 
@@ -50,7 +51,7 @@ class HHAuthClient(HHBaseMixin):
             form_data["captchaKey"] = captcha.get("key", "")
             form_data["captchaText"] = captcha.get("text", "")
 
-        print(f"[generate_otp] POST {url} phone={phone} data={form_data}", flush=True)
+        logger.debug(f"[generate_otp] POST {url} phone={phone} data={form_data}")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -60,24 +61,22 @@ class HHAuthClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[generate_otp] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[generate_otp] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[generate_otp] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[generate_otp] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[generate_otp] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[generate_otp] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа генерации OTP: {exc}; body_len={len(text)}"
@@ -127,7 +126,7 @@ class HHAuthClient(HHBaseMixin):
         if login_trust_flags:
             form_data["loginTrustFlags"] = login_trust_flags
 
-        print(f"[login_by_code] POST {url} phone={phone}", flush=True)
+        logger.debug(f"[login_by_code] POST {url} phone={phone}")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -137,24 +136,22 @@ class HHAuthClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[login_by_code] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[login_by_code] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[login_by_code] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[login_by_code] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[login_by_code] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[login_by_code] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа входа по коду: {exc}; body_len={len(text)}"
@@ -214,7 +211,7 @@ class HHAuthClient(HHBaseMixin):
         # Улучшаем заголовки для HTML запроса
         enhanced_headers = self._enhance_headers_for_html(headers, initial_cookies)
         
-        print(f"[get_initial_cookies] GET {url} params={params}", flush=True)
+        logger.debug(f"[get_initial_cookies] GET {url} params={params}")
         
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=initial_cookies, timeout=self._timeout, follow_redirects=True
@@ -224,15 +221,14 @@ class HHAuthClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[get_initial_cookies] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[get_initial_cookies] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[get_initial_cookies] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[get_initial_cookies] Body preview: {body_preview}")
                 raise
             
             # Извлекаем куки из ответа
@@ -262,7 +258,7 @@ class HHAuthClient(HHBaseMixin):
         enhanced_headers.setdefault("X-Requested-With", "XMLHttpRequest")
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
         
-        print(f"[get_captcha_key] GET {url} params={params}", flush=True)
+        logger.debug(f"[get_captcha_key] GET {url} params={params}")
         
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -272,24 +268,22 @@ class HHAuthClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[get_captcha_key] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[get_captcha_key] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[get_captcha_key] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[get_captcha_key] Body preview: {body_preview}")
                 raise
             
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[get_captcha_key] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[get_captcha_key] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа получения ключа капчи: {exc}; body_len={len(text)}"
@@ -321,7 +315,7 @@ class HHAuthClient(HHBaseMixin):
         enhanced_headers.setdefault("X-Requested-With", "XMLHttpRequest")
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
         
-        print(f"[get_captcha_picture] GET {url} params={params}", flush=True)
+        logger.debug(f"[get_captcha_picture] GET {url} params={params}")
         
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -331,15 +325,14 @@ class HHAuthClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[get_captcha_picture] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[get_captcha_picture] HTTP {response.status_code} for {response.request.url}"
                 )
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[get_captcha_picture] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[get_captcha_picture] Body preview: {body_preview}")
                 raise
             
             # Капча возвращается как изображение

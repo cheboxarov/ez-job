@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Dict, List, Optional
 from uuid import UUID
+from loguru import logger
 
 from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.interfaces.hh_client_port import HHClientPort
@@ -55,7 +56,7 @@ class FetchChatsDetailsUseCase:
             if isinstance(result, HHChatDetailed):
                 chats.append(result)
             elif isinstance(result, Exception):
-                print(f"[fetch_chats_details] Ошибка получения чата: {result}", flush=True)
+                logger.error(f"[fetch_chats_details] Ошибка получения чата: {result}")
 
         return chats
 

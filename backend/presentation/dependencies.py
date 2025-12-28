@@ -29,10 +29,12 @@ from domain.use_cases.list_agent_actions import ListAgentActionsUseCase
 from domain.use_cases.send_chat_message import SendChatMessageUseCase
 from domain.use_cases.generate_user_filter_settings import GenerateUserFilterSettingsUseCase
 from domain.use_cases.get_areas import GetAreasUseCase
+from domain.use_cases.evaluate_resume import EvaluateResumeUseCase
 from infrastructure.auth.fastapi_users_setup import get_current_active_user
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
 from infrastructure.database.models.user_model import UserModel
 from infrastructure.agents.filter_settings_generator_agent import FilterSettingsGeneratorAgent
+from infrastructure.agents.resume_evaluator_agent import ResumeEvaluatorAgent
 
 
 @lru_cache()
@@ -81,6 +83,14 @@ def get_filter_settings_generation_service() -> FilterSettingsGenerationService:
     agent = FilterSettingsGeneratorAgent(config.openai)
     use_case = GenerateUserFilterSettingsUseCase(agent)
     return FilterSettingsGenerationService(use_case)
+
+
+@lru_cache()
+def get_evaluate_resume_use_case() -> EvaluateResumeUseCase:
+    """Создает и возвращает EvaluateResumeUseCase (кешируется)."""
+    config = get_config()
+    agent = ResumeEvaluatorAgent(config.openai)
+    return EvaluateResumeUseCase(agent)
 
 
 async def get_unit_of_work() -> AsyncGenerator[UnitOfWorkPort, None]:
@@ -283,4 +293,90 @@ async def get_agent_action_service(
         send_chat_message_uc=send_chat_message_uc,
     )
     return service
+
+
+@lru_cache()
+def get_event_bus():
+    """Создает и возвращает singleton Event Bus (кешируется).
+    
+    Returns:
+        Singleton экземпляр Event Bus.
+    """
+    from application.factories.event_factory import get_event_bus as factory_get_event_bus
+    return factory_get_event_bus()
+
+
+@lru_cache()
+def get_event_publisher():
+    """Создает и возвращает EventPublisher (кешируется).
+    
+    Returns:
+        Экземпляр EventPublisher.
+    """
+    from application.factories.event_factory import create_event_publisher
+    config = get_config()
+    return create_event_publisher(config)
+
+
+@lru_cache()
+def get_websocket_manager():
+    """Создает и возвращает singleton WebSocketManager (кешируется).
+    
+    Returns:
+        Singleton экземпляр WebSocketManager.
+    """
+    from infrastructure.websocket.websocket_manager import WebSocketManager
+    return WebSocketManager()
+
+
+async def get_websocket_service() -> "WebSocketService":
+    """Создает и возвращает WebSocketService.
+    
+    Returns:
+        Экземпляр WebSocketService.
+    """
+    from application.services.websocket_service import WebSocketService
+    from infrastructure.events.event_bus import EventBus
+    
+    event_bus = get_event_bus()
+    websocket_manager = get_websocket_manager()
+    
+    return WebSocketService(
+        websocket_manager=websocket_manager,
+        event_subscriber=event_bus,
+    )
+
+
+@lru_cache()
+def get_telegram_bot() -> "TelegramBotPort":
+    """Создает и возвращает TelegramBot (singleton).
+    
+    Returns:
+        Экземпляр TelegramBotPort.
+    """
+    from infrastructure.telegram.telegram_bot import TelegramBot
+    
+    config = get_config()
+    
+    if not config.telegram.bot_token:
+        # Возвращаем заглушку, если токен не установлен
+        from domain.interfaces.telegram_bot_port import TelegramBotPort
+        
+        class DummyTelegramBot(TelegramBotPort):
+            async def send_message(
+                self,
+                chat_id: int,
+                text: str,
+                parse_mode: str = "HTML",
+                reply_markup: dict | None = None,
+            ) -> bool:
+                return False
+        
+        return DummyTelegramBot()
+    
+    return TelegramBot(
+        bot_token=config.telegram.bot_token,
+        link_token_handler=None,  # Будет установлен при запуске приложения
+        unlink_handler=None,  # Будет установлен при запуске приложения
+    )
 

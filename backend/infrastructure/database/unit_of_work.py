@@ -28,6 +28,12 @@ from domain.interfaces.user_subscription_repository_port import (
 from domain.interfaces.agent_action_repository_port import (
     AgentActionRepositoryPort,
 )
+from domain.interfaces.telegram_notification_settings_repository_port import (
+    TelegramNotificationSettingsRepositoryPort,
+)
+from domain.interfaces.telegram_link_token_repository_port import (
+    TelegramLinkTokenRepositoryPort,
+)
 from infrastructure.database.repositories.user_repository import UserRepository
 from infrastructure.database.repositories.resume_filter_settings_repository import (
     ResumeFilterSettingsRepository,
@@ -51,6 +57,12 @@ from infrastructure.database.repositories.user_subscription_repository import (
 from infrastructure.database.repositories.agent_action_repository import (
     AgentActionRepository,
 )
+from infrastructure.database.repositories.telegram_notification_settings_repository import (
+    TelegramNotificationSettingsRepository,
+)
+from infrastructure.database.repositories.telegram_link_token_repository import (
+    TelegramLinkTokenRepository,
+)
 
 
 class UnitOfWork(UnitOfWorkPort):
@@ -73,6 +85,8 @@ class UnitOfWork(UnitOfWorkPort):
         self._subscription_plan_repository: SubscriptionPlanRepositoryPort | None = None
         self._user_subscription_repository: UserSubscriptionRepositoryPort | None = None
         self._agent_action_repository: AgentActionRepositoryPort | None = None
+        self._telegram_notification_settings_repository: TelegramNotificationSettingsRepositoryPort | None = None
+        self._telegram_link_token_repository: TelegramLinkTokenRepositoryPort | None = None
 
     @property
     def user_repository(self) -> UserRepositoryPort:
@@ -200,6 +214,34 @@ class UnitOfWork(UnitOfWorkPort):
             raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
         return self._agent_action_repository
 
+    @property
+    def telegram_notification_settings_repository(self) -> TelegramNotificationSettingsRepositoryPort:
+        """Получить репозиторий настроек Telegram уведомлений.
+
+        Returns:
+            Репозиторий настроек Telegram уведомлений.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._telegram_notification_settings_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._telegram_notification_settings_repository
+
+    @property
+    def telegram_link_token_repository(self) -> TelegramLinkTokenRepositoryPort:
+        """Получить репозиторий токенов привязки Telegram.
+
+        Returns:
+            Репозиторий токенов привязки Telegram.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._telegram_link_token_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._telegram_link_token_repository
+
     async def __aenter__(self) -> UnitOfWorkPort:
         """Вход в контекстный менеджер.
 
@@ -216,6 +258,8 @@ class UnitOfWork(UnitOfWorkPort):
         self._subscription_plan_repository = SubscriptionPlanRepository(self._session)
         self._user_subscription_repository = UserSubscriptionRepository(self._session)
         self._agent_action_repository = AgentActionRepository(self._session)
+        self._telegram_notification_settings_repository = TelegramNotificationSettingsRepository(self._session)
+        self._telegram_link_token_repository = TelegramLinkTokenRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

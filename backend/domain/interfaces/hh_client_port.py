@@ -298,6 +298,33 @@ class HHClientPort(ABC):
         """
 
     @abstractmethod
+    async def edit_resume(
+        self,
+        resume_hash: str,
+        experience: List[Dict[str, Any]],
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+        return_cookies: bool = False,
+    ) -> Union[Dict[str, Any], tuple[Dict[str, Any], Dict[str, str]]]:  # pragma: no cover - интерфейс
+        """Редактировать резюме на HeadHunter по /applicant/resume/edit.
+        
+        Args:
+            resume_hash: Hash резюме для редактирования.
+            experience: Список объектов опыта работы для обновления.
+            headers: HTTP заголовки для запроса.
+            cookies: HTTP cookies для запроса.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+            hhtm_source: Источник запроса (по умолчанию "resume_partial_edit").
+            return_cookies: Если True, возвращает tuple (result, updated_cookies).
+        
+        Returns:
+            Dict[str, Any] с результатом редактирования или tuple[Dict[str, Any], Dict[str, str]] если return_cookies=True.
+        """
+
+    @abstractmethod
     async def generate_otp(
         self,
         phone: str,

@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import httpx
 from bs4 import BeautifulSoup
+from loguru import logger
 
 from domain.entities.vacancy_detail import VacancyDetail
 from domain.entities.vacancy_list import VacancyList, VacancyListItem
@@ -29,7 +30,7 @@ class HHVacancyClient(HHBaseMixin):
         # Публичное API: GET /vacancies
         url = f"{self._base_url}/vacancies"
 
-        print(f"[list] GET {url} params={query}", flush=True)
+        logger.debug(f"[list] GET {url} params={query}")
 
         enhanced_headers = self._enhance_headers(headers, cookies)
         async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
@@ -38,26 +39,24 @@ class HHVacancyClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[list] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[list] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[list] Content-Type: {ct}", flush=True)
+                logger.debug(f"[list] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[list] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[list] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:  # pragma: no cover - диагностика
                 text = resp.text
-                print(
-                    f"[list] Не удалось распарсить JSON списка вакансий: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[list] Не удалось распарсить JSON списка вакансий: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON списка вакансий: {exc}; body_len={len(text)}"
@@ -200,10 +199,10 @@ class HHVacancyClient(HHBaseMixin):
         # Извлекаем XSRF токен для логирования (если нужен)
         xsrf_token = cookies.get("_xsrf") or enhanced_headers.get("X-Xsrftoken") or ""
 
-        print(f"[list-front] GET {url} params={query}", flush=True)
-        print(f"[list-front] Query data: {json.dumps(query, indent=2, ensure_ascii=False)}", flush=True)
-        print(f"[list-front] Headers keys: {list(enhanced_headers.keys())}", flush=True)
-        print(f"[list-front] XSRF token: {xsrf_token[:50] if xsrf_token else 'NOT_FOUND'}", flush=True)
+        logger.debug(f"[list-front] GET {url} params={query}")
+        logger.debug(f"[list-front] Query data: {json.dumps(query, indent=2, ensure_ascii=False)}")
+        logger.debug(f"[list-front] Headers keys: {list(enhanced_headers.keys())}")
+        logger.debug(f"[list-front] XSRF token: {xsrf_token[:50] if xsrf_token else 'NOT_FOUND'}")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
@@ -213,26 +212,24 @@ class HHVacancyClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[list-front] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[list-front] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[list-front] Content-Type: {ct}", flush=True)
+                logger.debug(f"[list-front] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[list-front] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[list-front] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[list-front] Не удалось распарсить JSON: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[list-front] Не удалось распарсить JSON: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа /search/vacancy: {exc}; body_len={len(text)}"
@@ -491,26 +488,24 @@ class HHVacancyClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[areas] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[areas] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[areas] Content-Type: {ct}", flush=True)
+                logger.debug(f"[areas] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[areas] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[areas] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:  # pragma: no cover - диагностика
                 text = resp.text
-                print(
-                    f"[areas] Не удалось распарсить JSON дерева регионов: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[areas] Не удалось распарсить JSON дерева регионов: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON дерева регионов: {exc}; body_len={len(text)}"
@@ -543,16 +538,15 @@ class HHVacancyClient(HHBaseMixin):
             try:
                 resp = await client.get(url)
             except httpx.HTTPError as exc:  # pragma: no cover - сетевые ошибки
-                print(f"[detail] vacancyId={vacancy_id}: HTTP ошибка {exc}", flush=True)
+                logger.error(f"[detail] vacancyId={vacancy_id}: HTTP ошибка {exc}")
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
                     return None, updated_cookies
                 return None
 
             if resp.status_code != 200:
-                print(
-                    f"[detail] vacancyId={vacancy_id}: неожиданный статус HTTP {resp.status_code}",
-                    flush=True,
+                logger.warning(
+                    f"[detail] vacancyId={vacancy_id}: неожиданный статус HTTP {resp.status_code}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -563,9 +557,8 @@ class HHVacancyClient(HHBaseMixin):
                 payload = resp.json()
             except json.JSONDecodeError:
                 text = resp.text
-                print(
-                    f"[detail] vacancyId={vacancy_id}: не удалось распарсить JSON; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[detail] vacancyId={vacancy_id}: не удалось распарсить JSON; body_len={len(text)}"
                 )
                 if return_cookies:
                     updated_cookies = self._extract_cookies(client)
@@ -576,9 +569,8 @@ class HHVacancyClient(HHBaseMixin):
             updated_cookies = self._extract_cookies(client)
 
         if not isinstance(payload, dict):
-            print(
-                f"[detail] vacancyId={vacancy_id}: ожидался объект в корне ответа",
-                flush=True,
+            logger.warning(
+                f"[detail] vacancyId={vacancy_id}: ожидался объект в корне ответа"
             )
             if return_cookies:
                 return None, updated_cookies
@@ -587,9 +579,8 @@ class HHVacancyClient(HHBaseMixin):
         try:
             detail = self._map_vacancy_view_to_detail(payload)
         except Exception as exc:
-            print(
-                f"[detail] vacancyId={vacancy_id}: ошибка маппинга вакансии: {exc}",
-                flush=True,
+            logger.error(
+                f"[detail] vacancyId={vacancy_id}: ошибка маппинга вакансии: {exc}"
             )
             if return_cookies:
                 return None, updated_cookies
@@ -748,14 +739,14 @@ class HHVacancyClient(HHBaseMixin):
         # Добавляем анти-бот заголовки и XSRF токен (но не перезаписываем уже установленные)
         enhanced_headers = self._enhance_headers_for_html(get_headers, cookies)
         
-        print(f"[test] GET {url} vacancyId={vacancy_id}", flush=True)
+        logger.debug(f"[test] GET {url} vacancyId={vacancy_id}")
         
         async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
             try:
                 resp = await client.get(url, params=params)
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
-                print(f"[test] HTTP {exc.response.status_code} for {exc.response.request.url}", flush=True)
+                logger.error(f"[test] HTTP {exc.response.status_code} for {exc.response.request.url}")
                 raise
             
             html_content = resp.text
@@ -774,9 +765,9 @@ class HHVacancyClient(HHBaseMixin):
                     logs_dir.mkdir(exist_ok=True)
                     html_file = logs_dir / f"{vacancy_id}.html"
                     html_file.write_text(html_content, encoding="utf-8")
-                    print(f"[test] Сохранен HTML в {html_file} для вакансии {vacancy_id}", flush=True)
+                    logger.debug(f"[test] Сохранен HTML в {html_file} для вакансии {vacancy_id}")
                 except Exception as save_exc:
-                    print(f"[test] Не удалось сохранить HTML для вакансии {vacancy_id}: {save_exc}", flush=True)
+                    logger.warning(f"[test] Не удалось сохранить HTML для вакансии {vacancy_id}: {save_exc}")
                 
                 # Тест отсутствует
                 if return_cookies:
@@ -938,9 +929,9 @@ class HHVacancyClient(HHBaseMixin):
                     logs_dir.mkdir(exist_ok=True)
                     html_file = logs_dir / f"{vacancy_id}.html"
                     html_file.write_text(html_content, encoding="utf-8")
-                    print(f"[test] Сохранен HTML в {html_file} для вакансии {vacancy_id} (вопросы не найдены)", flush=True)
+                    logger.debug(f"[test] Сохранен HTML в {html_file} для вакансии {vacancy_id} (вопросы не найдены)")
                 except Exception as save_exc:
-                    print(f"[test] Не удалось сохранить HTML для вакансии {vacancy_id}: {save_exc}", flush=True)
+                    logger.warning(f"[test] Не удалось сохранить HTML для вакансии {vacancy_id}: {save_exc}")
                 
                 # Вопросы не найдены
                 if return_cookies:
@@ -1036,12 +1027,12 @@ class HHVacancyClient(HHBaseMixin):
                     # Для обычных вопросов - одно поле
                     files_list.append((field_name, (None, str(answer))))
 
-        print(f"[respond] POST {url} vacancy_id={vacancy_id} resume_hash={resume_hash}", flush=True)
+        logger.debug(f"[respond] POST {url} vacancy_id={vacancy_id} resume_hash={resume_hash}")
         # Логируем ключи для отладки
-        print(f"[respond] Form data keys: {[k for k, _ in files_list]}", flush=True)
-        print(f"[respond] Headers keys: {list(headers.keys())}", flush=True)
-        print(f"[respond] Cookies keys: {list(cookies.keys())}", flush=True)
-        print(f"[respond] XSRF token: {xsrf_token[:50] if xsrf_token else 'NOT_FOUND'}", flush=True)
+        logger.debug(f"[respond] Form data keys: {[k for k, _ in files_list]}")
+        logger.debug(f"[respond] Headers keys: {list(headers.keys())}")
+        logger.debug(f"[respond] Cookies keys: {list(cookies.keys())}")
+        logger.debug(f"[respond] XSRF token: {xsrf_token[:50] if xsrf_token else 'NOT_FOUND'}")
 
         enhanced_headers = self._enhance_headers(headers, cookies)
         async with httpx.AsyncClient(headers=enhanced_headers, cookies=cookies, timeout=self._timeout) as client:
@@ -1050,26 +1041,24 @@ class HHVacancyClient(HHBaseMixin):
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
-                print(
-                    f"[respond] HTTP {response.status_code} for {response.request.url}",
-                    flush=True,
+                logger.error(
+                    f"[respond] HTTP {response.status_code} for {response.request.url}"
                 )
                 ct = response.headers.get("Content-Type", "")
-                print(f"[respond] Content-Type: {ct}", flush=True)
+                logger.debug(f"[respond] Content-Type: {ct}")
                 try:
                     body_preview = response.text[:500]
                 except Exception:
                     body_preview = "<unavailable>"
-                print(f"[respond] Body preview: {body_preview}", flush=True)
+                logger.debug(f"[respond] Body preview: {body_preview}")
                 raise
 
             try:
                 payload = resp.json()
             except json.JSONDecodeError as exc:
                 text = resp.text
-                print(
-                    f"[respond] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}",
-                    flush=True,
+                logger.error(
+                    f"[respond] Не удалось распарсить JSON ответа: {exc}; body_len={len(text)}"
                 )
                 raise RuntimeError(
                     f"Не удалось распарсить JSON ответа отклика: {exc}; body_len={len(text)}"

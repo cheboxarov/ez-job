@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 from openai import AsyncOpenAI
+from loguru import logger
 
 from config import OpenAIConfig
 from domain.entities.suggested_user_filter_settings import SuggestedUserFilterSettings
@@ -63,7 +64,7 @@ class FilterSettingsGeneratorAgent(FilterSettingsGeneratorServicePort):
 
             return self._parse_response(content)
         except Exception as exc:  # pragma: no cover - диагностика
-            print(f"[ai] ошибка при генерации настроек фильтров: {exc}", flush=True)
+            logger.error(f"[ai] ошибка при генерации настроек фильтров: {exc}", exc_info=True)
             return SuggestedUserFilterSettings()
 
     def _parse_response(self, content: str) -> SuggestedUserFilterSettings:

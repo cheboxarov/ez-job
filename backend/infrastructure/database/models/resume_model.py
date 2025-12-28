@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from sqlalchemy import Boolean, ForeignKey, String, Text
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from infrastructure.database.base import Base
@@ -29,3 +29,4 @@ class ResumeModel(Base):
     external_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     headhunter_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_auto_reply: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    autolike_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=50)

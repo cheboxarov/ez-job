@@ -349,6 +349,32 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
             return result, updated_cookies
         return result
 
+    async def edit_resume(
+        self,
+        resume_hash: str,
+        experience: List[Dict[str, Any]],
+        headers: Dict[str, str],
+        cookies: Dict[str, str],
+        *,
+        internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
+        hhtm_source: str = "resume_partial_edit",
+        return_cookies: bool = False,
+    ) -> Dict[str, Any] | tuple[Dict[str, Any], Dict[str, str]]:
+        result, updated_cookies = await self._hh_client.edit_resume(
+            resume_hash,
+            experience,
+            headers,
+            cookies,
+            internal_api_base_url=internal_api_base_url,
+            hhtm_source=hhtm_source,
+            return_cookies=True,
+        )
+        cookies.update(updated_cookies)
+        await self._update_cookies(updated_cookies)
+        if return_cookies:
+            return result, updated_cookies
+        return result
+
     async def generate_otp(
         self,
         phone: str,

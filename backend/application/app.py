@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 from typing import Dict, List
 
+from loguru import logger
+
 from config import AppConfig, load_config
 from domain.entities.agent_action import AgentAction
 from domain.entities.hh_chat_detailed import HHChatDetailed
@@ -46,27 +48,27 @@ class Application:
         )
 
     async def run(self) -> None:
-        print("[app] Запускаю получение чатов пользователя...", flush=True)
+        logger.info("[app] Запускаю получение чатов пользователя...")
 
         # Создаем UnitOfWork и работаем с БД
         async with UnitOfWork(self._session_factory) as uow:
             # Получаем первого пользователя из БД
             user: User | None = await uow.user_repository.get_first()
             if user is None:
-                print("[app] Ошибка: пользователи не найдены в БД", flush=True)
+                logger.error("[app] Ошибка: пользователи не найдены в БД")
                 return
 
-            print(f"[app] Найден пользователь: {user.id}", flush=True)
+            logger.info(f"[app] Найден пользователь: {user.id}")
 
             # Получаем auth данные пользователя
             auth_data: UserHhAuthData | None = await uow.user_hh_auth_data_repository.get_by_user_id(
                 user.id
             )
             if auth_data is None:
-                print(f"[app] Ошибка: auth данные для пользователя {user.id} не найдены", flush=True)
+                logger.error(f"[app] Ошибка: auth данные для пользователя {user.id} не найдены")
                 return
 
-            print(f"[app] Получены auth данные для пользователя {user.id}", flush=True)
+            logger.info(f"[app] Получены auth данные для пользователя {user.id}")
 
             # Создаем use case для обновления cookies
             update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
@@ -81,9 +83,9 @@ class Application:
                     user_id=user.id,
                     update_cookies_uc=update_cookies_uc,
                 )
-                print(f"[app] Получено чатов: {len(chat_list.items)}", flush=True)
+                logger.info(f"[app] Получено чатов: {len(chat_list.items)}")
             except Exception as exc:
-                print(f"[app] Ошибка при получении списка чатов: {exc}", flush=True)
+                logger.error(f"[app] Ошибка при получении списка чатов: {exc}", exc_info=True)
                 return
 
             # Фильтруем чаты без отказа и помечаем чаты с отказом как прочитанные
@@ -94,15 +96,15 @@ class Application:
                 user_id=user.id,
                 update_cookies_uc=update_cookies_uc,
             )
-            print(f"[app] Чатов без отказа: {len(filtered_chat_list.items)}", flush=True)
+            logger.info(f"[app] Чатов без отказа: {len(filtered_chat_list.items)}")
 
             # Берем первые 3 чата из отфильтрованного списка (или все, если меньше 3)
             first_chats = filtered_chat_list.items
             if not first_chats:
-                print("[app] Чаты не найдены", flush=True)
+                logger.warning("[app] Чаты не найдены")
                 return
 
-            print(f"[app] Получаю детальную информацию о {len(first_chats)} чатах...", flush=True)
+            logger.info(f"[app] Получаю детальную информацию о {len(first_chats)} чатах...")
 
             # Получаем детальную информацию о чатах
             chat_ids = [chat.id for chat in first_chats]
@@ -114,14 +116,14 @@ class Application:
                     user_id=user.id,
                     update_cookies_uc=update_cookies_uc,
                 )
-                print(f"[app] Получено детальной информации о чатах: {len(chats_details)}", flush=True)
+                logger.info(f"[app] Получено детальной информации о чатах: {len(chats_details)}")
             except Exception as exc:
-                print(f"[app] Ошибка при получении детальной информации о чатах: {exc}", flush=True)
+                logger.error(f"[app] Ошибка при получении детальной информации о чатах: {exc}", exc_info=True)
                 return
 
             # Формируем result.txt
             self._generate_result_txt(chats_details, filtered_chat_list)
-            print("[app] Запись result.txt завершена", flush=True)
+            logger.info("[app] Запись result.txt завершена")
 
             # Анализируем чаты и генерируем ответы
             try:
@@ -143,7 +145,7 @@ class Application:
                     else:
                         chats_without_resume.append(chat)
 
-                print(f"[app] Чаты сгруппированы: {len(chats_by_resume)} групп по резюме, {len(chats_without_resume)} чатов без резюме", flush=True)
+                logger.info(f"[app] Чаты сгруппированы: {len(chats_by_resume)} групп по резюме, {len(chats_without_resume)} чатов без резюме")
 
                 # Создаем агента
                 messages_agent = MessagesAgent(self._config.openai)
@@ -155,7 +157,7 @@ class Application:
 
                 # Обрабатываем каждую группу чатов с соответствующим резюме
                 for resume_id, group_chats in chats_by_resume.items():
-                    print(f"[app] Обрабатываю группу из {len(group_chats)} чатов для резюме external_id={resume_id}", flush=True)
+                    logger.info(f"[app] Обрабатываю группу из {len(group_chats)} чатов для резюме external_id={resume_id}")
                     
                     # Ищем резюме по external_id
                     resume = await uow.resume_repository.get_by_external_id(
@@ -164,10 +166,10 @@ class Application:
                     )
                     
                     if resume is None:
-                        print(f"[app] Резюме с external_id={resume_id} не найдено, пропускаем группу чатов", flush=True)
+                        logger.warning(f"[app] Резюме с external_id={resume_id} не найдено, пропускаем группу чатов")
                         continue
                     
-                    print(f"[app] Используется резюме {resume.id} (external_id={resume_id}) для анализа {len(group_chats)} чатов", flush=True)
+                    logger.info(f"[app] Используется резюме {resume.id} (external_id={resume_id}) для анализа {len(group_chats)} чатов")
 
                     # Анализируем чаты этой группы с соответствующим резюме
                     actions = await analyze_chats_uc.execute(
@@ -179,15 +181,15 @@ class Application:
                     )
                     
                     all_actions.extend(actions)
-                    print(f"[app] Сгенерировано {len(actions)} действий для группы резюме {resume_id}", flush=True)
+                    logger.info(f"[app] Сгенерировано {len(actions)} действий для группы резюме {resume_id}")
 
                 # Обрабатываем чаты без резюме (используем первое доступное резюме или пропускаем)
                 if chats_without_resume:
-                    print(f"[app] Обрабатываю {len(chats_without_resume)} чатов без резюме", flush=True)
+                    logger.info(f"[app] Обрабатываю {len(chats_without_resume)} чатов без резюме")
                     resumes = await uow.resume_repository.list_by_user_id(user.id)
                     if resumes:
                         resume = resumes[0]
-                        print(f"[app] Используется первое резюме {resume.id} для чатов без резюме", flush=True)
+                        logger.info(f"[app] Используется первое резюме {resume.id} для чатов без резюме")
                         actions = await analyze_chats_uc.execute(
                             chats=chats_without_resume,
                             resume=resume.content,
@@ -196,11 +198,11 @@ class Application:
                             resume_hash=resume.headhunter_hash,
                         )
                         all_actions.extend(actions)
-                        print(f"[app] Сгенерировано {len(actions)} действий для чатов без резюме", flush=True)
+                        logger.info(f"[app] Сгенерировано {len(actions)} действий для чатов без резюме")
                     else:
-                        print("[app] Нет резюме для обработки чатов без резюме, пропускаем", flush=True)
+                        logger.warning("[app] Нет резюме для обработки чатов без резюме, пропускаем")
 
-                print(f"[app] Всего сгенерировано {len(all_actions)} действий для ответов", flush=True)
+                logger.info(f"[app] Всего сгенерировано {len(all_actions)} действий для ответов")
                 
                 # Сохраняем действия в БД
                 if all_actions:
@@ -216,30 +218,26 @@ class Application:
                                 message_to = action.data.get("message_to")
                                 preview = message_text[:100] + "..." if len(message_text) > 100 else message_text
                                 message_to_str = f" (ответ на сообщение {message_to})" if message_to else ""
-                                print(
-                                    f"[app] Сохранено действие: отправить сообщение в чат {dialog_id}{message_to_str}: {preview}",
-                                    flush=True,
+                                logger.info(
+                                    f"[app] Сохранено действие: отправить сообщение в чат {dialog_id}{message_to_str}: {preview}"
                                 )
                             elif action.type == "create_event":
                                 event_type = action.data.get("event_type", "")
                                 message = action.data.get("message", "")
                                 preview = message[:100] + "..." if len(message) > 100 else message
-                                print(
-                                    f"[app] Сохранено действие: создать событие в чате {dialog_id}, тип: {event_type}: {preview}",
-                                    flush=True,
+                                logger.info(
+                                    f"[app] Сохранено действие: создать событие в чате {dialog_id}, тип: {event_type}: {preview}"
                                 )
                         except Exception as exc:
-                            print(f"[app] Ошибка при сохранении действия {action.id}: {exc}", flush=True)
-                            import traceback
-                            print(f"[app] Traceback: {traceback.format_exc()}", flush=True)
+                            logger.error(f"[app] Ошибка при сохранении действия {action.id}: {exc}", exc_info=True)
                             # Продолжаем сохранять остальные действия
                     
-                    print(f"[app] Сохранено {saved_count} из {len(all_actions)} действий в БД", flush=True)
+                    logger.info(f"[app] Сохранено {saved_count} из {len(all_actions)} действий в БД")
                 else:
-                    print("[app] Нет действий для сохранения", flush=True)
+                    logger.info("[app] Нет действий для сохранения")
 
                 # Помечаем все чаты, которые были отправлены в агента, как прочитанные
-                print(f"[app] Помечаю {len(chats_details)} чатов как прочитанные...", flush=True)
+                logger.info(f"[app] Помечаю {len(chats_details)} чатов как прочитанные...")
                 mark_read_tasks = []
                 for chat in chats_details:
                     # Берем последнее сообщение из чата
@@ -256,25 +254,25 @@ class Application:
                                         user_id=user.id,
                                         update_cookies_uc=update_cookies_uc,
                                     )
-                                    print(f"[app] Успешно помечено как прочитанное: chat_id={chat_id}, message_id={message_id}", flush=True)
+                                    logger.debug(f"[app] Успешно помечено как прочитанное: chat_id={chat_id}, message_id={message_id}")
                                 except Exception as exc:
-                                    print(f"[app] Ошибка при пометке чата {chat_id}, сообщения {message_id} как прочитанного: {exc}", flush=True)
+                                    logger.error(f"[app] Ошибка при пометке чата {chat_id}, сообщения {message_id} как прочитанного: {exc}")
                             
                             task = asyncio.create_task(mark_read_wrapper(chat.id, last_message.id))
                             mark_read_tasks.append(task)
                         else:
-                            print(f"[app] Не удалось пометить чат {chat.id} как прочитанный: отсутствует last_message или message_id", flush=True)
+                            logger.warning(f"[app] Не удалось пометить чат {chat.id} как прочитанный: отсутствует last_message или message_id")
                     else:
-                        print(f"[app] Чат {chat.id} не имеет сообщений для пометки как прочитанного", flush=True)
+                        logger.warning(f"[app] Чат {chat.id} не имеет сообщений для пометки как прочитанного")
 
                 if mark_read_tasks:
                     results = await asyncio.gather(*mark_read_tasks, return_exceptions=True)
                     for result in results:
                         if isinstance(result, Exception):
-                            print(f"[app] Ошибка при пометке чата как прочитанного: {result}", flush=True)
-                    print(f"[app] Помечено {len([r for r in results if not isinstance(r, Exception)])} из {len(mark_read_tasks)} чатов как прочитанные", flush=True)
+                            logger.error(f"[app] Ошибка при пометке чата как прочитанного: {result}")
+                    logger.info(f"[app] Помечено {len([r for r in results if not isinstance(r, Exception)])} из {len(mark_read_tasks)} чатов как прочитанные")
             except Exception as exc:
-                print(f"[app] Ошибка при анализе чатов: {exc}", flush=True)
+                logger.error(f"[app] Ошибка при анализе чатов: {exc}", exc_info=True)
                 # Не прерываем выполнение, продолжаем работу
 
     def _generate_result_txt(
