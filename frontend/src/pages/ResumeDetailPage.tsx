@@ -509,7 +509,7 @@ export const ResumeDetailPage = () => {
                       tooltip={{ formatter: (value) => `${value}%` }}
                       style={{ marginBottom: 8 }}
                     />
-                    <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 12, display: 'block' }}>
+                    <Text style={{ fontSize: 12, color: '#94a3b8', marginTop: 24, display: 'block' }}>
                       Отклики будут отправляться только на вакансии с оценкой {localAutolikeThreshold ?? resume?.autolike_threshold ?? 50}% и выше
                     </Text>
                   </div>

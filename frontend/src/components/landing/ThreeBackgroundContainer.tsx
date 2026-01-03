@@ -141,12 +141,12 @@ export const ThreeBackgroundContainer = ({ containerRef }: ThreeBackgroundContai
     let mouseY = 0;
 
     const handleMouseMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      // Используем координаты относительно окна для стабильного параллакса при скролле
+      mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+      mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
     };
 
-    container.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mousemove', handleMouseMove);
 
     const clock = new THREE.Clock();
 
@@ -197,7 +197,7 @@ export const ThreeBackgroundContainer = ({ containerRef }: ThreeBackgroundContai
     resizeObserver.observe(container);
 
     return () => {
-      container.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mousemove', handleMouseMove);
       resizeObserver.disconnect();
       if (animationIdRef.current) {
         cancelAnimationFrame(animationIdRef.current);

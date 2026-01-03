@@ -110,6 +110,7 @@ export const LoginPage = () => {
   const [step, setStep] = useState<'phone' | 'code'>('phone');
   const [intermediateCookies, setIntermediateCookies] = useState<Record<string, string> | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
+  const [sendingCode, setSendingCode] = useState(false);
   const threeContainerRef = useRef<HTMLDivElement>(null);
 
   if (token) {
@@ -164,6 +165,7 @@ export const LoginPage = () => {
         message.error('Номер телефона должен быть в формате +7XXXXXXXXXX');
         return;
       }
+      setSendingCode(true);
       // Запрашиваем OTP через backend (используем тот же роутер, что и в настройках)
       const { generateOtp } = await import('../api/hhAuth');
       const response = await generateOtp(cleanedPhone);
@@ -173,6 +175,8 @@ export const LoginPage = () => {
       message.success('Код отправлен на ваш телефон');
     } catch (error: any) {
       message.error(error.response?.data?.detail || 'Ошибка при запросе кода');
+    } finally {
+      setSendingCode(false);
     }
   };
 
@@ -300,7 +304,8 @@ export const LoginPage = () => {
                 type="primary" 
                 htmlType="submit" 
                 block 
-                loading={loading}
+                loading={step === 'phone' ? sendingCode : loading}
+                disabled={step === 'phone' ? sendingCode : loading}
                 style={{ 
                   height: 48, 
                   fontSize: 16, 
