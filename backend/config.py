@@ -118,7 +118,7 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
     hh_login_trust_flags_public_key = os.getenv("HH_LOGIN_TRUST_FLAGS_PUBLIC_KEY", default_login_trust_flags_public_key)
 
     openai_base_url = os.getenv("OPENAI_BASE_URL", "https://bothub.chat/api/v2/openai/v1")
-    openai_model = os.getenv("OPENAI_MODEL", "deepseek-v3.2")
+    openai_model = os.getenv("OPENAI_MODEL", "gpt-oss-120b:exacto")
     openai_min_conf = _get_env_float("OPENAI_MIN_CONFIDENCE", 0.0)
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
