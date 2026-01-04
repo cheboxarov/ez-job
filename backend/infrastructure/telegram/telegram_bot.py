@@ -167,4 +167,27 @@ class TelegramBot(TelegramBotPort):
             return True
         except Exception as exc:
             logger.error(f"Ошибка при отправке сообщения в Telegram: {exc}", exc_info=True)
+            
+            # Если была клавиатура и произошла ошибка, пробуем отправить без неё
+            if reply_markup:
+                logger.warning(
+                    f"Попытка ретрая отправки сообщения без клавиатуры для chat_id={chat_id}. "
+                    f"Ошибка: {exc}"
+                )
+                try:
+                    await self._bot.send_message(
+                        chat_id=chat_id,
+                        text=text,
+                        parse_mode=parse_mode,
+                        reply_markup=None,
+                    )
+                    logger.info(f"Сообщение успешно отправлено без клавиатуры для chat_id={chat_id}")
+                    return True
+                except Exception as retry_exc:
+                    logger.error(
+                        f"Ошибка при ретрае отправки сообщения без клавиатуры: {retry_exc}",
+                        exc_info=True,
+                    )
+                    return False
+            
             return False

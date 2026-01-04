@@ -7,20 +7,13 @@ from loguru import logger
 
 from config import OpenAIConfig
 from domain.interfaces.resume_evaluator_port import ResumeEvaluatorPort
+from infrastructure.agents.base_agent import BaseAgent
 
 
-class ResumeEvaluatorAgent(ResumeEvaluatorPort):
+class ResumeEvaluatorAgent(BaseAgent, ResumeEvaluatorPort):
     """Агент для оценки резюме на основе правил HH.ru."""
 
-    def __init__(self, config: OpenAIConfig, client: AsyncOpenAI | None = None) -> None:
-        self._config = config
-        if client is None:
-            self._client = AsyncOpenAI(
-                base_url=self._config.base_url,
-                api_key=self._config.api_key,
-            )
-        else:
-            self._client = client
+    AGENT_NAME = "ResumeEvaluatorAgent"
 
     async def evaluate(self, resume_content: str) -> Dict[str, Any]:
         """Оценить резюме на основе правил из docs/hh/resume_rules.md."""
@@ -126,26 +119,17 @@ conf = 0.2125 + 0.27 + 0.12 + 0.1425 + 0.08 = 0.825
 }
 """
 
-        try:
-            response = await self._client.chat.completions.create(
-                model=self._config.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": f"Оцени следующее резюме:\n\n{resume_content}"},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-            )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Оцени следующее резюме:\n\n{resume_content}"},
+        ]
 
-            result_str = response.choices[0].message.content
-            if not result_str:
-                return {"conf": 0.0, "remarks": [], "summary": "Ошибка получения ответа от AI"}
+        def parse_func(content: str) -> Dict[str, Any]:
+            return json.loads(content)
 
-            return json.loads(result_str)
-        except Exception as exc:
-            logger.error(f"Ошибка при оценке резюме: {exc}", exc_info=True)
-            return {
-                "conf": 0.0,
-                "remarks": [{"rule": "System", "comment": str(exc), "improvement": "Попробуйте позже"}],
-                "summary": "Произошла системная ошибка при анализе резюме"
-            }
+        return await self._call_llm_with_retry(
+            messages=messages,
+            parse_func=parse_func,
+            validate_func=None,
+            response_format={"type": "json_object"},
+        )

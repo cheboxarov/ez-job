@@ -10,7 +10,9 @@ from domain.entities.resume_to_vacancy_match import ResumeToVacancyMatch
 from domain.entities.vacancy_detail import VacancyDetail
 from domain.interfaces.vacancy_filter_service_port import VacancyFilterServicePort
 from domain.utils.vacancy_hash import calculate_vacancy_hash
+from domain.exceptions.agent_exceptions import AgentParseError
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from loguru import logger
 
 
 class GetFilteredVacanciesWithCacheUseCase:
@@ -114,10 +116,24 @@ class GetFilteredVacanciesWithCacheUseCase:
                 )
                 for chunk in chunks
             ]
-            results = await asyncio.gather(*tasks)
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
             # Собираем результаты и создаем мэтчи
-            for dtos in results:
+            for result in results:
+                if isinstance(result, Exception):
+                    if isinstance(result, AgentParseError):
+                        logger.error(
+                            f"Ошибка парсинга ответа агента при фильтрации вакансий: {result}",
+                            exc_info=True,
+                        )
+                    else:
+                        logger.error(
+                            f"Ошибка при фильтрации вакансий: {result}",
+                            exc_info=True,
+                        )
+                    continue
+                
+                dtos = result
                 for dto in dtos:
                     vacancy_hash = vacancy_hashes[dto.vacancy_id]
                     match = ResumeToVacancyMatch(

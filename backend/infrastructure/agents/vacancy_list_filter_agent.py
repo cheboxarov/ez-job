@@ -10,29 +10,16 @@ from config import OpenAIConfig
 from domain.entities.filtered_vacancy_list import FilteredVacancyListDto
 from domain.entities.vacancy_list import VacancyListItem
 from domain.interfaces.vacancy_list_filter_service_port import VacancyListFilterServicePort
+from infrastructure.agents.base_agent import BaseAgent
 
 
-class VacancyListFilterAgent(VacancyListFilterServicePort):
+class VacancyListFilterAgent(BaseAgent, VacancyListFilterServicePort):
     """LLM‑агент для фильтрации list-вакансий по резюме.
 
     Инкапсулирует промпты и работу с AsyncOpenAI.
     """
 
-    def __init__(
-        self,
-        config: OpenAIConfig,
-        client: AsyncOpenAI | None = None,
-    ) -> None:
-        self._config = config
-        if client is None:
-            api_key = self._config.api_key
-            if not api_key:
-                raise RuntimeError("OpenAIConfig.api_key не задан (проверь конфиг/окружение)")
-            client = AsyncOpenAI(
-                base_url=self._config.base_url,
-                api_key=api_key,
-            )
-        self._client = client
+    AGENT_NAME = "VacancyListFilterAgent"
 
     async def filter_vacancy_list(
         self,
@@ -43,18 +30,15 @@ class VacancyListFilterAgent(VacancyListFilterServicePort):
         if not vacancies:
             return []
 
-        try:
-            prompt = self._build_prompt(vacancies, resume, user_filter_params)
-            logger.info(
-                f"[ai] filtering {len(vacancies)} list vacancies model={self._config.model}"
-            )
+        prompt = self._build_prompt(vacancies, resume, user_filter_params)
+        logger.info(
+            f"[{self.AGENT_NAME}] filtering {len(vacancies)} list vacancies model={self._config.model}"
+        )
 
-            response = await self._client.chat.completions.create(
-                model=self._config.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Ты ассистент по оценке релевантности вакансий конкретному кандидату.
+        messages = [
+            {
+                "role": "system",
+                "content": """Ты ассистент по оценке релевантности вакансий конкретному кандидату.
 
 Тебе в сообщении пользователя даны:
 - текст резюме кандидата;
@@ -101,28 +85,24 @@ class VacancyListFilterAgent(VacancyListFilterServicePort):
 - Если нужно тире, используй только обычный дефис '-'.
 
 Никакого другого текста, комментариев или форматирования, только JSON-массив.""",
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=0.0,
-            )
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
 
-            content = response.choices[0].message.content if response.choices else None
-            if not content:
-                logger.warning("[ai] пустой ответ от модели")
-                return []
-
-            # Логируем «сырое» содержимое ответа для диагностики
-            preview = content[:1000]
-            logger.debug(f"[ai] raw content preview: {preview}")
-
+        def parse_func(content: str) -> List[FilteredVacancyListDto]:
             return self._parse_response(content, vacancies)
-        except Exception as exc:  # pragma: no cover - диагностический путь
-            logger.error(f"[ai] ошибка при фильтрации list-вакансий: {exc}", exc_info=True)
-            return []
+
+        def validate_func(result: List[FilteredVacancyListDto]) -> bool:
+            return not result
+
+        return await self._call_llm_with_retry(
+            messages=messages,
+            parse_func=parse_func,
+            validate_func=validate_func,
+        )
 
     def _build_prompt(
         self,

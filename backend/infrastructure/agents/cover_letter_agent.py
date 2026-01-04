@@ -8,30 +8,17 @@ from loguru import logger
 from config import OpenAIConfig
 from domain.entities.filtered_vacancy import FilteredVacancyDetail
 from domain.interfaces.cover_letter_service_port import CoverLetterServicePort
+from infrastructure.agents.base_agent import BaseAgent
 
 
-class CoverLetterAgent(CoverLetterServicePort):
+class CoverLetterAgent(BaseAgent, CoverLetterServicePort):
     """LLM‑агент для генерации сопроводительного письма к вакансии.
 
     Инкапсулирует промпты и работу с AsyncOpenAI для создания
     персонализированного сопроводительного письма на основе резюме и вакансии.
     """
 
-    def __init__(
-        self,
-        config: OpenAIConfig,
-        client: AsyncOpenAI | None = None,
-    ) -> None:
-        self._config = config
-        if client is None:
-            api_key = self._config.api_key
-            if not api_key:
-                raise RuntimeError("OpenAIConfig.api_key не задан (проверь конфиг/окружение)")
-            client = AsyncOpenAI(
-                base_url=self._config.base_url,
-                api_key=api_key,
-            )
-        self._client = client
+    AGENT_NAME = "CoverLetterAgent"
 
     async def generate(
         self,
@@ -50,19 +37,16 @@ class CoverLetterAgent(CoverLetterServicePort):
         if not vacancy or not resume:
             return ""
 
-        try:
-            prompt = self._build_prompt(vacancy, resume)
-            logger.info(
-                f"[ai] генерирую сопроводительное письмо для вакансии {vacancy.vacancy_id} "
-                f"model={self._config.model}"
-            )
+        prompt = self._build_prompt(vacancy, resume)
+        logger.info(
+            f"[{self.AGENT_NAME}] генерирую сопроводительное письмо для вакансии {vacancy.vacancy_id} "
+            f"model={self._config.model}"
+        )
 
-            response = await self._client.chat.completions.create(
-                model=self._config.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Ты профессиональный HR-консультант и копирайтер, специализирующийся на написании убедительных сопроводительных писем.
+        messages = [
+            {
+                "role": "system",
+                "content": """Ты профессиональный HR-консультант и копирайтер, специализирующийся на написании убедительных сопроводительных писем.
 
 Твоя задача — написать персонализированное сопроводительное письмо на русском языке, которое активно "продает" кандидата.
 
@@ -104,20 +88,14 @@ class CoverLetterAgent(CoverLetterServicePort):
 - Если нужно тире, используй только обычный дефис '-'.
 
 Верни ТОЛЬКО текст письма, без markdown-разметки, без заголовков типа "Сопроводительное письмо", без подписей. Начни сразу с обращения (например, "Здравствуйте," или "Добрый день,").""",
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=0.7,
-            )
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
 
-            content = response.choices[0].message.content if response.choices else None
-            if not content:
-                logger.warning("[ai] пустой ответ от модели при генерации письма")
-                return ""
-
+        def parse_func(content: str) -> str:
             # Очищаем возможные markdown-артефакты
             cover_letter = content.strip()
             # Убираем markdown-код блоки, если они есть
@@ -125,11 +103,16 @@ class CoverLetterAgent(CoverLetterServicePort):
                 lines = cover_letter.split("\n")
                 # Пропускаем первую строку (```) и последнюю (```)
                 cover_letter = "\n".join(lines[1:-1]).strip()
-
             return cover_letter
-        except Exception as exc:  # pragma: no cover - диагностический путь
-            logger.error(f"[ai] ошибка при генерации сопроводительного письма: {exc}", exc_info=True)
-            return ""
+
+        def validate_func(result: str) -> bool:
+            return not result
+
+        return await self._call_llm_with_retry(
+            messages=messages,
+            parse_func=parse_func,
+            validate_func=validate_func,
+        )
 
     def _build_prompt(
         self,

@@ -8,6 +8,7 @@ from loguru import logger
 
 from domain.entities.vacancy_test import VacancyTest
 from domain.interfaces.vacancy_test_agent_service_port import VacancyTestAgentServicePort
+from domain.exceptions.agent_exceptions import AgentParseError
 
 
 class GenerateTestAnswersUseCase:
@@ -69,6 +70,12 @@ class GenerateTestAnswersUseCase:
                 f"Сгенерированы ответы на {len(test_answers)} вопросов из {len(test.questions)}"
             )
             return test_answers
+        except AgentParseError as exc:
+            logger.error(
+                f"Ошибка парсинга ответа агента при генерации ответов на тест: {exc}",
+                exc_info=True,
+            )
+            return {}
         except Exception as exc:
             logger.error(
                 f"Ошибка при генерации ответов на тест: {exc}",

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from urllib.parse import urlparse
+
+from loguru import logger
+
 from domain.entities.agent_action import AgentAction
 from domain.entities.vacancy_response import VacancyResponse
 
@@ -52,10 +56,15 @@ class TelegramNotificationFormatter:
         text += f"<b>Вакансия:</b> {self._escape_html(response.vacancy_name)}\n"
 
         keyboard = None
-        if response.vacancy_url:
+        if response.vacancy_url and self._is_valid_telegram_url(response.vacancy_url):
             keyboard = {
                 "inline_keyboard": [[{"text": "Посмотреть вакансию", "url": response.vacancy_url}]],
             }
+        elif response.vacancy_url:
+            logger.warning(
+                f"Пропущено создание кнопки для vacancy_response {response.id}: "
+                f"URL {response.vacancy_url} содержит localhost или внутренний IP"
+            )
 
         return text, keyboard
 
@@ -66,9 +75,16 @@ class TelegramNotificationFormatter:
         text += f"{self._escape_html(message)}"
 
         chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
-        keyboard = {
-            "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
-        }
+        keyboard = None
+        if self._is_valid_telegram_url(chat_url):
+            keyboard = {
+                "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
+            }
+        else:
+            logger.warning(
+                f"Пропущено создание кнопки для call_request action {action.id}: "
+                f"URL {chat_url} содержит localhost или внутренний IP"
+            )
 
         return text, keyboard
 
@@ -79,9 +95,16 @@ class TelegramNotificationFormatter:
         text += f"{self._escape_html(message)}"
 
         chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
-        keyboard = {
-            "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
-        }
+        keyboard = None
+        if self._is_valid_telegram_url(chat_url):
+            keyboard = {
+                "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
+            }
+        else:
+            logger.warning(
+                f"Пропущено создание кнопки для external_action action {action.id}: "
+                f"URL {chat_url} содержит localhost или внутренний IP"
+            )
 
         return text, keyboard
 
@@ -94,9 +117,16 @@ class TelegramNotificationFormatter:
             text += f"{self._escape_html(preview)}"
 
         chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
-        keyboard = {
-            "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
-        }
+        keyboard = None
+        if self._is_valid_telegram_url(chat_url):
+            keyboard = {
+                "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
+            }
+        else:
+            logger.warning(
+                f"Пропущено создание кнопки для message_suggestion action {action.id}: "
+                f"URL {chat_url} содержит localhost или внутренний IP"
+            )
 
         return text, keyboard
 
@@ -107,9 +137,16 @@ class TelegramNotificationFormatter:
         text += f"{self._escape_html(message)}"
 
         chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
-        keyboard = {
-            "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
-        }
+        keyboard = None
+        if self._is_valid_telegram_url(chat_url):
+            keyboard = {
+                "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
+            }
+        else:
+            logger.warning(
+                f"Пропущено создание кнопки для question_answered action {action.id}: "
+                f"URL {chat_url} содержит localhost или внутренний IP"
+            )
 
         return text, keyboard
 
@@ -119,6 +156,50 @@ class TelegramNotificationFormatter:
         text += f"<b>Тип:</b> {self._escape_html(action.type)}"
 
         return text, None
+
+    def _is_valid_telegram_url(self, url: str) -> bool:
+        """Проверить, является ли URL валидным для Telegram.
+
+        Telegram не принимает localhost, 127.0.0.1 и внутренние IP адреса в инлайн кнопках.
+
+        Args:
+            url: URL для проверки.
+
+        Returns:
+            True если URL валиден для Telegram, False в противном случае.
+        """
+        try:
+            parsed = urlparse(url)
+            hostname = parsed.hostname
+
+            if not hostname:
+                return False
+
+            # Проверка на localhost
+            if hostname.lower() in ("localhost", "127.0.0.1", "::1"):
+                return False
+
+            # Проверка на внутренние IP адреса
+            parts = hostname.split(".")
+            if len(parts) == 4:
+                try:
+                    octets = [int(part) for part in parts]
+                    # 10.0.0.0/8
+                    if octets[0] == 10:
+                        return False
+                    # 172.16.0.0/12
+                    if octets[0] == 172 and 16 <= octets[1] <= 31:
+                        return False
+                    # 192.168.0.0/16
+                    if octets[0] == 192 and octets[1] == 168:
+                        return False
+                except ValueError:
+                    pass
+
+            return True
+        except Exception as exc:
+            logger.warning(f"Ошибка при проверке URL {url}: {exc}")
+            return False
 
     def _escape_html(self, text: str) -> str:
         """Экранировать HTML символы.

@@ -11,36 +11,17 @@ from loguru import logger
 from config import OpenAIConfig
 from domain.entities.vacancy_test import VacancyTest
 from domain.interfaces.vacancy_test_agent_service_port import VacancyTestAgentServicePort
+from infrastructure.agents.base_agent import BaseAgent
 
 
-class VacancyTestAgent(VacancyTestAgentServicePort):
+class VacancyTestAgent(BaseAgent, VacancyTestAgentServicePort):
     """LLM-агент для генерации ответов на тест вакансии.
 
     Инкапсулирует промпты и работу с AsyncOpenAI для создания ответов
     на вопросы теста вакансии на основе резюме кандидата.
     """
 
-    def __init__(
-        self,
-        config: OpenAIConfig,
-        client: AsyncOpenAI | None = None,
-    ) -> None:
-        """Инициализация агента.
-
-        Args:
-            config: Конфигурация OpenAI.
-            client: Опциональный клиент AsyncOpenAI (для тестирования).
-        """
-        self._config = config
-        if client is None:
-            api_key = self._config.api_key
-            if not api_key:
-                raise RuntimeError("OpenAIConfig.api_key не задан (проверь конфиг/окружение)")
-            client = AsyncOpenAI(
-                base_url=self._config.base_url,
-                api_key=api_key,
-            )
-        self._client = client
+    AGENT_NAME = "VacancyTestAgent"
 
     async def generate_test_answers(
         self,
@@ -62,19 +43,16 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
         if not test or not test.questions or not resume:
             return {}
 
-        try:
-            prompt = self._build_prompt(test, resume, user_params)
-            logger.info(
-                f"[ai] генерирую ответы на тест вакансии ({len(test.questions)} вопросов) "
-                f"model={self._config.model}"
-            )
+        prompt = self._build_prompt(test, resume, user_params)
+        logger.info(
+            f"[{self.AGENT_NAME}] генерирую ответы на тест вакансии ({len(test.questions)} вопросов) "
+            f"model={self._config.model}"
+        )
 
-            response = await self._client.chat.completions.create(
-                model=self._config.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Ты ассистент, который помогает кандидатам отвечать на вопросы тестов при отклике на вакансии.
+        messages = [
+            {
+                "role": "system",
+                "content": """Ты ассистент, который помогает кандидатам отвечать на вопросы тестов при отклике на вакансии.
 
 Твоя задача — сгенерировать ответы на вопросы теста вакансии так, как бы ответил сам кандидат от первого лица, естественно и просто.
 
@@ -114,28 +92,24 @@ class VacancyTestAgent(VacancyTestAgentServicePort):
 }
 
 Никакого другого текста, комментариев или форматирования, только JSON-объект.""",
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=0.7,
-            )
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
 
-            content = response.choices[0].message.content if response.choices else None
-            if not content:
-                logger.warning("[ai] пустой ответ от модели при генерации ответов на тест")
-                return {}
-
-            # Логируем превью ответа для диагностики
-            preview = content[:500]
-            logger.debug(f"[ai] raw content preview: {preview}")
-
+        def parse_func(content: str) -> Dict[str, str | List[str]]:
             return self._parse_response(content, test)
-        except Exception as exc:  # pragma: no cover - диагностический путь
-            logger.error(f"[ai] ошибка при генерации ответов на тест: {exc}", exc_info=True)
-            return {}
+
+        def validate_func(result: Dict[str, str | List[str]]) -> bool:
+            return not result
+
+        return await self._call_llm_with_retry(
+            messages=messages,
+            parse_func=parse_func,
+            validate_func=validate_func,
+        )
 
     def _build_prompt(
         self,

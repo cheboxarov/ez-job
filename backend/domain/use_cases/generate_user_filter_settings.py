@@ -4,6 +4,8 @@ from domain.entities.suggested_user_filter_settings import SuggestedUserFilterSe
 from domain.interfaces.filter_settings_generator_service_port import (
     FilterSettingsGeneratorServicePort,
 )
+from domain.exceptions.agent_exceptions import AgentParseError
+from loguru import logger
 
 
 class GenerateUserFilterSettingsUseCase:
@@ -21,9 +23,16 @@ class GenerateUserFilterSettingsUseCase:
         resume: str,
         user_filter_params: str | None = None,
     ) -> SuggestedUserFilterSettings:
-        return await self._generator_service.generate_filter_settings(
-            resume=resume,
-            user_filter_params=user_filter_params,
-        )
+        try:
+            return await self._generator_service.generate_filter_settings(
+                resume=resume,
+                user_filter_params=user_filter_params,
+            )
+        except AgentParseError as exc:
+            logger.error(
+                f"Ошибка парсинга ответа агента при генерации настроек фильтров: {exc}",
+                exc_info=True,
+            )
+            return SuggestedUserFilterSettings()
 
 

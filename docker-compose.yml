@@ -1,0 +1,82 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hh_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-hh_db}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - hh_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hh_backend
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-hh_db}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Ijc0YzQ2MWVjLTRmMWMtNGY5Ni04YTliLWQwMDJjNjAyZjNmZCIsImlzRGV2ZWxvcGVyIjp0cnVlLCJpYXQiOjE3NTg1OTk1NzIsImV4cCI6MjA3NDE3NTU3Mn0.6s6VGU56cRNYEyOSYfIK2ERJfXGMUutJtqfYZcGHeFg}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://bothub.chat/api/v2/openai/v1}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-oss-120b:exacto}
+      OPENAI_MIN_CONFIDENCE: ${OPENAI_MIN_CONFIDENCE:-0.0}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-8586542877:AAExU-pQjY47W4AEwTjR7O4gFhX_HFJdsGk}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-autoofferai_bot}
+      TELEGRAM_LINK_TOKEN_TTL_SECONDS: ${TELEGRAM_LINK_TOKEN_TTL_SECONDS:-600}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      HH_BASE_URL: ${HH_BASE_URL:-https://api.hh.ru}
+      HH_MAX_VACANCIES: ${HH_MAX_VACANCIES:-50}
+      HH_DEFAULT_PAGES_DEPTH: ${HH_DEFAULT_PAGES_DEPTH:-1}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/app
+      - backend_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - hh_network
+    command: >
+      sh -c "
+        echo 'Waiting for postgres...' &&
+        sleep 5 &&
+        alembic upgrade head &&
+        uvicorn presentation.app:app --host 0.0.0.0 --port 8000
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hh_frontend
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - hh_network
+
+volumes:
+  postgres_data:
+  backend_logs:
+
+networks:
+  hh_network:
+    driver: bridge

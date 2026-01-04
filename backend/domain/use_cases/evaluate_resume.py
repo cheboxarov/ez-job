@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 from domain.interfaces.resume_evaluator_port import ResumeEvaluatorPort
+from domain.exceptions.agent_exceptions import AgentParseError
+from loguru import logger
 
 
 class EvaluateResumeUseCase:
@@ -24,4 +26,21 @@ class EvaluateResumeUseCase:
         Returns:
             Dict с оценкой и замечаниями.
         """
-        return await self._resume_evaluator.evaluate(resume_content)
+        try:
+            return await self._resume_evaluator.evaluate(resume_content)
+        except AgentParseError as exc:
+            logger.error(
+                f"Ошибка парсинга ответа агента при оценке резюме: {exc}",
+                exc_info=True,
+            )
+            return {
+                "conf": 0.0,
+                "remarks": [
+                    {
+                        "rule": "System",
+                        "comment": str(exc),
+                        "improvement": "Попробуйте позже",
+                    }
+                ],
+                "summary": "Произошла ошибка при анализе резюме",
+            }

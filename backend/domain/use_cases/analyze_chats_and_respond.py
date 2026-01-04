@@ -9,6 +9,7 @@ from loguru import logger
 from domain.entities.hh_chat_detailed import HHChatDetailed
 from domain.entities.agent_action import AgentAction
 from domain.interfaces.messages_agent_service_port import MessagesAgentServicePort
+from domain.exceptions.agent_exceptions import AgentParseError
 
 
 class AnalyzeChatsAndRespondUseCase:
@@ -65,6 +66,9 @@ class AnalyzeChatsAndRespondUseCase:
                 resume_hash=resume_hash,
             )
             return actions
+        except AgentParseError as exc:
+            logger.error(f"[usecase] Ошибка парсинга ответа агента: {exc}", exc_info=True)
+            return []
         except Exception as exc:  # pragma: no cover - диагностический путь
             logger.error(f"[usecase] Ошибка при анализе чатов: {exc}", exc_info=True)
             return []

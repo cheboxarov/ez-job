@@ -4,6 +4,7 @@ from loguru import logger
 
 from domain.entities.filtered_vacancy import FilteredVacancyDetail
 from domain.interfaces.cover_letter_service_port import CoverLetterServicePort
+from domain.exceptions.agent_exceptions import AgentParseError
 
 
 class GenerateCoverLetterUseCase:
@@ -38,6 +39,12 @@ class GenerateCoverLetterUseCase:
         try:
             cover_letter = await self._service.generate(vacancy, resume)
             return cover_letter
+        except AgentParseError as exc:
+            logger.error(
+                f"[usecase] Ошибка парсинга ответа агента при генерации письма: {exc}",
+                exc_info=True,
+            )
+            return ""
         except Exception as exc:  # pragma: no cover - диагностический путь
             logger.error(f"[usecase] ошибка при генерации письма: {exc}", exc_info=True)
             return ""

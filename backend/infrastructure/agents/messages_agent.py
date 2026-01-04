@@ -15,36 +15,17 @@ from domain.entities.agent_action import AgentAction
 from datetime import datetime
 from uuid import uuid4
 from domain.interfaces.messages_agent_service_port import MessagesAgentServicePort
+from infrastructure.agents.base_agent import BaseAgent
 
 
-class MessagesAgent(MessagesAgentServicePort):
+class MessagesAgent(BaseAgent, MessagesAgentServicePort):
     """LLM-агент для анализа чатов и генерации ответов на вопросы.
 
     Инкапсулирует промпты и работу с AsyncOpenAI для анализа чатов,
     определения вопросов и генерации ответов.
     """
 
-    def __init__(
-        self,
-        config: OpenAIConfig,
-        client: AsyncOpenAI | None = None,
-    ) -> None:
-        """Инициализация агента.
-
-        Args:
-            config: Конфигурация OpenAI.
-            client: Опциональный клиент AsyncOpenAI (для тестирования).
-        """
-        self._config = config
-        if client is None:
-            api_key = self._config.api_key
-            if not api_key:
-                raise RuntimeError("OpenAIConfig.api_key не задан (проверь конфиг/окружение)")
-            client = AsyncOpenAI(
-                base_url=self._config.base_url,
-                api_key=api_key,
-            )
-        self._client = client
+    AGENT_NAME = "MessagesAgent"
 
     async def analyze_chats_and_generate_responses(
         self,
@@ -69,18 +50,15 @@ class MessagesAgent(MessagesAgentServicePort):
         if not chats:
             return []
 
-        try:
-            prompt = self._build_prompt(chats, resume, user_parameters)
-            logger.info(
-                f"[messages_agent] Анализирую {len(chats)} чатов, model={self._config.model}"
-            )
+        prompt = self._build_prompt(chats, resume, user_parameters)
+        logger.info(
+            f"[{self.AGENT_NAME}] Анализирую {len(chats)} чатов, model={self._config.model}"
+        )
 
-            response = await self._client.chat.completions.create(
-                model=self._config.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """Ты ассистент, который анализирует чаты с работодателями и отвечает на вопросы.
+        messages = [
+            {
+                "role": "system",
+                "content": """Ты ассистент, который анализирует чаты с работодателями и отвечает на вопросы.
 
 Тебе переданы:
 - Резюме кандидата (для контекста при ответах)
@@ -182,28 +160,24 @@ create_event - используй когда:
 - message - краткое описание на русском языке, что требуется сделать или куда нас зовут (для create_event). Для "question_answered" укажи краткое описание ответа работодателя на вопрос пользователя
 
 Никакого другого текста, комментариев или форматирования, только JSON-массив.""",
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-                temperature=0.3,
-            )
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ]
 
-            content = response.choices[0].message.content if response.choices else None
-            if not content:
-                logger.warning("[messages_agent] Пустой ответ от модели")
-                return []
-
-            # Логируем превью ответа для диагностики
-            preview = content
-            logger.debug(f"[messages_agent] Raw content preview: {preview}")
-
+        def parse_func(content: str) -> List[AgentAction]:
             return self._parse_response(content, chats, user_id, resume_hash)
-        except Exception as exc:  # pragma: no cover - диагностический путь
-            logger.error(f"[messages_agent] Ошибка при анализе чатов: {exc}", exc_info=True)
-            return []
+
+        def validate_func(result: List[AgentAction]) -> bool:
+            return not result
+
+        return await self._call_llm_with_retry(
+            messages=messages,
+            parse_func=parse_func,
+            validate_func=validate_func,
+        )
 
     def _build_prompt(
         self,
