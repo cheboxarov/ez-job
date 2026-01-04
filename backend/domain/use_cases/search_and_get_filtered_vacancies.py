@@ -60,12 +60,10 @@ class SearchAndGetFilteredVacanciesUseCase:
             Список отфильтрованных вакансий со всех обработанных страниц.
 
         Raises:
-            ValueError: Если текст поиска не заполнен в настройках.
+            ValueError: При ошибках выполнения use case.
         """
-        # 1. Берём поисковый текст из настроек фильтров резюме
+        # 1. Берём поисковый текст из настроек фильтров резюме (может быть пустым)
         search_text = (settings.text or "").strip()
-        if not search_text:
-            raise ValueError("text не заполнен в настройках фильтров резюме")
 
         # 2. Создаем задачи для параллельной обработки страниц
         async def process_page(page_index: int) -> List[FilteredVacancyDetail]:

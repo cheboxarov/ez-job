@@ -40,7 +40,7 @@ export const PageHeader = ({
         flexDirection: 'column',
         gap: 12,
         marginBottom: 20,
-        padding: '16px 20px',
+        padding: '16px 20px 16px 32px',
         background: '#ffffff',
         borderRadius: 16,
         border: '1px solid #e5e7eb',

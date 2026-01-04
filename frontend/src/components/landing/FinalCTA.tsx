@@ -11,7 +11,7 @@ export const FinalCTA = () => {
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
-          viewport={{ once: true }}
+          viewport={{ once: true, margin: '-100px' }}
           transition={{ duration: 0.5 }}
         >
           <h2 className={styles.finalCtaTitle}>Хватит откладывать карьеру на потом</h2>

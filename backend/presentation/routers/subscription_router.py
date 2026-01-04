@@ -196,8 +196,14 @@ async def change_plan(
         Обновленная информация о подписке пользователя.
 
     Raises:
-        HTTPException: 404 если план не найден, 400 при ошибках валидации.
+        HTTPException: 403 если пользователь не является администратором, 404 если план не найден, 400 при ошибках валидации.
     """
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="Только администраторы могут менять план подписки"
+        )
+    
     try:
         change_subscription_uc = ChangeUserSubscriptionUseCase(
             user_subscription_repository=unit_of_work.user_subscription_repository,

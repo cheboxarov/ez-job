@@ -13,6 +13,7 @@ import {
 import { getAllPlans, changePlan, getMySubscriptionPlan } from '../api/subscription';
 import { PageHeader } from '../components/PageHeader';
 import type { SubscriptionPlanResponse, UserSubscriptionResponse } from '../types/api';
+import { useAuthStore } from '../stores/authStore';
 
 const { Text, Title } = Typography;
 
@@ -83,10 +84,12 @@ const formatResetPeriod = (seconds: number): string => {
 };
 
 export const PlansPage = () => {
+  const { user } = useAuthStore();
   const [plans, setPlans] = useState<SubscriptionPlanResponse[]>([]);
   const [currentPlan, setCurrentPlan] = useState<UserSubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingPlan, setChangingPlan] = useState<string | null>(null);
+  const isAdmin = user?.is_superuser === true;
 
   useEffect(() => {
     const loadData = async () => {
@@ -153,7 +156,7 @@ export const PlansPage = () => {
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
         <Row gutter={[24, 24]}>
-          {plans.map((plan) => {
+          {plans.filter(plan => plan.name !== 'FREE').map((plan) => {
             const planConfig = getPlanConfig(plan.name);
             const isCurrentPlan = currentPlan?.plan_name === plan.name;
             const isLoading = changingPlan === plan.name;
@@ -308,27 +311,29 @@ export const PlansPage = () => {
                   </div>
 
                   {/* Button */}
-                  <div style={{ padding: '0 24px 24px' }}>
-                    <Button
-                      type={isCurrentPlan ? 'default' : 'primary'}
-                      block
-                      size="large"
-                      loading={isLoading}
-                      disabled={isCurrentPlan}
-                      onClick={() => handleChangePlan(plan.name)}
-                      style={{
-                        height: 46,
-                        fontSize: 15,
-                        fontWeight: 600,
-                        borderRadius: 12,
-                        background: isCurrentPlan ? '#f1f5f9' : planConfig.gradient,
-                        border: 'none',
-                        color: isCurrentPlan ? '#64748b' : 'white',
-                      }}
-                    >
-                      {isCurrentPlan ? 'Текущий план' : 'Выбрать план'}
-                    </Button>
-                  </div>
+                  {isAdmin && (
+                    <div style={{ padding: '0 24px 24px' }}>
+                      <Button
+                        type={isCurrentPlan ? 'default' : 'primary'}
+                        block
+                        size="large"
+                        loading={isLoading}
+                        disabled={isCurrentPlan}
+                        onClick={() => handleChangePlan(plan.name)}
+                        style={{
+                          height: 46,
+                          fontSize: 15,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                          background: isCurrentPlan ? '#f1f5f9' : planConfig.gradient,
+                          border: 'none',
+                          color: isCurrentPlan ? '#64748b' : 'white',
+                        }}
+                      >
+                        {isCurrentPlan ? 'Текущий план' : 'Выбрать план'}
+                      </Button>
+                    </div>
+                  )}
                 </Card>
               </Col>
             );

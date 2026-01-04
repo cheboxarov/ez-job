@@ -83,7 +83,7 @@ export const ResumeDetailPage = () => {
   const [initialFilterValues, setInitialFilterValues] = useState<Record<string, unknown> | null>(
     null,
   );
-  const { count, limit, remaining, fetchDailyResponses } = useDailyResponsesStore();
+  const { count, limit, remaining, loading: dailyResponsesLoading, fetchDailyResponses } = useDailyResponsesStore();
 
   useEffect(() => {
     if (resumeId) {
@@ -384,7 +384,7 @@ export const ResumeDetailPage = () => {
       />
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        {count >= limit && limit < 200 && (
+        {!dailyResponsesLoading && count >= limit && limit > 0 && limit < 200 && (
           <LimitReachedAlert 
             limit={limit} 
             count={count} 

@@ -17,10 +17,6 @@ const steps = [
   {
     title: "04. Авто-отклик",
     description: "Бот генерирует персонализированное письмо и отправляет отклик. Если в вакансии есть тест, он автоматически решается. Вы получаете уведомление о приглашении."
-  },
-  {
-    title: "05. Авто-ответы",
-    description: "Агент читает сообщения от работодателей, автоматически отвечает на вопросы (включая вопросы от нейросетей компаний) и уведомляет вас, когда дело подошло к собеседованию."
   }
 ];
 
@@ -30,7 +26,7 @@ export const HowItWorks = () => {
       <div className={styles.container}>
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Настроил за 5 минут — работает месяцами</h2>
-          <p className={styles.sectionSubtitle}>Пять простых шагов от регистрации до первых собеседований</p>
+          <p className={styles.sectionSubtitle}>Четыре простых шага от регистрации до первых собеседований</p>
         </div>
         
         <div className={styles.stepsGrid}>
@@ -40,7 +36,7 @@ export const HowItWorks = () => {
               className={styles.step}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, margin: '-100px' }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
               <div className={styles.stepLine}></div>

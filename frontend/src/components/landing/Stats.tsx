@@ -31,7 +31,7 @@ export const Stats = () => {
               className={styles.statItem}
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
-              viewport={{ once: true }}
+              viewport={{ once: true, margin: '-100px' }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
             >
               <span className={styles.statValue}>{stat.value}</span>

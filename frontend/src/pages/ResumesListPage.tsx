@@ -21,7 +21,7 @@ export const ResumesListPage = () => {
   const navigate = useNavigate();
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const { count, limit, fetchDailyResponses } = useDailyResponsesStore();
+  const { count, limit, loading, fetchDailyResponses } = useDailyResponsesStore();
 
   useEffect(() => {
     const initializePage = async () => {
@@ -90,7 +90,7 @@ export const ResumesListPage = () => {
       )}
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        {count >= limit && limit < 200 && (
+        {!loading && count >= limit && limit > 0 && limit < 200 && (
           <LimitReachedAlert 
             limit={limit} 
             count={count} 
@@ -122,7 +122,7 @@ export const ResumesListPage = () => {
               }}
               styles={{ body: { padding: 0 } }}
                 onMouseEnter={(e) => {
-                const stripColor = count >= limit && limit < 200
+                const stripColor = !loading && count >= limit && limit > 0 && limit < 200
                   ? '#f59e0b'
                   : resume.is_auto_reply 
                     ? '#22c55e'
@@ -138,7 +138,7 @@ export const ResumesListPage = () => {
                 <div
                   style={{
                     width: 6,
-                    background: count >= limit && limit < 200
+                    background: !loading && count >= limit && limit > 0 && limit < 200
                       ? 'linear-gradient(180deg, #f59e0b 0%, #d97706 100%)'
                       : resume.is_auto_reply 
                         ? 'linear-gradient(180deg, #22c55e 0%, #16a34a 100%)'
@@ -154,7 +154,7 @@ export const ResumesListPage = () => {
                         style={{
                           width: 44,
                           height: 44,
-                          background: count >= limit && limit < 200
+                          background: !loading && count >= limit && limit > 0 && limit < 200
                             ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
                             : resume.is_auto_reply 
                               ? 'linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%)'
@@ -165,7 +165,7 @@ export const ResumesListPage = () => {
                           justifyContent: 'center',
                         }}
                       >
-                        {count >= limit && limit < 200 ? (
+                        {!loading && count >= limit && limit > 0 && limit < 200 ? (
                           <LockOutlined style={{ fontSize: 20, color: '#d97706' }} />
                         ) : (
                           <FileTextOutlined style={{ 
@@ -188,7 +188,7 @@ export const ResumesListPage = () => {
                               Автоотклик активен
                             </Tag>
                           )}
-                          {count >= limit && limit < 200 && (
+                          {!loading && count >= limit && limit > 0 && limit < 200 && (
                             <Tag 
                               icon={<LockOutlined />}
                               style={{ 

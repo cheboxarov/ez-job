@@ -1,107 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { Form, Input, Button, Typography, message, Row, Col, Divider } from 'antd';
+import { Form, Input, Button, Typography, message, Row, Col } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { ThreeBackgroundContainer } from '../components/landing/ThreeBackgroundContainer';
 import { Logo } from '../components/Logo';
 import { 
-  RocketOutlined, 
   PhoneOutlined,
-  SearchOutlined,
-  FileTextOutlined,
-  BarChartOutlined,
-  UserOutlined,
   ThunderboltOutlined,
-  ClockCircleOutlined,
   ArrowLeftOutlined
 } from '@ant-design/icons';
 
 const { Title, Text } = Typography;
-
-// Компонент карточки Bento
-const BentoCard = ({ 
-  icon, 
-  title, 
-  description, 
-  gridArea,
-  large = false 
-}: { 
-  icon: React.ReactNode; 
-  title: string; 
-  description: string;
-  gridArea: string;
-  large?: boolean;
-}) => (
-  <div
-    style={{
-      gridArea,
-      background: 'rgba(255, 255, 255, 0.08)',
-      backdropFilter: 'blur(12px)',
-      borderRadius: 20,
-      padding: large ? '32px 28px' : '24px 20px',
-      border: '1px solid rgba(255, 255, 255, 0.12)',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 12,
-      transition: 'all 0.3s ease',
-      cursor: 'default',
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.12)';
-      e.currentTarget.style.borderColor = '#2563eb';
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)';
-      e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)';
-    }}
-  >
-    <div style={{ 
-      fontSize: large ? 36 : 28, 
-      color: '#fff',
-      opacity: 0.9
-    }}>
-      {icon}
-    </div>
-    <div>
-      <div style={{ 
-        fontSize: large ? 20 : 16, 
-        fontWeight: 600, 
-        color: '#fff',
-        marginBottom: 4
-      }}>
-        {title}
-      </div>
-      <div style={{ 
-        fontSize: large ? 15 : 13, 
-        color: 'rgba(255,255,255,0.7)',
-        lineHeight: 1.5
-      }}>
-        {description}
-      </div>
-    </div>
-  </div>
-);
-
-// Компонент статистики
-const StatItem = ({ value, label }: { value: string; label: string }) => (
-  <div style={{ textAlign: 'center' }}>
-    <div style={{ 
-      fontSize: 32, 
-      fontWeight: 700, 
-      color: '#fff',
-      lineHeight: 1
-    }}>
-      {value}
-    </div>
-    <div style={{ 
-      fontSize: 13, 
-      color: 'rgba(255,255,255,0.7)',
-      marginTop: 4
-    }}>
-      {label}
-    </div>
-  </div>
-);
 
 export const LoginPage = () => {
   const navigate = useNavigate();
@@ -393,77 +302,6 @@ export const LoginPage = () => {
             left: '5%',
             pointerEvents: 'none',
           }} />
-
-          <div style={{ maxWidth: 580, width: '100%', zIndex: 1 }}>
-            {/* Заголовок */}
-            <div style={{ marginBottom: 32, textAlign: 'center' }}>
-              <Title style={{ color: 'white', marginBottom: 8, fontSize: 36 }}>
-                Найди работу мечты
-              </Title>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }}>
-                Умный помощник для автоматизации поиска работы
-              </Text>
-            </div>
-
-            {/* Статистика */}
-            <div 
-              style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                gap: 48,
-                marginBottom: 32,
-                padding: '24px 32px',
-                background: 'rgba(255,255,255,0.05)',
-                borderRadius: 16,
-                border: '1px solid rgba(255,255,255,0.08)'
-              }}
-            >
-              <StatItem value="1000+" label="Пользователей" />
-              <StatItem value="50K+" label="Вакансий" />
-              <StatItem value="24/7" label="Автоматизация" />
-            </div>
-
-            {/* Bento Grid */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gridTemplateRows: 'auto auto auto',
-                gridTemplateAreas: `
-                  "main main"
-                  "search resume"
-                  "stats stats"
-                `,
-                gap: 16,
-              }}
-            >
-              <BentoCard
-                gridArea="main"
-                icon={<RocketOutlined />}
-                title="Автоотклики на вакансии"
-                description="Настрой фильтры один раз — система будет откликаться на подходящие вакансии автоматически"
-                large
-              />
-              <BentoCard
-                gridArea="search"
-                icon={<SearchOutlined />}
-                title="Умный подбор"
-                description="AI анализирует твоё резюме и находит релевантные вакансии"
-              />
-              <BentoCard
-                gridArea="resume"
-                icon={<FileTextOutlined />}
-                title="Управление резюме"
-                description="Храни и редактируй все резюме в одном месте"
-              />
-              <BentoCard
-                gridArea="stats"
-                icon={<BarChartOutlined />}
-                title="Статистика и аналитика"
-                description="Отслеживай эффективность откликов, просмотры и приглашения в реальном времени"
-              />
-            </div>
-          </div>
         </div>
       </Col>
     </Row>

@@ -73,13 +73,6 @@ class VacanciesService:
         if not resume.content:
             raise ValueError("content не заполнен в резюме")
 
-        # Базовые обязательные поля теперь берём из настроек фильтров.
-        # hh_resume_id стал опциональным и не валидируется.
-        if not filter_settings.area:
-            raise ValueError("area не заполнен в настройках фильтров резюме")
-        if filter_settings.salary is None:
-            raise ValueError("salary не заполнен в настройках фильтров резюме")
-
         # Генерация search_session_id
         search_session_id = str(uuid.uuid4())
 
@@ -204,12 +197,6 @@ class VacanciesService:
         # Валидация обязательных полей
         if not resume.content:
             raise ValueError("content не заполнен в резюме")
-
-        # Базовые обязательные поля теперь берём из настроек фильтров.
-        if not filter_settings.area:
-            raise ValueError("area не заполнен в настройках фильтров резюме")
-        if filter_settings.salary is None:
-            raise ValueError("salary не заполнен в настройках фильтров резюме")
 
         # Генерация search_session_id
         search_session_id = str(uuid.uuid4())
