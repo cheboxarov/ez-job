@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Вкатился API",
+    title="AutoOffer API",
     description="API для получения релевантных вакансий с сопроводительными письмами",
     version="1.0.0",
     lifespan=lifespan,
@@ -194,7 +194,7 @@ app.include_router(telegram_router)
 @app.get("/")
 async def root():
     """Корневой endpoint для проверки работы API."""
-    return {"message": "Вкатился API", "version": "1.0.0"}
+    return {"message": "AutoOffer API", "version": "1.0.0"}
 
 
 @app.get("/health")

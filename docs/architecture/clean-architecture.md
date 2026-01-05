@@ -1,6 +1,6 @@
 # Чистая архитектура
 
-Описание принципов Clean Architecture и их применения в проекте "Вкатился".
+Описание принципов Clean Architecture и их применения в проекте "AutoOffer".
 
 ## Принципы Clean Architecture
 

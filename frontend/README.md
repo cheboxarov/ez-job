@@ -1,4 +1,4 @@
-# Frontend - Вкатился
+# Frontend - AutoOffer
 
 Фронтенд приложение для работы с вакансиями на React + TypeScript + Ant Design.
 
