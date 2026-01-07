@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+from typing import Union
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from domain.entities.user_filter_settings import UserFilterSettings
 from domain.interfaces.user_filter_settings_repository_port import (
@@ -15,6 +16,7 @@ from domain.interfaces.user_filter_settings_repository_port import (
 from infrastructure.database.models.user_filter_settings_model import (
     UserFilterSettingsModel,
 )
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
 def _loads_list(value: str | None) -> list[str] | None:
@@ -36,58 +38,63 @@ def _dumps_list(value: list[str] | None) -> str | None:
     return json.dumps(list(value), ensure_ascii=False)
 
 
-class UserFilterSettingsRepository(UserFilterSettingsRepositoryPort):
+class UserFilterSettingsRepository(BaseRepository, UserFilterSettingsRepositoryPort):
     """Реализация репозитория настроек фильтров пользователя."""
 
-    def __init__(self, session: AsyncSession) -> None:
-        self._session = session
+    def __init__(
+        self, 
+        session_or_factory: Union[AsyncSession, async_sessionmaker[AsyncSession]]
+    ) -> None:
+        super().__init__(session_or_factory)
 
     async def get_by_user_id(self, user_id: UUID) -> UserFilterSettings | None:
-        stmt = select(UserFilterSettingsModel).where(
-            UserFilterSettingsModel.user_id == user_id
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_domain(model)
+        async with self._get_session() as session:
+            stmt = select(UserFilterSettingsModel).where(
+                UserFilterSettingsModel.user_id == user_id
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
+            if model is None:
+                return None
+            return self._to_domain(model)
 
     async def upsert_for_user(
         self,
         user_id: UUID,
         settings: UserFilterSettings,
     ) -> UserFilterSettings:
-        stmt = select(UserFilterSettingsModel).where(
-            UserFilterSettingsModel.user_id == user_id
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(UserFilterSettingsModel).where(
+                UserFilterSettingsModel.user_id == user_id
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            model = UserFilterSettingsModel(user_id=user_id)
-            self._session.add(model)
+            if model is None:
+                model = UserFilterSettingsModel(user_id=user_id)
+                session.add(model)
 
-        model.text = settings.text
-        model.resume_id = settings.resume_id
+            model.text = settings.text
+            model.resume_id = settings.resume_id
 
-        model.experience = _dumps_list(settings.experience)
-        model.employment = _dumps_list(settings.employment)
-        model.schedule = _dumps_list(settings.schedule)
-        model.professional_role = _dumps_list(settings.professional_role)
+            model.experience = _dumps_list(settings.experience)
+            model.employment = _dumps_list(settings.employment)
+            model.schedule = _dumps_list(settings.schedule)
+            model.professional_role = _dumps_list(settings.professional_role)
 
-        model.area = settings.area
-        model.salary = settings.salary
-        model.currency = settings.currency
-        model.only_with_salary = settings.only_with_salary
+            model.area = settings.area
+            model.salary = settings.salary
+            model.currency = settings.currency
+            model.only_with_salary = settings.only_with_salary
 
-        model.order_by = settings.order_by
-        model.period = settings.period
-        model.date_from = settings.date_from
-        model.date_to = settings.date_to
+            model.order_by = settings.order_by
+            model.period = settings.period
+            model.date_from = settings.date_from
+            model.date_to = settings.date_to
 
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_domain(model)
+            await session.flush()
+            await session.refresh(model)
+            return self._to_domain(model)
 
     @staticmethod
     def _to_domain(model: UserFilterSettingsModel) -> UserFilterSettings:

@@ -32,7 +32,7 @@ class AdminLlmService:
         """Получить метрики использования LLM."""
         async with self._unit_of_work:
             use_case = GetLlmUsageMetricsUseCase(
-                llm_call_repository=self._unit_of_work.llm_call_repository,
+                llm_call_repository=self._unit_of_work.standalone_llm_call_repository,
             )
             return await use_case.execute(
                 start_date=start_date,
@@ -52,7 +52,7 @@ class AdminLlmService:
         """Получить метрики откликов на вакансии."""
         async with self._unit_of_work:
             use_case = GetVacancyResponsesMetricsUseCase(
-                vacancy_response_repository=self._unit_of_work.vacancy_response_repository,
+                vacancy_response_repository=self._unit_of_work.standalone_vacancy_response_repository,
             )
             return await use_case.execute(
                 start_date=start_date,
@@ -75,7 +75,7 @@ class AdminLlmService:
         """Получить список вызовов LLM для админки."""
         async with self._unit_of_work:
             use_case = ListLlmCallsForAdminUseCase(
-                llm_call_repository=self._unit_of_work.llm_call_repository,
+                llm_call_repository=self._unit_of_work.standalone_llm_call_repository,
             )
             return await use_case.execute(
                 start_date=start_date,
@@ -91,6 +91,6 @@ class AdminLlmService:
         """Получить детальную информацию о вызове LLM."""
         async with self._unit_of_work:
             use_case = GetLlmCallDetailUseCase(
-                llm_call_repository=self._unit_of_work.llm_call_repository,
+                llm_call_repository=self._unit_of_work.standalone_llm_call_repository,
             )
             return await use_case.execute(call_id)

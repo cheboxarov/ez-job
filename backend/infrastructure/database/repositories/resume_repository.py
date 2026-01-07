@@ -2,28 +2,33 @@
 
 from __future__ import annotations
 
+from typing import Union
 from loguru import logger
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from domain.entities.resume import Resume
 from domain.interfaces.resume_repository_port import ResumeRepositoryPort
 from infrastructure.database.models.resume_model import ResumeModel
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
-
-class ResumeRepository(ResumeRepositoryPort):
+class ResumeRepository(BaseRepository, ResumeRepositoryPort):
     """Реализация репозитория резюме для SQLAlchemy."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, 
+        session_or_factory: Union[AsyncSession, async_sessionmaker[AsyncSession]]
+    ) -> None:
         """Инициализация репозитория.
 
         Args:
-            session: Async сессия SQLAlchemy.
+            session_or_factory: Либо AsyncSession (для транзакционного режима),
+                               либо async_sessionmaker (для standalone режима).
         """
-        self._session = session
+        super().__init__(session_or_factory)
 
     async def create(self, resume: Resume) -> Resume:
         """Создать резюме.
@@ -34,20 +39,21 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Созданная доменная сущность Resume с заполненным id.
         """
-        model = ResumeModel(
-            id=resume.id,
-            user_id=resume.user_id,
-            content=resume.content,
-            user_parameters=resume.user_parameters,
-            external_id=resume.external_id,
-            headhunter_hash=resume.headhunter_hash,
-            is_auto_reply=resume.is_auto_reply,
-            autolike_threshold=resume.autolike_threshold,
-        )
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_domain(model)
+        async with self._get_session() as session:
+            model = ResumeModel(
+                id=resume.id,
+                user_id=resume.user_id,
+                content=resume.content,
+                user_parameters=resume.user_parameters,
+                external_id=resume.external_id,
+                headhunter_hash=resume.headhunter_hash,
+                is_auto_reply=resume.is_auto_reply,
+                autolike_threshold=resume.autolike_threshold,
+            )
+            session.add(model)
+            await session.flush()
+            await session.refresh(model)
+            return self._to_domain(model)
 
     async def update(self, resume: Resume) -> Resume:
         """Обновить резюме.
@@ -61,24 +67,25 @@ class ResumeRepository(ResumeRepositoryPort):
         Raises:
             ValueError: Если резюме с таким ID не найдено.
         """
-        stmt = select(ResumeModel).where(ResumeModel.id == resume.id)
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(ResumeModel).where(ResumeModel.id == resume.id)
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            raise ValueError(f"Резюме с ID {resume.id} не найдено")
+            if model is None:
+                raise ValueError(f"Резюме с ID {resume.id} не найдено")
 
-        model.content = resume.content
-        model.user_parameters = resume.user_parameters
-        model.headhunter_hash = resume.headhunter_hash
-        model.is_auto_reply = resume.is_auto_reply
-        model.autolike_threshold = resume.autolike_threshold
-        # external_id не обновляем через API (store_only)
+            model.content = resume.content
+            model.user_parameters = resume.user_parameters
+            model.headhunter_hash = resume.headhunter_hash
+            model.is_auto_reply = resume.is_auto_reply
+            model.autolike_threshold = resume.autolike_threshold
+            # external_id не обновляем через API (store_only)
 
-        await self._session.flush()
-        await self._session.refresh(model)
+            await session.flush()
+            await session.refresh(model)
 
-        return self._to_domain(model)
+            return self._to_domain(model)
 
     async def delete(self, resume_id: UUID) -> None:
         """Удалить резюме.
@@ -89,15 +96,16 @@ class ResumeRepository(ResumeRepositoryPort):
         Raises:
             ValueError: Если резюме с таким ID не найдено.
         """
-        stmt = select(ResumeModel).where(ResumeModel.id == resume_id)
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(ResumeModel).where(ResumeModel.id == resume_id)
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            raise ValueError(f"Резюме с ID {resume_id} не найдено")
+            if model is None:
+                raise ValueError(f"Резюме с ID {resume_id} не найдено")
 
-        await self._session.delete(model)
-        await self._session.flush()
+            await session.delete(model)
+            await session.flush()
 
     async def get_by_id(self, resume_id: UUID) -> Resume | None:
         """Получить резюме по ID.
@@ -108,14 +116,15 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Доменная сущность Resume или None, если резюме не найдено.
         """
-        stmt = select(ResumeModel).where(ResumeModel.id == resume_id)
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(ResumeModel).where(ResumeModel.id == resume_id)
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            return None
+            if model is None:
+                return None
 
-        return self._to_domain(model)
+            return self._to_domain(model)
 
     async def list_by_user_id(self, user_id: UUID) -> list[Resume]:
         """Получить список резюме по ID пользователя.
@@ -126,11 +135,12 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Список доменных сущностей Resume.
         """
-        stmt = select(ResumeModel).where(ResumeModel.user_id == user_id)
-        result = await self._session.execute(stmt)
-        models = result.scalars().all()
+        async with self._get_session() as session:
+            stmt = select(ResumeModel).where(ResumeModel.user_id == user_id)
+            result = await session.execute(stmt)
+            models = result.scalars().all()
 
-        return [self._to_domain(model) for model in models]
+            return [self._to_domain(model) for model in models]
 
     async def belongs_to_user(self, resume_id: UUID, user_id: UUID) -> bool:
         """Проверить, принадлежит ли резюме пользователю.
@@ -142,13 +152,14 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             True, если резюме принадлежит пользователю, иначе False.
         """
-        stmt = (
-            select(ResumeModel.id)
-            .where(ResumeModel.id == resume_id)
-            .where(ResumeModel.user_id == user_id)
-        )
-        result = await self._session.execute(stmt)
-        return result.scalar_one_or_none() is not None
+        async with self._get_session() as session:
+            stmt = (
+                select(ResumeModel.id)
+                .where(ResumeModel.id == resume_id)
+                .where(ResumeModel.user_id == user_id)
+            )
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none() is not None
 
     async def get_by_external_id(
         self, external_id: str, user_id: UUID
@@ -162,18 +173,19 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Доменная сущность Resume или None, если резюме не найдено.
         """
-        stmt = (
-            select(ResumeModel)
-            .where(ResumeModel.external_id == external_id)
-            .where(ResumeModel.user_id == user_id)
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = (
+                select(ResumeModel)
+                .where(ResumeModel.external_id == external_id)
+                .where(ResumeModel.user_id == user_id)
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            return None
+            if model is None:
+                return None
 
-        return self._to_domain(model)
+            return self._to_domain(model)
 
     async def get_all_active_auto_reply_resumes(self) -> list[Resume]:
         """Получить все резюме с включенным автооткликом.
@@ -181,11 +193,12 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Список доменных сущностей Resume с is_auto_reply = True.
         """
-        stmt = select(ResumeModel).where(ResumeModel.is_auto_reply == True)
-        result = await self._session.execute(stmt)
-        models = result.scalars().all()
+        async with self._get_session() as session:
+            stmt = select(ResumeModel).where(ResumeModel.is_auto_reply == True)
+            result = await session.execute(stmt)
+            models = result.scalars().all()
 
-        return [self._to_domain(model) for model in models]
+            return [self._to_domain(model) for model in models]
 
     async def get_by_headhunter_hash(
         self, user_id: UUID, headhunter_hash: str
@@ -199,38 +212,39 @@ class ResumeRepository(ResumeRepositoryPort):
         Returns:
             Доменная сущность Resume или None, если резюме не найдено.
         """
-        logger.info(
-            f"Поиск резюме: headhunter_hash={headhunter_hash}, user_id={user_id}"
-        )
-        stmt = (
-            select(ResumeModel)
-            .where(ResumeModel.headhunter_hash == headhunter_hash)
-            .where(ResumeModel.user_id == user_id)
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            logger.info(
+                f"Поиск резюме: headhunter_hash={headhunter_hash}, user_id={user_id}"
+            )
+            stmt = (
+                select(ResumeModel)
+                .where(ResumeModel.headhunter_hash == headhunter_hash)
+                .where(ResumeModel.user_id == user_id)
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            logger.warning(
-                f"Резюме не найдено: headhunter_hash={headhunter_hash}, user_id={user_id}"
-            )
-            # Проверяем, есть ли резюме с таким hash у других пользователей
-            stmt_all = select(ResumeModel).where(
-                ResumeModel.headhunter_hash == headhunter_hash
-            )
-            result_all = await self._session.execute(stmt_all)
-            models_all = result_all.scalars().all()
-            if models_all:
+            if model is None:
                 logger.warning(
-                    f"Найдено {len(models_all)} резюме с таким headhunter_hash, "
-                    f"но они принадлежат другим пользователям"
+                    f"Резюме не найдено: headhunter_hash={headhunter_hash}, user_id={user_id}"
                 )
-            return None
+                # Проверяем, есть ли резюме с таким hash у других пользователей
+                stmt_all = select(ResumeModel).where(
+                    ResumeModel.headhunter_hash == headhunter_hash
+                )
+                result_all = await session.execute(stmt_all)
+                models_all = result_all.scalars().all()
+                if models_all:
+                    logger.warning(
+                        f"Найдено {len(models_all)} резюме с таким headhunter_hash, "
+                        f"но они принадлежат другим пользователям"
+                    )
+                return None
 
-        logger.info(
-            f"Найдено резюме: id={model.id}, headhunter_hash={model.headhunter_hash}, user_id={model.user_id}"
-        )
-        return self._to_domain(model)
+            logger.info(
+                f"Найдено резюме: id={model.id}, headhunter_hash={model.headhunter_hash}, user_id={model.user_id}"
+            )
+            return self._to_domain(model)
 
     def _to_domain(self, model: ResumeModel) -> Resume:
         """Преобразовать SQLAlchemy модель в доменную сущность.

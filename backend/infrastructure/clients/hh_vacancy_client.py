@@ -196,14 +196,6 @@ class HHVacancyClient(HHBaseMixin):
         # Анти-бот заголовки и XSRF токен добавляются через _enhance_headers
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
 
-        # Извлекаем XSRF токен для логирования (если нужен)
-        xsrf_token = cookies.get("_xsrf") or enhanced_headers.get("X-Xsrftoken") or ""
-
-        logger.debug(f"[list-front] GET {url} params={query}")
-        logger.debug(f"[list-front] Query data: {json.dumps(query, indent=2, ensure_ascii=False)}")
-        logger.debug(f"[list-front] Headers keys: {list(enhanced_headers.keys())}")
-        logger.debug(f"[list-front] XSRF token: {xsrf_token[:50] if xsrf_token else 'NOT_FOUND'}")
-
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
         ) as client:
@@ -215,13 +207,6 @@ class HHVacancyClient(HHBaseMixin):
                 logger.error(
                     f"[list-front] HTTP {response.status_code} for {response.request.url}"
                 )
-                ct = response.headers.get("Content-Type", "")
-                logger.debug(f"[list-front] Content-Type: {ct}")
-                try:
-                    body_preview = response.text[:500]
-                except Exception:
-                    body_preview = "<unavailable>"
-                logger.debug(f"[list-front] Body preview: {body_preview}")
                 raise
 
             try:

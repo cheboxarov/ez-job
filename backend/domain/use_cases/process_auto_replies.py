@@ -510,8 +510,10 @@ class ProcessAutoRepliesUseCase:
                 event_publisher = create_event_publisher()
                 
                 # Создаем Use Case для сохранения откликов в БД с уведомлениями
+                # Используем standalone репозиторий, так как сохранение происходит после HTTP запроса
+                # и не требует атомарности с другими операциями
                 create_vacancy_response_base_uc = CreateVacancyResponseUseCase(
-                    vacancy_response_repository=unit_of_work.vacancy_response_repository,
+                    vacancy_response_repository=unit_of_work.standalone_vacancy_response_repository,
                 )
                 create_vacancy_response_uc = CreateVacancyResponseWithNotificationUseCase(
                     create_vacancy_response_uc=create_vacancy_response_base_uc,

@@ -125,7 +125,7 @@ def get_get_resume_evaluation_from_cache_use_case(
         unit_of_work: UnitOfWork для доступа к репозиторию оценок резюме.
     """
     return GetResumeEvaluationFromCacheUseCase(
-        unit_of_work.resume_evaluation_repository
+        unit_of_work.standalone_resume_evaluation_repository
     )
 
 
@@ -138,7 +138,7 @@ def get_save_resume_evaluation_use_case(
         unit_of_work: UnitOfWork для доступа к репозиторию оценок резюме.
     """
     return SaveResumeEvaluationUseCase(
-        unit_of_work.resume_evaluation_repository
+        unit_of_work.standalone_resume_evaluation_repository
     )
 
 
@@ -157,22 +157,24 @@ def get_evaluate_resume_use_case(
 
 def get_evaluate_resume_with_cache_use_case(
     unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
-    get_evaluation_from_cache_uc: GetResumeEvaluationFromCacheUseCase = Depends(
-        get_get_resume_evaluation_from_cache_use_case
-    ),
-    evaluate_resume_uc: EvaluateResumeUseCase = Depends(get_evaluate_resume_use_case),
-    save_evaluation_uc: SaveResumeEvaluationUseCase = Depends(
-        get_save_resume_evaluation_use_case
-    ),
 ) -> EvaluateResumeWithCacheUseCase:
     """Создает и возвращает EvaluateResumeWithCacheUseCase.
     
     Args:
         unit_of_work: UnitOfWork для доступа к репозиториям.
-        get_evaluation_from_cache_uc: Use case для получения оценки из кеша.
-        evaluate_resume_uc: Use case для оценки резюме через LLM.
-        save_evaluation_uc: Use case для сохранения оценки в БД.
     """
+    # Используем standalone репозитории для кеширования, так как LLM вызов занимает 10-30 секунд
+    # и не должен держать транзакцию открытой
+    get_evaluation_from_cache_uc = GetResumeEvaluationFromCacheUseCase(
+        unit_of_work.standalone_resume_evaluation_repository
+    )
+    config = get_config()
+    agent = ResumeEvaluatorAgent(config.openai, unit_of_work=unit_of_work)
+    evaluate_resume_uc = EvaluateResumeUseCase(agent)
+    save_evaluation_uc = SaveResumeEvaluationUseCase(
+        unit_of_work.standalone_resume_evaluation_repository
+    )
+    
     return EvaluateResumeWithCacheUseCase(
         get_evaluation_from_cache_uc=get_evaluation_from_cache_uc,
         evaluate_resume_uc=evaluate_resume_uc,

@@ -2,27 +2,32 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Union
 from uuid import UUID, uuid4
 
 from sqlalchemy import select, update, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from domain.entities.agent_action import AgentAction
 from domain.interfaces.agent_action_repository_port import AgentActionRepositoryPort
 from infrastructure.database.models.agent_action_model import AgentActionModel
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
-class AgentActionRepository(AgentActionRepositoryPort):
+class AgentActionRepository(BaseRepository, AgentActionRepositoryPort):
     """Реализация репозитория действий агента для SQLAlchemy."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, 
+        session_or_factory: Union[AsyncSession, async_sessionmaker[AsyncSession]]
+    ) -> None:
         """Инициализация репозитория.
 
         Args:
-            session: Async сессия SQLAlchemy.
+            session_or_factory: Либо AsyncSession (для транзакционного режима),
+                               либо async_sessionmaker (для standalone режима).
         """
-        self._session = session
+        super().__init__(session_or_factory)
 
     async def create(self, action: AgentAction) -> AgentAction:
         """Создать действие агента.
@@ -34,24 +39,25 @@ class AgentActionRepository(AgentActionRepositoryPort):
         Returns:
             Созданная доменная сущность AgentAction с заполненными id, created_at и updated_at.
         """
-        # Генерируем ID, если не указан
-        action_id = action.id if action.id else uuid4()
+        async with self._get_session() as session:
+            # Генерируем ID, если не указан
+            action_id = action.id if action.id else uuid4()
 
-        model = AgentActionModel(
-            id=action_id,
-            type=action.type,
-            entity_type=action.entity_type,
-            entity_id=action.entity_id,
-            created_by=action.created_by,
-            user_id=action.user_id,
-            resume_hash=action.resume_hash,
-            data=action.data,
-            is_read=action.is_read,
-        )
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_domain(model)
+            model = AgentActionModel(
+                id=action_id,
+                type=action.type,
+                entity_type=action.entity_type,
+                entity_id=action.entity_id,
+                created_by=action.created_by,
+                user_id=action.user_id,
+                resume_hash=action.resume_hash,
+                data=action.data,
+                is_read=action.is_read,
+            )
+            session.add(model)
+            await session.flush()
+            await session.refresh(model)
+            return self._to_domain(model)
 
     async def list(
         self,
@@ -72,44 +78,47 @@ class AgentActionRepository(AgentActionRepositoryPort):
         Returns:
             Список доменных сущностей AgentAction, отсортированный по created_at (desc).
         """
-        stmt = select(AgentActionModel)
+        async with self._get_session() as session:
+            stmt = select(AgentActionModel)
 
-        # Динамически добавляем фильтры
-        if type is not None:
-            stmt = stmt.where(AgentActionModel.type == type)
-        if entity_type is not None:
-            stmt = stmt.where(AgentActionModel.entity_type == entity_type)
-        if entity_id is not None:
-            stmt = stmt.where(AgentActionModel.entity_id == entity_id)
-        if created_by is not None:
-            stmt = stmt.where(AgentActionModel.created_by == created_by)
+            # Динамически добавляем фильтры
+            if type is not None:
+                stmt = stmt.where(AgentActionModel.type == type)
+            if entity_type is not None:
+                stmt = stmt.where(AgentActionModel.entity_type == entity_type)
+            if entity_id is not None:
+                stmt = stmt.where(AgentActionModel.entity_id == entity_id)
+            if created_by is not None:
+                stmt = stmt.where(AgentActionModel.created_by == created_by)
 
-        # Сортируем по дате создания (новые сначала)
-        stmt = stmt.order_by(AgentActionModel.created_at.desc())
+            # Сортируем по дате создания (новые сначала)
+            stmt = stmt.order_by(AgentActionModel.created_at.desc())
 
-        result = await self._session.execute(stmt)
-        models = result.scalars().all()
+            result = await session.execute(stmt)
+            models = result.scalars().all()
 
-        return [self._to_domain(model) for model in models]
+            return [self._to_domain(model) for model in models]
 
     async def get_unread_count(self, user_id: UUID) -> int:
-        stmt = select(func.count()).select_from(AgentActionModel).where(
-            AgentActionModel.user_id == user_id,
-            AgentActionModel.is_read.is_(False),
-        )
-        result = await self._session.execute(stmt)
-        return int(result.scalar_one())
-
-    async def mark_all_as_read(self, user_id: UUID) -> None:
-        stmt = (
-            update(AgentActionModel)
-            .where(
+        async with self._get_session() as session:
+            stmt = select(func.count()).select_from(AgentActionModel).where(
                 AgentActionModel.user_id == user_id,
                 AgentActionModel.is_read.is_(False),
             )
-            .values(is_read=True)
-        )
-        await self._session.execute(stmt)
+            result = await session.execute(stmt)
+            return int(result.scalar_one())
+
+    async def mark_all_as_read(self, user_id: UUID) -> None:
+        async with self._get_session() as session:
+            stmt = (
+                update(AgentActionModel)
+                .where(
+                    AgentActionModel.user_id == user_id,
+                    AgentActionModel.is_read.is_(False),
+                )
+                .values(is_read=True)
+            )
+            await session.execute(stmt)
 
     async def update(self, action: AgentAction) -> AgentAction:
         """Обновить действие агента.
@@ -123,26 +132,27 @@ class AgentActionRepository(AgentActionRepositoryPort):
         Raises:
             ValueError: Если действие с таким ID не найдено.
         """
-        stmt = select(AgentActionModel).where(AgentActionModel.id == action.id)
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(AgentActionModel).where(AgentActionModel.id == action.id)
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            raise ValueError(f"Действие с ID {action.id} не найдено")
+            if model is None:
+                raise ValueError(f"Действие с ID {action.id} не найдено")
 
-        model.type = action.type
-        model.entity_type = action.entity_type
-        model.entity_id = action.entity_id
-        model.created_by = action.created_by
-        model.user_id = action.user_id
-        model.resume_hash = action.resume_hash
-        model.data = action.data
-        model.is_read = action.is_read
+            model.type = action.type
+            model.entity_type = action.entity_type
+            model.entity_id = action.entity_id
+            model.created_by = action.created_by
+            model.user_id = action.user_id
+            model.resume_hash = action.resume_hash
+            model.data = action.data
+            model.is_read = action.is_read
 
-        await self._session.flush()
-        await self._session.refresh(model)
+            await session.flush()
+            await session.refresh(model)
 
-        return self._to_domain(model)
+            return self._to_domain(model)
 
     async def get_by_id(self, action_id: UUID) -> AgentAction | None:
         """Получить действие агента по ID.
@@ -153,14 +163,15 @@ class AgentActionRepository(AgentActionRepositoryPort):
         Returns:
             Доменная сущность AgentAction или None, если не найдено.
         """
-        stmt = select(AgentActionModel).where(AgentActionModel.id == action_id)
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+        async with self._get_session() as session:
+            stmt = select(AgentActionModel).where(AgentActionModel.id == action_id)
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        if model is None:
-            return None
+            if model is None:
+                return None
 
-        return self._to_domain(model)
+            return self._to_domain(model)
 
     def _to_domain(self, model: AgentActionModel) -> AgentAction:
         """Преобразовать SQLAlchemy модель в доменную сущность.

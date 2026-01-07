@@ -248,7 +248,9 @@ class BaseAgent(ABC):
                 created_at=datetime.now(),  # Будет перезаписано БД
             )
 
-            await self._unit_of_work.llm_call_repository.create(llm_call)
+            # Используем standalone репозиторий для логирования, так как логирование не должно
+            # держать транзакцию открытой во время LLM вызова
+            await self._unit_of_work.standalone_llm_call_repository.create(llm_call)
         except Exception as e:
             # Логирование не должно прерывать выполнение основного кода
             logger.error(

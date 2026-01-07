@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 import os
 import sys
+from typing import Union
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
 from sqlalchemy import select, update
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql import func
 
 from domain.entities.user_hh_auth_data import UserHhAuthData
@@ -19,6 +20,7 @@ from domain.interfaces.user_hh_auth_data_repository_port import (
     UserHhAuthDataRepositoryPort,
 )
 from infrastructure.database.models.user_model import UserModel
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
 # region agent log
@@ -46,16 +48,20 @@ def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> N
 # endregion
 
 
-class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
+class UserHhAuthDataRepository(BaseRepository, UserHhAuthDataRepositoryPort):
     """Реализация репозитория для HH auth data пользователя."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, 
+        session_or_factory: Union[AsyncSession, async_sessionmaker[AsyncSession]]
+    ) -> None:
         """Инициализация репозитория.
 
         Args:
-            session: Async сессия SQLAlchemy.
+            session_or_factory: Либо AsyncSession (для транзакционного режима),
+                               либо async_sessionmaker (для standalone режима).
         """
-        self._session = session
+        super().__init__(session_or_factory)
 
     async def get_by_user_id(
         self, user_id: UUID, *, with_for_update: bool = False
@@ -69,57 +75,58 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         Returns:
             Доменная сущность UserHhAuthData или None, если не найдено.
         """
-        _debug_log(
-            "H2",
-            "user_hh_auth_data_repository.get_by_user_id:enter",
-            "select user row",
-            {"user_id": str(user_id), "with_for_update": with_for_update, "session_id": id(self._session)},
-        )
-
-        # Межпроцессная синхронизация обновления HH cookies:
-        # когда мы хотим блокировать строку пользователя (FOR UPDATE), дополнительно берём
-        # advisory lock на время транзакции. Это предотвращает дедлоки между API-сервером и воркерами,
-        # которые одновременно обновляют hh_cookies/hh_headers для одного user_id.
-        if with_for_update:
-            u = user_id.int
-            k1 = (u >> 96) & 0xFFFFFFFF
-            k2 = u & 0xFFFFFFFF
-
-            # Приводим к signed int32, чтобы гарантированно влазило в Postgres int4
-            if k1 >= 2**31:
-                k1 -= 2**32
-            if k2 >= 2**31:
-                k2 -= 2**32
-
+        async with self._get_session() as session:
             _debug_log(
-                "H5",
-                "user_hh_auth_data_repository.get_by_user_id:before_advisory_lock",
-                "acquiring pg_advisory_xact_lock",
-                {"user_id": str(user_id), "k1": k1, "k2": k2, "session_id": id(self._session)},
-            )
-            await self._session.execute(
-                text("SELECT pg_advisory_xact_lock(:k1, :k2)"),
-                {"k1": k1, "k2": k2},
-            )
-            _debug_log(
-                "H5",
-                "user_hh_auth_data_repository.get_by_user_id:after_advisory_lock",
-                "pg_advisory_xact_lock acquired",
-                {"user_id": str(user_id), "session_id": id(self._session)},
+                "H2",
+                "user_hh_auth_data_repository.get_by_user_id:enter",
+                "select user row",
+                {"user_id": str(user_id), "with_for_update": with_for_update, "session_id": id(session)},
             )
 
-        stmt = select(UserModel).where(UserModel.id == user_id)
+            # Межпроцессная синхронизация обновления HH cookies:
+            # когда мы хотим блокировать строку пользователя (FOR UPDATE), дополнительно берём
+            # advisory lock на время транзакции. Это предотвращает дедлоки между API-сервером и воркерами,
+            # которые одновременно обновляют hh_cookies/hh_headers для одного user_id.
+            if with_for_update:
+                u = user_id.int
+                k1 = (u >> 96) & 0xFFFFFFFF
+                k2 = u & 0xFFFFFFFF
 
-        if with_for_update:
-            stmt = stmt.with_for_update()
+                # Приводим к signed int32, чтобы гарантированно влазило в Postgres int4
+                if k1 >= 2**31:
+                    k1 -= 2**32
+                if k2 >= 2**31:
+                    k2 -= 2**32
 
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
+                _debug_log(
+                    "H5",
+                    "user_hh_auth_data_repository.get_by_user_id:before_advisory_lock",
+                    "acquiring pg_advisory_xact_lock",
+                    {"user_id": str(user_id), "k1": k1, "k2": k2, "session_id": id(session)},
+                )
+                await session.execute(
+                    text("SELECT pg_advisory_xact_lock(:k1, :k2)"),
+                    {"k1": k1, "k2": k2},
+                )
+                _debug_log(
+                    "H5",
+                    "user_hh_auth_data_repository.get_by_user_id:after_advisory_lock",
+                    "pg_advisory_xact_lock acquired",
+                    {"user_id": str(user_id), "session_id": id(session)},
+                )
 
-        if model is None:
-            return None
+            stmt = select(UserModel).where(UserModel.id == user_id)
 
-        return self._to_domain(model)
+            if with_for_update:
+                stmt = stmt.with_for_update()
+
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
+
+            if model is None:
+                return None
+
+            return self._to_domain(model)
 
     async def upsert(
         self,
@@ -137,28 +144,29 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         Returns:
             Сохраненная доменная сущность UserHhAuthData.
         """
-        _debug_log(
-            "H3",
-            "user_hh_auth_data_repository.upsert:enter",
-            "update user hh cookies/headers",
-            {"user_id": str(user_id), "session_id": id(self._session)},
-        )
-        stmt = (
-            update(UserModel)
-            .where(UserModel.id == user_id)
-            .values(
-                hh_headers=headers,
-                hh_cookies=cookies,
-                hh_cookies_updated_at=func.now(),
+        async with self._get_session() as session:
+            _debug_log(
+                "H3",
+                "user_hh_auth_data_repository.upsert:enter",
+                "update user hh cookies/headers",
+                {"user_id": str(user_id), "session_id": id(session)},
             )
-            .returning(UserModel)
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model is None:
-            raise ValueError(f"User with id={user_id} not found for HH auth update")
-        await self._session.flush()
-        return self._to_domain(model)
+            stmt = (
+                update(UserModel)
+                .where(UserModel.id == user_id)
+                .values(
+                    hh_headers=headers,
+                    hh_cookies=cookies,
+                    hh_cookies_updated_at=func.now(),
+                )
+                .returning(UserModel)
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
+            if model is None:
+                raise ValueError(f"User with id={user_id} not found for HH auth update")
+            await session.flush()
+            return self._to_domain(model)
 
     async def delete(self, user_id: UUID) -> None:
         """Удалить HH auth data для пользователя (очистить HH поля в users).
@@ -166,13 +174,14 @@ class UserHhAuthDataRepository(UserHhAuthDataRepositoryPort):
         Args:
             user_id: UUID пользователя.
         """
-        stmt = (
-            update(UserModel)
-            .where(UserModel.id == user_id)
-            .values(hh_headers=None, hh_cookies=None)
-        )
-        await self._session.execute(stmt)
-        await self._session.flush()
+        async with self._get_session() as session:
+            stmt = (
+                update(UserModel)
+                .where(UserModel.id == user_id)
+                .values(hh_headers=None, hh_cookies=None)
+            )
+            await session.execute(stmt)
+            await session.flush()
 
     def _to_domain(self, model: UserModel) -> UserHhAuthData:
         """Преобразовать UserModel в доменную сущность HH auth data.

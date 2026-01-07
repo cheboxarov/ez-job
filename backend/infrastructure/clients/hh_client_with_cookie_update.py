@@ -100,10 +100,6 @@ class HHHttpClientWithCookieUpdate(HHClientPort):
                     user_id=self._user_id,
                     updated_cookies=updated_cookies,
                 )
-                logger.debug(
-                    f"Updated cookies for user_id={self._user_id}. "
-                    f"Cookies keys: {list(updated_cookies.keys())}"
-                )
             except Exception as exc:
                 _debug_log(
                     "H4",

@@ -47,7 +47,7 @@ class AgentActionService(AgentActionServicePort):
         """
         async with self._unit_of_work:
             use_case = CreateAgentActionUseCase(
-                self._unit_of_work.agent_action_repository
+                self._unit_of_work.standalone_agent_action_repository
             )
             result = await use_case.execute(action)
             await self._unit_of_work.commit()
@@ -77,7 +77,7 @@ class AgentActionService(AgentActionServicePort):
         """
         async with self._unit_of_work:
             use_case = ListAgentActionsUseCase(
-                self._unit_of_work.agent_action_repository
+                self._unit_of_work.standalone_agent_action_repository
             )
             return await use_case.execute(
                 type=type,
@@ -123,7 +123,7 @@ class AgentActionService(AgentActionServicePort):
                 )
 
                 use_case = ExecuteAgentActionUseCase(
-                    agent_action_repository=self._unit_of_work.agent_action_repository,
+                    agent_action_repository=self._unit_of_work.standalone_agent_action_repository,
                     send_chat_message_uc=self._send_chat_message_uc,
                 )
 
@@ -137,7 +137,7 @@ class AgentActionService(AgentActionServicePort):
 
         # Если user_id не передан, выполняем без обновления cookies
         use_case = ExecuteAgentActionUseCase(
-            agent_action_repository=self._unit_of_work.agent_action_repository,
+            agent_action_repository=self._unit_of_work.standalone_agent_action_repository,
             send_chat_message_uc=self._send_chat_message_uc,
         )
 
@@ -184,7 +184,7 @@ class AgentActionService(AgentActionServicePort):
                 )
 
                 use_case = ExecuteAgentActionUseCase(
-                    agent_action_repository=self._unit_of_work.agent_action_repository,
+                    agent_action_repository=self._unit_of_work.standalone_agent_action_repository,
                     send_chat_message_uc=self._send_chat_message_uc,
                 )
 
@@ -200,7 +200,7 @@ class AgentActionService(AgentActionServicePort):
 
         # Если user_id не передан, выполняем без обновления cookies
         use_case = ExecuteAgentActionUseCase(
-            agent_action_repository=self._unit_of_work.agent_action_repository,
+            agent_action_repository=self._unit_of_work.standalone_agent_action_repository,
             send_chat_message_uc=self._send_chat_message_uc,
         )
 
@@ -216,12 +216,12 @@ class AgentActionService(AgentActionServicePort):
 
     async def get_unread_count(self, user_id: UUID) -> int:
         async with self._unit_of_work:
-            return await self._unit_of_work.agent_action_repository.get_unread_count(
+            return await self._unit_of_work.standalone_agent_action_repository.get_unread_count(
                 user_id
             )
 
     async def mark_all_as_read(self, user_id: UUID) -> None:
         async with self._unit_of_work:
-            await self._unit_of_work.agent_action_repository.mark_all_as_read(user_id)
+            await self._unit_of_work.standalone_agent_action_repository.mark_all_as_read(user_id)
             await self._unit_of_work.commit()
 

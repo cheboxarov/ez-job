@@ -25,7 +25,7 @@ async def get_user(
 ) -> UserResponse:
     """Получить пользователя по ID."""
     try:
-        user = await unit_of_work.user_repository.get_by_id(user_id)
+        user = await unit_of_work.standalone_user_repository.get_by_id(user_id)
         if user is None:
             raise HTTPException(
                 status_code=404, detail=f"Пользователь с ID {user_id} не найден"
@@ -51,7 +51,7 @@ async def update_user(
     """
     try:
         # Получаем существующего пользователя
-        existing_user = await unit_of_work.user_repository.get_by_id(user_id)
+        existing_user = await unit_of_work.standalone_user_repository.get_by_id(user_id)
         if existing_user is None:
             raise HTTPException(
                 status_code=404, detail=f"Пользователь с ID {user_id} не найден"

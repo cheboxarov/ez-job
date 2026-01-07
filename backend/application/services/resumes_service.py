@@ -170,7 +170,7 @@ class ResumesService(ResumeServicePort):
         async with self._unit_of_work:
             use_case = ImportResumeFromHHUseCase(
                 hh_client=hh_client,
-                resume_repository=self._unit_of_work.resume_repository,
+                resume_repository=self._unit_of_work.standalone_resume_repository,
                 user_hh_auth_data_repository=self._unit_of_work.user_hh_auth_data_repository,
             )
             resumes = await use_case.execute(

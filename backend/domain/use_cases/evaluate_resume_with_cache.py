@@ -67,6 +67,9 @@ class EvaluateResumeWithCacheUseCase:
         evaluation_data = await self._evaluate_resume_uc.execute(resume_content, user_id)
 
         # Сохраняем результат в кеш
-        await self._save_evaluation_uc.execute(resume_content_hash, evaluation_data)
+        try:
+            await self._save_evaluation_uc.execute(resume_content_hash, evaluation_data)
+        except Exception as e:
+            raise
 
         return evaluation_data

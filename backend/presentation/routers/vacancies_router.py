@@ -75,7 +75,7 @@ async def get_relevant_vacancies(
     """
     try:
         # Загружаем резюме и проверяем принадлежность
-        resume = await unit_of_work.resume_repository.get_by_id(request.resume_id)
+        resume = await unit_of_work.standalone_resume_repository.get_by_id(request.resume_id)
         if resume is None:
             raise HTTPException(
                 status_code=404, detail=f"Резюме с ID {request.resume_id} не найдено"
@@ -178,7 +178,7 @@ async def get_relevant_vacancy_list(
     """
     try:
         # Загружаем резюме и проверяем принадлежность
-        resume = await unit_of_work.resume_repository.get_by_id(request.resume_id)
+        resume = await unit_of_work.standalone_resume_repository.get_by_id(request.resume_id)
         if resume is None:
             raise HTTPException(
                 status_code=404, detail=f"Резюме с ID {request.resume_id} не найдено"
@@ -282,7 +282,7 @@ async def respond_to_vacancy(
     """
     try:
         # Загружаем резюме и проверяем принадлежность
-        resume = await unit_of_work.resume_repository.get_by_id(request.resume_id)
+        resume = await unit_of_work.standalone_resume_repository.get_by_id(request.resume_id)
         if resume is None:
             raise HTTPException(
                 status_code=404, detail=f"Резюме с ID {request.resume_id} не найдено"
@@ -319,8 +319,10 @@ async def respond_to_vacancy(
         
         hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
         respond_to_vacancy_uc = RespondToVacancyUseCase(hh_client)
+        # Используем standalone репозиторий, так как сохранение происходит после HTTP запроса
+        # и не требует атомарности с другими операциями
         create_vacancy_response_uc = CreateVacancyResponseUseCase(
-            vacancy_response_repository=unit_of_work.vacancy_response_repository
+            vacancy_response_repository=unit_of_work.standalone_vacancy_response_repository
         )
         
         # Создаем use cases для проверки подписки и инкремента счетчика

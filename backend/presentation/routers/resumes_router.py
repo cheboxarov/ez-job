@@ -390,7 +390,7 @@ async def evaluate_resume(
     resume_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     service: ResumeServicePort = Depends(get_resumes_service),
-    evaluate_resume_with_cache_uc=Depends(get_evaluate_resume_with_cache_use_case),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
 ) -> ResumeEvaluationResponse:
     """Оценить резюме на основе правил."""
     try:
@@ -406,15 +406,40 @@ async def evaluate_resume(
                 status_code=400, detail="Текст резюме пуст"
             )
 
+        # Создаем use case с standalone репозиториями для кеширования
+        # Используем standalone, так как LLM вызов занимает 10-30 секунд и не должен держать транзакцию открытой
+        from domain.use_cases.get_resume_evaluation_from_cache import GetResumeEvaluationFromCacheUseCase
+        from domain.use_cases.evaluate_resume import EvaluateResumeUseCase
+        from domain.use_cases.save_resume_evaluation import SaveResumeEvaluationUseCase
+        from domain.use_cases.evaluate_resume_with_cache import EvaluateResumeWithCacheUseCase
+        from infrastructure.agents.resume_evaluator_agent import ResumeEvaluatorAgent
+        from config import load_config
+        
+        config = load_config()
+        get_evaluation_from_cache_uc = GetResumeEvaluationFromCacheUseCase(
+            unit_of_work.standalone_resume_evaluation_repository
+        )
+        agent = ResumeEvaluatorAgent(config.openai, unit_of_work=unit_of_work)
+        evaluate_resume_uc = EvaluateResumeUseCase(agent)
+        save_evaluation_uc = SaveResumeEvaluationUseCase(
+            unit_of_work.standalone_resume_evaluation_repository
+        )
+        evaluate_resume_with_cache_uc = EvaluateResumeWithCacheUseCase(
+            get_evaluation_from_cache_uc=get_evaluation_from_cache_uc,
+            evaluate_resume_uc=evaluate_resume_uc,
+            save_evaluation_uc=save_evaluation_uc,
+        )
+        
         result = await evaluate_resume_with_cache_uc.execute(resume.content, user_id=current_user.id)
-        return ResumeEvaluationResponse(**result)
+        response = ResumeEvaluationResponse(**result)
+        return response
     except PermissionError as exc:
         logger.warning(f"Попытка оценить чужое резюме: {exc}")
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error(f"Ошибка при оценке резюме: {exc}", exc_info=True)
+        logger.error("Ошибка при оценке резюме: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=500, detail="Внутренняя ошибка при оценке резюме"
         ) from exc

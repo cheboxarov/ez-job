@@ -2,28 +2,34 @@
 
 from __future__ import annotations
 
+from typing import Union
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from domain.entities.user_subscription import UserSubscription
 from domain.interfaces.user_subscription_repository_port import (
     UserSubscriptionRepositoryPort,
 )
 from infrastructure.database.models.user_subscription_model import UserSubscriptionModel
+from infrastructure.database.repositories.base_repository import BaseRepository
 
 
-class UserSubscriptionRepository(UserSubscriptionRepositoryPort):
+class UserSubscriptionRepository(BaseRepository, UserSubscriptionRepositoryPort):
     """Реализация репозитория подписок пользователей для SQLAlchemy."""
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, 
+        session_or_factory: Union[AsyncSession, async_sessionmaker[AsyncSession]]
+    ) -> None:
         """Инициализация репозитория.
 
         Args:
-            session: Async сессия SQLAlchemy.
+            session_or_factory: Либо AsyncSession (для транзакционного режима),
+                               либо async_sessionmaker (для standalone режима).
         """
-        self._session = session
+        super().__init__(session_or_factory)
 
     async def get_by_user_id(self, user_id: UUID) -> UserSubscription | None:
         """Получить подписку пользователя по user_id.
@@ -34,14 +40,15 @@ class UserSubscriptionRepository(UserSubscriptionRepositoryPort):
         Returns:
             Доменная сущность UserSubscription или None, если не найдено.
         """
-        stmt = select(UserSubscriptionModel).where(
-            UserSubscriptionModel.user_id == user_id
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
-        if model is None:
-            return None
-        return self._to_domain(model)
+        async with self._get_session() as session:
+            stmt = select(UserSubscriptionModel).where(
+                UserSubscriptionModel.user_id == user_id
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
+            if model is None:
+                return None
+            return self._to_domain(model)
 
     async def create(self, user_subscription: UserSubscription) -> UserSubscription:
         """Создать подписку пользователя.
@@ -52,18 +59,19 @@ class UserSubscriptionRepository(UserSubscriptionRepositoryPort):
         Returns:
             Созданная доменная сущность UserSubscription.
         """
-        model = UserSubscriptionModel(
-            user_id=user_subscription.user_id,
-            subscription_plan_id=user_subscription.subscription_plan_id,
-            responses_count=user_subscription.responses_count,
-            period_started_at=user_subscription.period_started_at,
-            started_at=user_subscription.started_at,
-            expires_at=user_subscription.expires_at,
-        )
-        self._session.add(model)
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_domain(model)
+        async with self._get_session() as session:
+            model = UserSubscriptionModel(
+                user_id=user_subscription.user_id,
+                subscription_plan_id=user_subscription.subscription_plan_id,
+                responses_count=user_subscription.responses_count,
+                period_started_at=user_subscription.period_started_at,
+                started_at=user_subscription.started_at,
+                expires_at=user_subscription.expires_at,
+            )
+            session.add(model)
+            await session.flush()
+            await session.refresh(model)
+            return self._to_domain(model)
 
     async def update(self, user_subscription: UserSubscription) -> UserSubscription:
         """Обновить подписку пользователя.
@@ -77,26 +85,27 @@ class UserSubscriptionRepository(UserSubscriptionRepositoryPort):
         Raises:
             ValueError: Если подписка с таким user_id не найдена.
         """
-        stmt = select(UserSubscriptionModel).where(
-            UserSubscriptionModel.user_id == user_subscription.user_id
-        )
-        result = await self._session.execute(stmt)
-        model = result.scalar_one_or_none()
-
-        if model is None:
-            raise ValueError(
-                f"Подписка для пользователя {user_subscription.user_id} не найдена"
+        async with self._get_session() as session:
+            stmt = select(UserSubscriptionModel).where(
+                UserSubscriptionModel.user_id == user_subscription.user_id
             )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
 
-        model.subscription_plan_id = user_subscription.subscription_plan_id
-        model.responses_count = user_subscription.responses_count
-        model.period_started_at = user_subscription.period_started_at
-        model.started_at = user_subscription.started_at
-        model.expires_at = user_subscription.expires_at
+            if model is None:
+                raise ValueError(
+                    f"Подписка для пользователя {user_subscription.user_id} не найдена"
+                )
 
-        await self._session.flush()
-        await self._session.refresh(model)
-        return self._to_domain(model)
+            model.subscription_plan_id = user_subscription.subscription_plan_id
+            model.responses_count = user_subscription.responses_count
+            model.period_started_at = user_subscription.period_started_at
+            model.started_at = user_subscription.started_at
+            model.expires_at = user_subscription.expires_at
+
+            await session.flush()
+            await session.refresh(model)
+            return self._to_domain(model)
 
     def _to_domain(self, model: UserSubscriptionModel) -> UserSubscription:
         """Преобразовать SQLAlchemy модель в доменную сущность.

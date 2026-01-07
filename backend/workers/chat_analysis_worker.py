@@ -277,7 +277,7 @@ async def process_chats_cycle(config: AppConfig) -> None:
                     event_publisher = create_event_publisher()
                     
                     # Используем use case с уведомлениями
-                    create_action_base_uc = CreateAgentActionUseCase(uow.agent_action_repository)
+                    create_action_base_uc = CreateAgentActionUseCase(uow.standalone_agent_action_repository)
                     create_action_uc = CreateAgentActionWithNotificationUseCase(
                         create_agent_action_uc=create_action_base_uc,
                         event_publisher=event_publisher,
@@ -329,11 +329,11 @@ async def process_chats_cycle(config: AppConfig) -> None:
                         # Создаем use cases для автоматической отправки
                         send_chat_message_uc = SendChatMessageUseCase(hh_client)
                         execute_agent_action_uc = ExecuteAgentActionUseCase(
-                            agent_action_repository=uow.agent_action_repository,
+                            agent_action_repository=uow.standalone_agent_action_repository,
                             send_chat_message_uc=send_chat_message_uc,
                         )
                         mark_as_sent_uc = MarkAgentActionAsSentUseCase(
-                            agent_action_repository=uow.agent_action_repository
+                            agent_action_repository=uow.standalone_agent_action_repository
                         )
                         
                         # Автоматически отправляем сообщения для send_message действий

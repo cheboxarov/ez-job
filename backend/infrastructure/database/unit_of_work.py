@@ -94,6 +94,7 @@ class UnitOfWork(UnitOfWorkPort):
         """
         self._session_factory = session_factory
         self._session: AsyncSession | None = None
+        # Транзакционные репозитории (одна сессия на все)
         self._user_repository: UserRepositoryPort | None = None
         self._resume_filter_settings_repository: ResumeFilterSettingsRepositoryPort | None = None
         self._resume_repository: ResumeRepositoryPort | None = None
@@ -108,6 +109,8 @@ class UnitOfWork(UnitOfWorkPort):
         self._llm_call_repository: LlmCallRepositoryPort | None = None
         self._user_automation_settings_repository: UserAutomationSettingsRepositoryPort | None = None
         self._resume_evaluation_repository: ResumeEvaluationRepositoryPort | None = None
+        # Кеш для standalone репозиториев
+        self._standalone_repositories: dict[str, any] = {}
 
     @property
     def user_repository(self) -> UserRepositoryPort:
@@ -305,6 +308,110 @@ class UnitOfWork(UnitOfWorkPort):
             raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
         return self._resume_evaluation_repository
 
+    # ========== Standalone репозитории (неатомарные операции) ==========
+
+    @property
+    def standalone_user_repository(self) -> UserRepositoryPort:
+        """Получить standalone репозиторий пользователя.
+        
+        Каждый вызов метода создает свою сессию и коммитит отдельно.
+        Используется для операций, которые не требуют атомарности.
+        """
+        if "user" not in self._standalone_repositories:
+            self._standalone_repositories["user"] = UserRepository(self._session_factory)
+        return self._standalone_repositories["user"]
+
+    @property
+    def standalone_resume_filter_settings_repository(self) -> ResumeFilterSettingsRepositoryPort:
+        """Получить standalone репозиторий настроек фильтров резюме."""
+        if "resume_filter_settings" not in self._standalone_repositories:
+            self._standalone_repositories["resume_filter_settings"] = ResumeFilterSettingsRepository(self._session_factory)
+        return self._standalone_repositories["resume_filter_settings"]
+
+    @property
+    def standalone_resume_repository(self) -> ResumeRepositoryPort:
+        """Получить standalone репозиторий резюме."""
+        if "resume" not in self._standalone_repositories:
+            self._standalone_repositories["resume"] = ResumeRepository(self._session_factory)
+        return self._standalone_repositories["resume"]
+
+    @property
+    def standalone_user_hh_auth_data_repository(self) -> UserHhAuthDataRepositoryPort:
+        """Получить standalone репозиторий HH auth data пользователя."""
+        if "user_hh_auth_data" not in self._standalone_repositories:
+            self._standalone_repositories["user_hh_auth_data"] = UserHhAuthDataRepository(self._session_factory)
+        return self._standalone_repositories["user_hh_auth_data"]
+
+    @property
+    def standalone_vacancy_response_repository(self) -> VacancyResponseRepositoryPort:
+        """Получить standalone репозиторий откликов на вакансии."""
+        if "vacancy_response" not in self._standalone_repositories:
+            self._standalone_repositories["vacancy_response"] = VacancyResponseRepository(self._session_factory)
+        return self._standalone_repositories["vacancy_response"]
+
+    @property
+    def standalone_resume_to_vacancy_match_repository(self) -> ResumeToVacancyMatchRepositoryPort:
+        """Получить standalone репозиторий мэтчей резюме-вакансия."""
+        if "resume_to_vacancy_match" not in self._standalone_repositories:
+            self._standalone_repositories["resume_to_vacancy_match"] = ResumeToVacancyMatchRepository(self._session_factory)
+        return self._standalone_repositories["resume_to_vacancy_match"]
+
+    @property
+    def standalone_subscription_plan_repository(self) -> SubscriptionPlanRepositoryPort:
+        """Получить standalone репозиторий планов подписки."""
+        if "subscription_plan" not in self._standalone_repositories:
+            self._standalone_repositories["subscription_plan"] = SubscriptionPlanRepository(self._session_factory)
+        return self._standalone_repositories["subscription_plan"]
+
+    @property
+    def standalone_user_subscription_repository(self) -> UserSubscriptionRepositoryPort:
+        """Получить standalone репозиторий подписок пользователей."""
+        if "user_subscription" not in self._standalone_repositories:
+            self._standalone_repositories["user_subscription"] = UserSubscriptionRepository(self._session_factory)
+        return self._standalone_repositories["user_subscription"]
+
+    @property
+    def standalone_agent_action_repository(self) -> AgentActionRepositoryPort:
+        """Получить standalone репозиторий действий агента."""
+        if "agent_action" not in self._standalone_repositories:
+            self._standalone_repositories["agent_action"] = AgentActionRepository(self._session_factory)
+        return self._standalone_repositories["agent_action"]
+
+    @property
+    def standalone_telegram_notification_settings_repository(self) -> TelegramNotificationSettingsRepositoryPort:
+        """Получить standalone репозиторий настроек Telegram уведомлений."""
+        if "telegram_notification_settings" not in self._standalone_repositories:
+            self._standalone_repositories["telegram_notification_settings"] = TelegramNotificationSettingsRepository(self._session_factory)
+        return self._standalone_repositories["telegram_notification_settings"]
+
+    @property
+    def standalone_telegram_link_token_repository(self) -> TelegramLinkTokenRepositoryPort:
+        """Получить standalone репозиторий токенов привязки Telegram."""
+        if "telegram_link_token" not in self._standalone_repositories:
+            self._standalone_repositories["telegram_link_token"] = TelegramLinkTokenRepository(self._session_factory)
+        return self._standalone_repositories["telegram_link_token"]
+
+    @property
+    def standalone_llm_call_repository(self) -> LlmCallRepositoryPort:
+        """Получить standalone репозиторий для логирования вызовов LLM."""
+        if "llm_call" not in self._standalone_repositories:
+            self._standalone_repositories["llm_call"] = LlmCallRepository(self._session_factory)
+        return self._standalone_repositories["llm_call"]
+
+    @property
+    def standalone_user_automation_settings_repository(self) -> UserAutomationSettingsRepositoryPort:
+        """Получить standalone репозиторий настроек автоматизации пользователя."""
+        if "user_automation_settings" not in self._standalone_repositories:
+            self._standalone_repositories["user_automation_settings"] = UserAutomationSettingsRepository(self._session_factory)
+        return self._standalone_repositories["user_automation_settings"]
+
+    @property
+    def standalone_resume_evaluation_repository(self) -> ResumeEvaluationRepositoryPort:
+        """Получить standalone репозиторий оценок резюме."""
+        if "resume_evaluation" not in self._standalone_repositories:
+            self._standalone_repositories["resume_evaluation"] = ResumeEvaluationRepository(self._session_factory)
+        return self._standalone_repositories["resume_evaluation"]
+
     async def __aenter__(self) -> UnitOfWorkPort:
         """Вход в контекстный менеджер.
 
@@ -343,6 +450,9 @@ class UnitOfWork(UnitOfWorkPort):
 
         if self._session:
             await self._session.close()
+        
+        # Очищаем кеш standalone репозиториев
+        self._standalone_repositories.clear()
 
     async def commit(self) -> None:
         """Зафиксировать транзакцию."""
