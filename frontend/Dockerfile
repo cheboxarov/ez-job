@@ -9,21 +9,11 @@ COPY package*.json ./
 # Установка зависимостей
 RUN npm install --legacy-peer-deps
 
-# Копирование конфигурационных файлов
-COPY index.html ./
-COPY vite.config.ts ./
-COPY tsconfig*.json ./
-COPY package*.json ./
-
 # Копирование исходного кода
-COPY src ./src
-COPY public ./public
+COPY . .
 
-# Проверка наличия index.html
-RUN test -f /app/index.html || (echo "index.html not found!" && ls -la /app && exit 1)
-
-# Сборка приложения
-RUN npm run build
+# Сборка приложения (vite сам проверяет типы через плагин)
+RUN npx vite build
 
 # Этап production
 FROM nginx:alpine

@@ -138,7 +138,6 @@ Thumbs.db
 *.backup
 *.old
 result.txt
-*.html
 
 # Alembic
 alembic/versions/*.pyc
