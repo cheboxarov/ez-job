@@ -34,6 +34,15 @@ from domain.interfaces.telegram_notification_settings_repository_port import (
 from domain.interfaces.telegram_link_token_repository_port import (
     TelegramLinkTokenRepositoryPort,
 )
+from domain.interfaces.llm_call_repository_port import (
+    LlmCallRepositoryPort,
+)
+from domain.interfaces.user_automation_settings_repository_port import (
+    UserAutomationSettingsRepositoryPort,
+)
+from domain.interfaces.resume_evaluation_repository_port import (
+    ResumeEvaluationRepositoryPort,
+)
 from infrastructure.database.repositories.user_repository import UserRepository
 from infrastructure.database.repositories.resume_filter_settings_repository import (
     ResumeFilterSettingsRepository,
@@ -63,6 +72,15 @@ from infrastructure.database.repositories.telegram_notification_settings_reposit
 from infrastructure.database.repositories.telegram_link_token_repository import (
     TelegramLinkTokenRepository,
 )
+from infrastructure.database.repositories.llm_call_repository import (
+    LlmCallRepository,
+)
+from infrastructure.database.repositories.user_automation_settings_repository import (
+    UserAutomationSettingsRepository,
+)
+from infrastructure.database.repositories.resume_evaluation_repository import (
+    ResumeEvaluationRepository,
+)
 
 
 class UnitOfWork(UnitOfWorkPort):
@@ -87,6 +105,9 @@ class UnitOfWork(UnitOfWorkPort):
         self._agent_action_repository: AgentActionRepositoryPort | None = None
         self._telegram_notification_settings_repository: TelegramNotificationSettingsRepositoryPort | None = None
         self._telegram_link_token_repository: TelegramLinkTokenRepositoryPort | None = None
+        self._llm_call_repository: LlmCallRepositoryPort | None = None
+        self._user_automation_settings_repository: UserAutomationSettingsRepositoryPort | None = None
+        self._resume_evaluation_repository: ResumeEvaluationRepositoryPort | None = None
 
     @property
     def user_repository(self) -> UserRepositoryPort:
@@ -242,6 +263,48 @@ class UnitOfWork(UnitOfWorkPort):
             raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
         return self._telegram_link_token_repository
 
+    @property
+    def llm_call_repository(self) -> LlmCallRepositoryPort:
+        """Получить репозиторий для логирования вызовов LLM.
+
+        Returns:
+            Репозиторий для логирования вызовов LLM.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._llm_call_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._llm_call_repository
+
+    @property
+    def user_automation_settings_repository(self) -> UserAutomationSettingsRepositoryPort:
+        """Получить репозиторий настроек автоматизации пользователя.
+
+        Returns:
+            Репозиторий настроек автоматизации пользователя.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._user_automation_settings_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._user_automation_settings_repository
+
+    @property
+    def resume_evaluation_repository(self) -> ResumeEvaluationRepositoryPort:
+        """Получить репозиторий оценок резюме.
+
+        Returns:
+            Репозиторий оценок резюме.
+
+        Raises:
+            RuntimeError: Если UnitOfWork не был введен в контекст.
+        """
+        if self._resume_evaluation_repository is None:
+            raise RuntimeError("UnitOfWork должен использоваться в async with контексте")
+        return self._resume_evaluation_repository
+
     async def __aenter__(self) -> UnitOfWorkPort:
         """Вход в контекстный менеджер.
 
@@ -260,6 +323,9 @@ class UnitOfWork(UnitOfWorkPort):
         self._agent_action_repository = AgentActionRepository(self._session)
         self._telegram_notification_settings_repository = TelegramNotificationSettingsRepository(self._session)
         self._telegram_link_token_repository = TelegramLinkTokenRepository(self._session)
+        self._llm_call_repository = LlmCallRepository(self._session)
+        self._user_automation_settings_repository = UserAutomationSettingsRepository(self._session)
+        self._resume_evaluation_repository = ResumeEvaluationRepository(self._session)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:

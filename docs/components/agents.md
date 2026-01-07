@@ -19,8 +19,8 @@
 **Использование:**
 
 ```python
-agent = VacancyFilterAgent(llm_client)
-filtered = await agent.filter_vacancies(resume, vacancies)
+agent = VacancyFilterAgent(config.openai, unit_of_work=uow)
+filtered = await agent.filter_vacancies(resume, vacancies, user_id=user_id)
 ```
 
 ### Cover Letter Generator Agent
@@ -38,8 +38,8 @@ filtered = await agent.filter_vacancies(resume, vacancies)
 **Использование:**
 
 ```python
-agent = CoverLetterGeneratorAgent(llm_client)
-letter = await agent.generate_cover_letter(resume, vacancy)
+agent = CoverLetterGeneratorAgent(config.openai, unit_of_work=uow)
+letter = await agent.generate(resume, vacancy_description, user_id=user_id)
 ```
 
 ### Messages Agent
@@ -56,8 +56,10 @@ letter = await agent.generate_cover_letter(resume, vacancy)
 **Использование:**
 
 ```python
-agent = MessagesAgent(llm_client)
-actions = await agent.analyze_chat(chat)
+agent = MessagesAgent(config.openai, unit_of_work=uow)
+actions = await agent.analyze_chats_and_generate_responses(
+    chats=chats, resume=resume, user_id=user_id
+)
 ```
 
 ### Resume Evaluator Agent
@@ -74,8 +76,8 @@ actions = await agent.analyze_chat(chat)
 **Использование:**
 
 ```python
-agent = ResumeEvaluatorAgent(llm_client)
-evaluation = await agent.evaluate_resume(resume)
+agent = ResumeEvaluatorAgent(config.openai, unit_of_work=uow)
+evaluation = await agent.evaluate(resume, user_id=user_id)
 ```
 
 ### Vacancy Test Agent
@@ -92,22 +94,24 @@ evaluation = await agent.evaluate_resume(resume)
 **Использование:**
 
 ```python
-agent = VacancyTestAgent(llm_client)
-answers = await agent.generate_answers(vacancy_test)
+agent = VacancyTestAgent(config.openai, unit_of_work=uow)
+answers = await agent.generate_test_answers(test, resume, user_id=user_id)
 ```
 
 ## Интеграция с LLM
 
-Все агенты используют единый интерфейс для работы с LLM:
+Все агенты наследуются от `BaseAgent`, который предоставляет единый интерфейс для работы с LLM через OpenAI-совместимое API (BotHub).
 
-```python
-class LLMClientPort(ABC):
-    @abstractmethod
-    async def chat_completion(self, messages: list[dict]) -> dict:
-        pass
-```
+### Логирование вызовов
 
-Реализация использует OpenAI-совместимое API (BotHub).
+Все вызовы LLM автоматически логируются в таблицу `llm_calls` с полной информацией:
+- Промпт и ответ
+- Метрики производительности (время выполнения, токены, размер ответа)
+- Информация об ошибках (если были)
+- Контекст вызова (use_case, resume_id, vacancy_id и т.д.)
+- Каждая попытка retry логируется отдельно с общим `call_id`
+
+Логирование происходит автоматически на уровне `BaseAgent._call_llm_with_retry` и не требует дополнительной настройки в агентах.
 
 ## Настройка агентов
 

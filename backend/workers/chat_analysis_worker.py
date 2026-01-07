@@ -30,6 +30,10 @@ from domain.use_cases.filter_chats_without_rejection_and_mark_read import (
 )
 from domain.use_cases.mark_chat_message_read import MarkChatMessageReadUseCase
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from domain.use_cases.get_user_automation_settings import GetUserAutomationSettingsUseCase
+from domain.use_cases.execute_agent_action import ExecuteAgentActionUseCase
+from domain.use_cases.send_chat_message import SendChatMessageUseCase
+from domain.use_cases.mark_agent_action_as_sent import MarkAgentActionAsSentUseCase
 from infrastructure.agents.messages_agent import MessagesAgent
 from infrastructure.clients.hh_client import HHHttpClient
 from infrastructure.database.session import create_session_factory
@@ -83,11 +87,10 @@ async def process_chats_cycle(config: AppConfig) -> None:
         mark_chat_message_read_uc=mark_chat_message_read_uc
     )
     
-    # Создаем агента и use case для анализа
-    messages_agent = MessagesAgent(config.openai)
-    analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)
-    
     async with UnitOfWork(session_factory) as uow:
+        # Создаем агента и use case для анализа с unit_of_work для логирования
+        messages_agent = MessagesAgent(config.openai, unit_of_work=uow)
+        analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)
         # Получаем всех пользователей из БД
         users = await uow.user_repository.list_all()
         
@@ -312,6 +315,57 @@ async def process_chats_cycle(config: AppConfig) -> None:
                             # Продолжаем сохранять остальные действия
                     
                     logger.info(f"Сохранено {saved_count} из {len(all_actions)} действий в БД")
+                    
+                    # Получаем настройки автоматизации для пользователя
+                    get_automation_settings_uc = GetUserAutomationSettingsUseCase(
+                        settings_repository=uow.user_automation_settings_repository
+                    )
+                    automation_settings = await get_automation_settings_uc.execute(user.id)
+                    
+                    # Если включена автоматическая отправка ответов на вопросы
+                    if automation_settings.auto_reply_to_questions_in_chats:
+                        logger.info(f"Автоматическая отправка ответов включена для пользователя {user.id}")
+                        
+                        # Создаем use cases для автоматической отправки
+                        send_chat_message_uc = SendChatMessageUseCase(hh_client)
+                        execute_agent_action_uc = ExecuteAgentActionUseCase(
+                            agent_action_repository=uow.agent_action_repository,
+                            send_chat_message_uc=send_chat_message_uc,
+                        )
+                        mark_as_sent_uc = MarkAgentActionAsSentUseCase(
+                            agent_action_repository=uow.agent_action_repository
+                        )
+                        
+                        # Автоматически отправляем сообщения для send_message действий
+                        for action in all_actions:
+                            if (
+                                action.type == "send_message"
+                                and action.data.get("sended") != True
+                            ):
+                                try:
+                                    logger.info(
+                                        f"Автоматическая отправка сообщения для действия {action.id}"
+                                    )
+                                    await execute_agent_action_uc.execute(
+                                        action=action,
+                                        headers=auth_data.headers,
+                                        cookies=auth_data.cookies,
+                                        user_id=user.id,
+                                        update_cookies_uc=update_cookies_uc,
+                                    )
+                                    # Помечаем как отправленное
+                                    await mark_as_sent_uc.execute(action)
+                                    logger.info(
+                                        f"Сообщение успешно отправлено для действия {action.id}"
+                                    )
+                                except Exception as exc:
+                                    logger.error(
+                                        f"Ошибка при автоматической отправке сообщения для действия {action.id}: {exc}",
+                                        exc_info=True,
+                                    )
+                                    # Продолжаем работу, не прерываем цикл
+                    else:
+                        logger.info(f"Автоматическая отправка ответов выключена для пользователя {user.id}")
                 else:
                     logger.info("Нет действий для сохранения")
                 

@@ -17,6 +17,7 @@ from presentation.routers.hh_auth_router import router as hh_auth_router
 from presentation.routers.resumes_router import router as resumes_router
 from presentation.routers.users_router import router as users_router
 from presentation.routers.vacancies_router import router
+from presentation.routers.admin_router import router as admin_router
 from workers.auto_reply_worker import run_worker as run_auto_reply_worker
 from workers.chat_analysis_worker import run_worker as run_chat_analysis_worker
 from workers.telegram_bot_worker import run_worker as run_telegram_bot_worker
@@ -164,6 +165,7 @@ app.include_router(users_router)
 app.include_router(resumes_router)
 app.include_router(dictionaries_router)
 app.include_router(hh_auth_router)
+app.include_router(admin_router)
 
 # Subscription router
 from presentation.routers.subscription_router import router as subscription_router
@@ -189,6 +191,11 @@ app.include_router(websocket_router)
 from presentation.routers.telegram_router import router as telegram_router
 
 app.include_router(telegram_router)
+
+# Automation router
+from presentation.routers.automation_router import router as automation_router
+
+app.include_router(automation_router)
 
 
 @app.get("/")

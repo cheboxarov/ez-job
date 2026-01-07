@@ -42,6 +42,35 @@ class UserRepositoryPort(ABC):
         """
 
     @abstractmethod
+    async def search_for_admin(
+        self,
+        phone_substring: str | None,
+        page: int,
+        page_size: int,
+    ) -> tuple[list[User], int]:
+        """Поиск пользователей для админки.
+
+        Args:
+            phone_substring: Подстрока телефона для фильтрации (ILIKE), либо None.
+            page: Номер страницы (начиная с 1).
+            page_size: Размер страницы.
+
+        Returns:
+            Кортеж (список пользователей, общее количество записей под фильтром).
+        """
+
+    @abstractmethod
+    async def delete(self, user_id: UUID) -> None:
+        """Удалить пользователя по ID.
+
+        Args:
+            user_id: UUID пользователя.
+
+        Raises:
+            ValueError: Если пользователь с таким ID не найден.
+        """
+
+    @abstractmethod
     async def update(self, user: User) -> User:
         """Обновить пользователя.
 

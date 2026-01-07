@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Dict, List
+from uuid import UUID
 
 from domain.entities.vacancy_test import VacancyTest
 
@@ -20,6 +21,7 @@ class VacancyTestAgentServicePort(ABC):
         test: VacancyTest,
         resume: str,
         user_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> Dict[str, str | List[str]]:
         """Генерирует ответы на вопросы теста вакансии на основе резюме кандидата.
 

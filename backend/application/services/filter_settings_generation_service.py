@@ -24,6 +24,7 @@ class FilterSettingsGenerationService:
         return await self._use_case.execute(
             resume=resume.content,
             user_filter_params=resume.user_parameters,
+            user_id=resume.user_id,
         )
 
 

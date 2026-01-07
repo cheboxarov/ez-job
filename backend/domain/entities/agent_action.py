@@ -40,6 +40,7 @@ class AgentAction:
     - dialog_id: int - ID чата
     - message_to: int | None - ID сообщения, на которое отвечаем (опционально)
     - message_text: str - текст сообщения для отправки
+    - sended: bool - флаг отправки сообщения (по умолчанию False)
     
     Для "create_event" содержит:
     - dialog_id: int - ID чата

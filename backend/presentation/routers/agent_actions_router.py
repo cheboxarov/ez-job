@@ -15,7 +15,12 @@ from presentation.dependencies import (
     get_agent_action_service,
     get_list_agent_actions_uc,
     get_unit_of_work,
+    get_execute_agent_action_by_id_uc,
+    get_headers,
+    get_cookies,
 )
+from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from domain.use_cases.execute_agent_action_by_id import ExecuteAgentActionByIdUseCase
 from presentation.dto.agent_action_response import (
     AgentActionResponse,
     AgentActionsListResponse,
@@ -118,5 +123,66 @@ async def mark_all_agent_actions_as_read(
         raise HTTPException(
             status_code=500,
             detail="Внутренняя ошибка при пометке действий агента как прочитанных",
+        ) from exc
+
+
+@router.post("/{action_id}/execute", response_model=AgentActionResponse)
+async def execute_agent_action(
+    action_id: UUID,
+    current_user: UserModel = Depends(get_current_active_user),
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+    headers: dict[str, str] = Depends(get_headers),
+    cookies: dict[str, str] = Depends(get_cookies),
+    execute_agent_action_by_id_uc: ExecuteAgentActionByIdUseCase = Depends(
+        get_execute_agent_action_by_id_uc
+    ),
+) -> AgentActionResponse:
+    """Выполнить действие агента типа send_message.
+
+    Args:
+        action_id: UUID действия агента.
+        current_user: Текущий авторизованный пользователь.
+        unit_of_work: UnitOfWork для работы с БД.
+        headers: HTTP заголовки для запросов к HH API.
+        cookies: HTTP cookies для запросов к HH API.
+        execute_agent_action_by_id_uc: Use case для выполнения действия по ID.
+
+    Returns:
+        Обновленное действие агента с data["sended"] = True.
+
+    Raises:
+        HTTPException: 404 если действие не найдено, 400 если действие не типа send_message
+                      или уже отправлено, 403 если действие принадлежит другому пользователю.
+    """
+    try:
+        update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
+            unit_of_work.user_hh_auth_data_repository
+        )
+        updated_action = await execute_agent_action_by_id_uc.execute(
+            action_id=action_id,
+            user_id=current_user.id,
+            headers=headers,
+            cookies=cookies,
+            update_cookies_uc=update_cookies_uc,
+        )
+        return AgentActionResponse.from_entity(updated_action)
+    except ValueError as exc:
+        error_msg = str(exc)
+        if "не найдено" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg) from exc
+        elif "не принадлежит" in error_msg:
+            raise HTTPException(status_code=403, detail=error_msg) from exc
+        else:
+            raise HTTPException(status_code=400, detail=error_msg) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"Ошибка при выполнении действия агента {action_id}: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка при выполнении действия агента",
         ) from exc
 

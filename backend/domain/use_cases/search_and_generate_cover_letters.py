@@ -105,6 +105,7 @@ class SearchAndGenerateCoverLettersUseCase:
                 cover_letter = await self._generate_cover_letter_uc.execute(
                     vacancy=vacancy,
                     resume=user_resume,
+                    user_id=user_id,
                 )
                 return (vacancy, cover_letter if cover_letter else None)
             except Exception as exc:

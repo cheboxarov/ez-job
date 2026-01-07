@@ -10,6 +10,7 @@ import {
   SendOutlined,
   BarChartOutlined,
   CrownOutlined,
+  SafetyOutlined,
   } from '@ant-design/icons';
 import { useEffect } from 'react';
 import { useAuthStore } from '../../stores/authStore';
@@ -23,7 +24,7 @@ interface MainLayoutProps {
 }
 
 export const MainLayout = ({ children }: MainLayoutProps) => {
-  const { logout } = useAuthStore();
+  const { logout, user } = useAuthStore();
   const { unreadCount, fetchUnreadCount } = useAgentActionsStore();
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,7 +94,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           label: 'Профиль',
         },
         {
-          key: '/settings/telegram',
+          key: '/settings',
           icon: <SettingOutlined />,
           label: 'Настройки',
         },
@@ -106,6 +107,21 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       ]
     }
   ];
+
+  // Добавляем группу админки только для суперпользователей
+  if (user?.is_superuser) {
+    menuItems.push({
+      type: 'group' as const,
+      label: <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: '#9ca3af', marginTop: 12 }}>АДМИНИСТРИРОВАНИЕ</span>,
+      children: [
+        {
+          key: '/admin/users',
+          icon: <SafetyOutlined />,
+          label: 'Админ панель',
+        },
+      ]
+    });
+  }
 
   const handleMenuClick = ({ key }: { key: string }) => {
     if (key === 'support') {
@@ -122,6 +138,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     }
     if (key === 'statistics') {
       navigate('/statistics');
+      return;
+    }
+    if (key === '/admin/users') {
+      navigate('/admin/users');
       return;
     }
     navigate(key);
@@ -165,7 +185,8 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             selectedKeys={[
               location.pathname === '/statistics' ? 'statistics' : 
               location.pathname === '/events' ? 'events' : 
-              location.pathname.startsWith('/settings') ? '/settings/telegram' :
+              location.pathname.startsWith('/settings') ? '/settings' :
+              location.pathname.startsWith('/admin') ? '/admin/users' :
               location.pathname
             ]}
             items={menuItems}

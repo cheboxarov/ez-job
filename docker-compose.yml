@@ -46,6 +46,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_logs:/app/logs
+      - ./.cursor:/Users/apple/dev/hh/.cursor:rw
     depends_on:
       postgres:
         condition: service_healthy

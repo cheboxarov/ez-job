@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from uuid import UUID
 
 from openai import AsyncOpenAI
 from loguru import logger
@@ -26,6 +27,7 @@ class CoverLetterGeneratorAgent(BaseAgent, CoverLetterGeneratorPort):
         resume: str,
         vacancy_description: str,
         user_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> str:
         """Сгенерировать сопроводительное письмо для вакансии.
 
@@ -116,10 +118,17 @@ class CoverLetterGeneratorAgent(BaseAgent, CoverLetterGeneratorPort):
         def validate_func(result: str) -> bool:
             return not result
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "generate_cover_letter",
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
             validate_func=validate_func,
+            user_id=user_id,
+            context=context,
         )
 
     def _build_prompt(

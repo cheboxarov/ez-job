@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import Any
+from uuid import UUID
 
 from openai import AsyncOpenAI
 from loguru import logger
@@ -23,6 +24,7 @@ class FilterSettingsGeneratorAgent(BaseAgent, FilterSettingsGeneratorServicePort
         self,
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> SuggestedUserFilterSettings:
         if not resume or not resume.strip():
             return SuggestedUserFilterSettings()
@@ -42,10 +44,17 @@ class FilterSettingsGeneratorAgent(BaseAgent, FilterSettingsGeneratorServicePort
 
         messages.append({"role": "user", "content": "\n".join(user_content_lines)})
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "generate_filter_settings",
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=self._parse_response,
             validate_func=None,
+            user_id=user_id,
+            context=context,
         )
 
     def _parse_response(self, content: str) -> SuggestedUserFilterSettings:

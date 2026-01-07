@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 from domain.entities.suggested_user_filter_settings import SuggestedUserFilterSettings
 
@@ -13,6 +14,7 @@ class FilterSettingsGeneratorServicePort(ABC):
         self,
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> SuggestedUserFilterSettings:
         """Сгенерировать предположительные настройки фильтров.
 

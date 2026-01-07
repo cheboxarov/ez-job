@@ -58,6 +58,7 @@ export class WebSocketClient {
     this.shouldReconnect = true;
 
     const token = localStorage.getItem('auth_token');
+    
     if (!token) {
       console.warn('WebSocket: Нет токена авторизации, подключение невозможно');
       this.isConnecting = false;

@@ -48,6 +48,7 @@ class GetFilteredVacanciesWithCacheUseCase:
         resume_id: UUID,
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> List[FilteredVacancyDetail]:
         """Получить отфильтрованные детальные вакансии с кэшированием.
 
@@ -112,7 +113,7 @@ class GetFilteredVacanciesWithCacheUseCase:
             # Кидаем запросы в нейронку по чанкам асинхронно
             tasks = [
                 self._filter_service.filter_vacancies(
-                    chunk, resume, user_filter_params
+                    chunk, resume, user_filter_params, user_id=user_id
                 )
                 for chunk in chunks
             ]

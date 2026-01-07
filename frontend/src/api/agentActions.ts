@@ -2,6 +2,7 @@ import apiClient from './client';
 import type {
   AgentActionsListResponse,
   AgentActionsUnreadCountResponse,
+  AgentAction,
 } from '../types/api';
 
 export interface GetAgentActionsParams {
@@ -42,3 +43,9 @@ export const markAllAgentActionsAsRead = async (): Promise<void> => {
   await apiClient.post('/api/agent-actions/read-all');
 };
 
+export const executeAgentAction = async (actionId: string): Promise<AgentAction> => {
+  const response = await apiClient.post<AgentAction>(
+    `/api/agent-actions/${actionId}/execute`
+  );
+  return response.data;
+};

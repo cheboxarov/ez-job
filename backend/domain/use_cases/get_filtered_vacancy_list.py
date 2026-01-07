@@ -65,6 +65,7 @@ class GetFilteredVacancyListUseCase:
             resume_id=resume_id,
             resume=user_resume,
             user_filter_params=user_filter_params,
+            user_id=user_id,
         )
 
         return filtered

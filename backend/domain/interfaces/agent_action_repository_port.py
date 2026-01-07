@@ -57,3 +57,28 @@ class AgentActionRepositoryPort(ABC):
     @abstractmethod
     async def mark_all_as_read(self, user_id: UUID) -> None:
         """Пометить все действия пользователя как прочитанные."""
+
+    @abstractmethod
+    async def update(self, action: AgentAction) -> AgentAction:
+        """Обновить действие агента.
+
+        Args:
+            action: Доменная сущность AgentAction с обновленными данными.
+
+        Returns:
+            Обновленная доменная сущность AgentAction.
+
+        Raises:
+            ValueError: Если действие с таким ID не найдено.
+        """
+
+    @abstractmethod
+    async def get_by_id(self, action_id: UUID) -> AgentAction | None:
+        """Получить действие агента по ID.
+
+        Args:
+            action_id: UUID действия.
+
+        Returns:
+            Доменная сущность AgentAction или None, если не найдено.
+        """

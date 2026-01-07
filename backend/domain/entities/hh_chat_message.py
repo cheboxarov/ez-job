@@ -42,3 +42,4 @@ class HHChatMessage:
     participant_display: Optional[HHParticipantDisplay] = None
     participant_id: Optional[str] = None
     resources: Optional[Dict[str, List[str]]] = None
+    text_buttons: Optional[List[str]] = None

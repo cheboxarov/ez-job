@@ -369,6 +369,7 @@ export interface AgentAction {
     message_text?: string;
     event_type?: string;
     message?: string;
+    sended?: boolean;
   };
   created_at: string;
   updated_at: string;
@@ -439,6 +440,18 @@ export interface UpdateTelegramNotificationSettingsRequest {
   notify_question_answered?: boolean | null;
   notify_message_suggestion?: boolean | null;
   notify_vacancy_response?: boolean | null;
+}
+
+export interface UserAutomationSettings {
+  id: string;
+  user_id: string;
+  auto_reply_to_questions_in_chats: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UpdateUserAutomationSettingsRequest {
+  auto_reply_to_questions_in_chats?: boolean | null;
 }
 
 export interface GenerateTelegramLinkTokenResponse {

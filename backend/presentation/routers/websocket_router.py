@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from loguru import logger
+from jose import jwt as jose_jwt
+from jose.exceptions import JWTError, ExpiredSignatureError
 
 from application.services.websocket_service import WebSocketService
 from config import load_config
@@ -22,13 +24,35 @@ async def get_user_id_from_token(token: str) -> str | None:
         user_id из токена или None, если токен невалиден.
     """
     try:
-        # Используем JWTStrategy для декодирования токена, чтобы использовать правильный audience
         from infrastructure.auth.fastapi_users_setup import get_jwt_strategy
         
         strategy = get_jwt_strategy()
-        decoded_token = strategy.decode(token)
+        
+        # Обрабатываем token_audience: если это список, берем первый элемент
+        # jose_jwt.decode ожидает строку или None для audience
+        audience = strategy.token_audience
+        if isinstance(audience, list):
+            if len(audience) > 0:
+                audience = audience[0]
+            else:
+                audience = None
+        
+        # Декодируем токен с проверкой подписи и audience
+        decoded_token = jose_jwt.decode(
+            token,
+            strategy.secret,
+            algorithms=[strategy.algorithm],
+            audience=audience,
+        )
+        
         user_id = decoded_token.get("sub")
         return user_id
+    except ExpiredSignatureError as exc:
+        logger.warning(f"JWT токен истек: {exc}")
+        return None
+    except JWTError as exc:
+        logger.warning(f"Ошибка при декодировании JWT токена: {exc}")
+        return None
     except Exception as exc:
         logger.warning(f"Ошибка при декодировании JWT токена: {exc}")
         return None
@@ -47,6 +71,7 @@ async def websocket_endpoint(
     """
     # 1. Валидируем JWT токен
     user_id_str = await get_user_id_from_token(token)
+    
     if not user_id_str:
         logger.warning("Невалидный JWT токен при подключении к WebSocket")
         await websocket.close(code=1008, reason="Invalid token")

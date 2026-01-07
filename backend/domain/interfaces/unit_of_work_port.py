@@ -30,6 +30,15 @@ from domain.interfaces.telegram_notification_settings_repository_port import (
 from domain.interfaces.telegram_link_token_repository_port import (
     TelegramLinkTokenRepositoryPort,
 )
+from domain.interfaces.llm_call_repository_port import (
+    LlmCallRepositoryPort,
+)
+from domain.interfaces.user_automation_settings_repository_port import (
+    UserAutomationSettingsRepositoryPort,
+)
+from domain.interfaces.resume_evaluation_repository_port import (
+    ResumeEvaluationRepositoryPort,
+)
 
 
 class UnitOfWorkPort(ABC):
@@ -92,6 +101,21 @@ class UnitOfWorkPort(ABC):
     @abstractmethod
     def telegram_link_token_repository(self) -> TelegramLinkTokenRepositoryPort:
         """Получить репозиторий токенов привязки Telegram."""
+
+    @property
+    @abstractmethod
+    def llm_call_repository(self) -> LlmCallRepositoryPort:
+        """Получить репозиторий для логирования вызовов LLM."""
+
+    @property
+    @abstractmethod
+    def user_automation_settings_repository(self) -> UserAutomationSettingsRepositoryPort:
+        """Получить репозиторий настроек автоматизации пользователя."""
+
+    @property
+    @abstractmethod
+    def resume_evaluation_repository(self) -> ResumeEvaluationRepositoryPort:
+        """Получить репозиторий оценок резюме."""
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWorkPort":

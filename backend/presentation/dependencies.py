@@ -17,6 +17,8 @@ from application.services.filter_settings_generation_service import (
 )
 from application.services.vacancies_service import VacanciesService
 from application.services.vacancy_responses_service import VacancyResponsesService
+from application.services.admin_user_service import AdminUserService
+from application.services.admin_plan_service import AdminPlanService
 
 if TYPE_CHECKING:
     from application.services.agent_action_service import AgentActionService
@@ -27,9 +29,17 @@ from domain.use_cases.fetch_chat_detail import FetchChatDetailUseCase
 from domain.use_cases.fetch_user_chats import FetchUserChatsUseCase
 from domain.use_cases.list_agent_actions import ListAgentActionsUseCase
 from domain.use_cases.send_chat_message import SendChatMessageUseCase
+from domain.use_cases.execute_agent_action import ExecuteAgentActionUseCase
+from domain.use_cases.mark_agent_action_as_sent import MarkAgentActionAsSentUseCase
+from domain.use_cases.execute_agent_action_by_id import ExecuteAgentActionByIdUseCase
 from domain.use_cases.generate_user_filter_settings import GenerateUserFilterSettingsUseCase
 from domain.use_cases.get_areas import GetAreasUseCase
 from domain.use_cases.evaluate_resume import EvaluateResumeUseCase
+from domain.use_cases.get_resume_evaluation_from_cache import (
+    GetResumeEvaluationFromCacheUseCase,
+)
+from domain.use_cases.save_resume_evaluation import SaveResumeEvaluationUseCase
+from domain.use_cases.evaluate_resume_with_cache import EvaluateResumeWithCacheUseCase
 from infrastructure.auth.fastapi_users_setup import get_current_active_user
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
 from infrastructure.database.models.user_model import UserModel
@@ -43,16 +53,32 @@ def get_config() -> AppConfig:
     return load_config()
 
 
-@lru_cache()
-def get_vacancies_service() -> VacanciesService:
-    """Создает и возвращает VacanciesService (кешируется).
+async def get_unit_of_work() -> AsyncGenerator[UnitOfWorkPort, None]:
+    """Dependency для получения UnitOfWork.
+
+    Yields:
+        UnitOfWork для управления транзакциями.
+    """
+    config = get_config()
+    unit_of_work = create_unit_of_work(config.database)
+    async with unit_of_work:
+        yield unit_of_work
+
+
+def get_vacancies_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> VacanciesService:
+    """Создает и возвращает VacanciesService с unit_of_work для логирования вызовов LLM.
+
+    Args:
+        unit_of_work: UnitOfWork для логирования вызовов LLM.
 
     Returns:
         Инстанс VacanciesService с настроенными зависимостями.
     """
     config = get_config()
-    use_case = create_search_and_generate_cover_letters_usecase(config)
-    list_use_case = create_search_and_get_filtered_vacancy_list_usecase(config)
+    use_case = create_search_and_generate_cover_letters_usecase(config, unit_of_work=unit_of_work)
+    list_use_case = create_search_and_get_filtered_vacancy_list_usecase(config, unit_of_work=unit_of_work)
     from infrastructure.clients.hh_client import RateLimitedHHHttpClient
     from domain.use_cases.respond_to_vacancy import RespondToVacancyUseCase
     from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
@@ -76,33 +102,82 @@ def get_areas_use_case() -> GetAreasUseCase:
     return GetAreasUseCase(hh_client)
 
 
-@lru_cache()
-def get_filter_settings_generation_service() -> FilterSettingsGenerationService:
-    """Создает сервис генерации предложенных настроек фильтров (кешируется)."""
+def get_filter_settings_generation_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> FilterSettingsGenerationService:
+    """Создает сервис генерации предложенных настроек фильтров.
+    
+    Args:
+        unit_of_work: UnitOfWork для логирования вызовов LLM.
+    """
     config = get_config()
-    agent = FilterSettingsGeneratorAgent(config.openai)
+    agent = FilterSettingsGeneratorAgent(config.openai, unit_of_work=unit_of_work)
     use_case = GenerateUserFilterSettingsUseCase(agent)
     return FilterSettingsGenerationService(use_case)
 
 
-@lru_cache()
-def get_evaluate_resume_use_case() -> EvaluateResumeUseCase:
-    """Создает и возвращает EvaluateResumeUseCase (кешируется)."""
+def get_get_resume_evaluation_from_cache_use_case(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> GetResumeEvaluationFromCacheUseCase:
+    """Создает и возвращает GetResumeEvaluationFromCacheUseCase.
+    
+    Args:
+        unit_of_work: UnitOfWork для доступа к репозиторию оценок резюме.
+    """
+    return GetResumeEvaluationFromCacheUseCase(
+        unit_of_work.resume_evaluation_repository
+    )
+
+
+def get_save_resume_evaluation_use_case(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> SaveResumeEvaluationUseCase:
+    """Создает и возвращает SaveResumeEvaluationUseCase.
+    
+    Args:
+        unit_of_work: UnitOfWork для доступа к репозиторию оценок резюме.
+    """
+    return SaveResumeEvaluationUseCase(
+        unit_of_work.resume_evaluation_repository
+    )
+
+
+def get_evaluate_resume_use_case(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> EvaluateResumeUseCase:
+    """Создает и возвращает EvaluateResumeUseCase (базовый, без кеша).
+    
+    Args:
+        unit_of_work: UnitOfWork для логирования вызовов LLM.
+    """
     config = get_config()
-    agent = ResumeEvaluatorAgent(config.openai)
+    agent = ResumeEvaluatorAgent(config.openai, unit_of_work=unit_of_work)
     return EvaluateResumeUseCase(agent)
 
 
-async def get_unit_of_work() -> AsyncGenerator[UnitOfWorkPort, None]:
-    """Dependency для получения UnitOfWork.
-
-    Yields:
-        UnitOfWork для управления транзакциями.
+def get_evaluate_resume_with_cache_use_case(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+    get_evaluation_from_cache_uc: GetResumeEvaluationFromCacheUseCase = Depends(
+        get_get_resume_evaluation_from_cache_use_case
+    ),
+    evaluate_resume_uc: EvaluateResumeUseCase = Depends(get_evaluate_resume_use_case),
+    save_evaluation_uc: SaveResumeEvaluationUseCase = Depends(
+        get_save_resume_evaluation_use_case
+    ),
+) -> EvaluateResumeWithCacheUseCase:
+    """Создает и возвращает EvaluateResumeWithCacheUseCase.
+    
+    Args:
+        unit_of_work: UnitOfWork для доступа к репозиториям.
+        get_evaluation_from_cache_uc: Use case для получения оценки из кеша.
+        evaluate_resume_uc: Use case для оценки резюме через LLM.
+        save_evaluation_uc: Use case для сохранения оценки в БД.
     """
-    config = get_config()
-    unit_of_work = create_unit_of_work(config.database)
-    async with unit_of_work:
-        yield unit_of_work
+    return EvaluateResumeWithCacheUseCase(
+        get_evaluation_from_cache_uc=get_evaluation_from_cache_uc,
+        evaluate_resume_uc=evaluate_resume_uc,
+        save_evaluation_uc=save_evaluation_uc,
+    )
 
 
 async def get_headers(
@@ -202,6 +277,32 @@ async def get_vacancy_responses_service(
     return VacancyResponsesService(get_vacancy_responses_by_resume_uc=use_case)
 
 
+async def get_admin_user_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> AdminUserService:
+    """Создает и возвращает AdminUserService."""
+    return AdminUserService(unit_of_work=unit_of_work)
+
+
+async def get_admin_plan_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> AdminPlanService:
+    """Создает и возвращает AdminPlanService."""
+    return AdminPlanService(unit_of_work=unit_of_work)
+
+
+async def admin_only(
+    current_user: UserModel = Depends(get_current_active_user),
+) -> UserModel:
+    """Dependency, проверяющий, что текущий пользователь является администратором."""
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=403,
+            detail="Только администраторы могут выполнять это действие",
+        )
+    return current_user
+
+
 @lru_cache()
 def get_hh_auth_service():
     """Создает и возвращает HhAuthService.
@@ -295,6 +396,33 @@ async def get_agent_action_service(
     return service
 
 
+async def get_execute_agent_action_by_id_uc(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+    send_chat_message_uc: SendChatMessageUseCase = Depends(get_send_chat_message_uc),
+) -> ExecuteAgentActionByIdUseCase:
+    """Создает и возвращает ExecuteAgentActionByIdUseCase.
+
+    Args:
+        unit_of_work: UnitOfWork для работы с репозиториями.
+        send_chat_message_uc: Use case для отправки сообщений в чат.
+
+    Returns:
+        Инстанс ExecuteAgentActionByIdUseCase с настроенными зависимостями.
+    """
+    execute_agent_action_uc = ExecuteAgentActionUseCase(
+        agent_action_repository=unit_of_work.agent_action_repository,
+        send_chat_message_uc=send_chat_message_uc,
+    )
+    mark_agent_action_as_sent_uc = MarkAgentActionAsSentUseCase(
+        agent_action_repository=unit_of_work.agent_action_repository
+    )
+    return ExecuteAgentActionByIdUseCase(
+        agent_action_repository=unit_of_work.agent_action_repository,
+        execute_agent_action_uc=execute_agent_action_uc,
+        mark_agent_action_as_sent_uc=mark_agent_action_as_sent_uc,
+    )
+
+
 @lru_cache()
 def get_event_bus():
     """Создает и возвращает singleton Event Bus (кешируется).
@@ -379,4 +507,20 @@ def get_telegram_bot() -> "TelegramBotPort":
         link_token_handler=None,  # Будет установлен при запуске приложения
         unlink_handler=None,  # Будет установлен при запуске приложения
     )
+
+
+async def get_admin_llm_service(
+    unit_of_work: UnitOfWorkPort = Depends(get_unit_of_work),
+) -> "AdminLlmService":
+    """Создает и возвращает AdminLlmService.
+
+    Args:
+        unit_of_work: UnitOfWork для работы с репозиториями.
+
+    Returns:
+        Инстанс AdminLlmService с настроенными зависимостями.
+    """
+    from application.services.admin_llm_service import AdminLlmService
+
+    return AdminLlmService(unit_of_work=unit_of_work)
 

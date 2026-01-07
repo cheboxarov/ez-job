@@ -439,6 +439,23 @@ class HHChatClient(HHBaseMixin):
         if not isinstance(resources, dict):
             resources = None
 
+        # Извлекаем варианты ответов из actions.text_buttons
+        text_buttons = None
+        actions_raw = raw.get("actions")
+        if isinstance(actions_raw, dict):
+            text_buttons_raw = actions_raw.get("text_buttons")
+            if isinstance(text_buttons_raw, list) and len(text_buttons_raw) > 0:
+                # Преобразуем массив объектов {"text": "..."} в список строк
+                text_buttons = []
+                for button in text_buttons_raw:
+                    if isinstance(button, dict):
+                        button_text = button.get("text")
+                        if isinstance(button_text, str) and button_text.strip():
+                            text_buttons.append(button_text.strip())
+                # Если после обработки список пустой, устанавливаем None
+                if not text_buttons:
+                    text_buttons = None
+
         return HHChatMessage(
             id=message_id,
             chat_id=chat_id,
@@ -455,6 +472,7 @@ class HHChatClient(HHBaseMixin):
             participant_display=participant_display,
             participant_id=participant_id,
             resources=resources,
+            text_buttons=text_buttons,
         )
 
     @staticmethod

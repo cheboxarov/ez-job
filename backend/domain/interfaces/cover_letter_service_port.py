@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 from domain.entities.filtered_vacancy import FilteredVacancyDetail
 
@@ -13,6 +14,7 @@ class CoverLetterServicePort(ABC):
         self,
         vacancy: FilteredVacancyDetail,
         resume: str,
+        user_id: UUID | None = None,
     ) -> str:
         """Генерирует сопроводительное письмо для указанной вакансии.
 

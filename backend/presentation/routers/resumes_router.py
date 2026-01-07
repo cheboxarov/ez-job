@@ -14,7 +14,7 @@ from infrastructure.auth.fastapi_users_setup import get_current_active_user
 from infrastructure.clients.hh_client import HHHttpClient
 from infrastructure.database.models.user_model import UserModel
 from presentation.dependencies import (
-    get_evaluate_resume_use_case,
+    get_evaluate_resume_with_cache_use_case,
     get_filter_settings_generation_service,
     get_unit_of_work,
 )
@@ -390,7 +390,7 @@ async def evaluate_resume(
     resume_id: UUID,
     current_user: UserModel = Depends(get_current_active_user),
     service: ResumeServicePort = Depends(get_resumes_service),
-    evaluate_uc=Depends(get_evaluate_resume_use_case),
+    evaluate_resume_with_cache_uc=Depends(get_evaluate_resume_with_cache_use_case),
 ) -> ResumeEvaluationResponse:
     """Оценить резюме на основе правил."""
     try:
@@ -406,7 +406,7 @@ async def evaluate_resume(
                 status_code=400, detail="Текст резюме пуст"
             )
 
-        result = await evaluate_uc.execute(resume.content)
+        result = await evaluate_resume_with_cache_uc.execute(resume.content, user_id=current_user.id)
         return ResumeEvaluationResponse(**result)
     except PermissionError as exc:
         logger.warning(f"Попытка оценить чужое резюме: {exc}")

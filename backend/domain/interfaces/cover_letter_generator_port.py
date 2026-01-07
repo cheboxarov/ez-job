@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from uuid import UUID
 
 
 class CoverLetterGeneratorPort(ABC):
@@ -17,6 +18,7 @@ class CoverLetterGeneratorPort(ABC):
         resume: str,
         vacancy_description: str,
         user_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> str:
         """Сгенерировать сопроводительное письмо для вакансии.
 

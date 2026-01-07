@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Dict, List
+from uuid import UUID
 
 from loguru import logger
 
@@ -28,11 +29,21 @@ class GenerateTestAnswersUseCase:
         """
         self._vacancy_test_agent = vacancy_test_agent
 
+    def set_unit_of_work(self, unit_of_work) -> None:
+        """Обновить UnitOfWork в агенте для логирования вызовов LLM.
+
+        Args:
+            unit_of_work: Новый UnitOfWork для логирования (может быть None).
+        """
+        if hasattr(self._vacancy_test_agent, 'set_unit_of_work'):
+            self._vacancy_test_agent.set_unit_of_work(unit_of_work)
+
     async def execute(
         self,
         test: VacancyTest,
         resume: str,
         user_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> Dict[str, str | List[str]]:
         """Сгенерировать ответы на вопросы теста.
 
@@ -58,6 +69,7 @@ class GenerateTestAnswersUseCase:
                 test=test,
                 resume=resume,
                 user_params=user_params,
+                user_id=user_id,
             )
             
             if not test_answers:

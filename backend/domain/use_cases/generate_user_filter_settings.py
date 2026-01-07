@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import UUID
 
 from domain.entities.suggested_user_filter_settings import SuggestedUserFilterSettings
 from domain.interfaces.filter_settings_generator_service_port import (
@@ -22,11 +23,13 @@ class GenerateUserFilterSettingsUseCase:
         *,
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> SuggestedUserFilterSettings:
         try:
             return await self._generator_service.generate_filter_settings(
                 resume=resume,
                 user_filter_params=user_filter_params,
+                user_id=user_id,
             )
         except AgentParseError as exc:
             logger.error(

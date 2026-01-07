@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from typing import Any, Dict
+from uuid import UUID
+
 from openai import AsyncOpenAI
 from loguru import logger
 
@@ -15,7 +17,7 @@ class ResumeEvaluatorAgent(BaseAgent, ResumeEvaluatorPort):
 
     AGENT_NAME = "ResumeEvaluatorAgent"
 
-    async def evaluate(self, resume_content: str) -> Dict[str, Any]:
+    async def evaluate(self, resume_content: str, user_id: UUID | None = None) -> Dict[str, Any]:
         """Оценить резюме на основе правил из docs/hh/resume_rules.md."""
         
         system_prompt = """Ты эксперт по найму и оптимизации резюме на платформе HH.ru. 
@@ -127,9 +129,16 @@ conf = 0.2125 + 0.27 + 0.12 + 0.1425 + 0.08 = 0.825
         def parse_func(content: str) -> Dict[str, Any]:
             return json.loads(content)
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "evaluate_resume",
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
             validate_func=None,
             response_format={"type": "json_object"},
+            user_id=user_id,
+            context=context,
         )

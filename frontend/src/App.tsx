@@ -9,6 +9,7 @@ import { ResumeVacanciesPage } from './pages/ResumeVacanciesPage';
 import { ResumeResponsesPage } from './pages/ResumeResponsesPage';
 import { HhAuthSettingsPage } from './pages/HhAuthSettingsPage';
 import { TelegramSettingsPage } from './pages/TelegramSettingsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { PlansPage } from './pages/PlansPage';
 import { StatisticsPage } from './pages/StatisticsPage';
@@ -17,6 +18,13 @@ import { ChatDetailPage } from './pages/ChatDetailPage';
 import { EventsPage } from './pages/EventsPage';
 import { MainLayout } from './components/Layout/MainLayout';
 import { ProtectedRoute } from './components/Layout/ProtectedRoute';
+import { AdminLayout } from './components/Layout/AdminLayout';
+import { AdminProtectedRoute } from './components/Layout/AdminProtectedRoute';
+import { AdminUsersPage } from './pages/admin/AdminUsersPage';
+import { AdminUserDetailPage } from './pages/admin/AdminUserDetailPage';
+import { AdminPlansPage } from './pages/admin/AdminPlansPage';
+import { AdminLlmCallsPage } from './pages/admin/AdminLlmCallsPage';
+import { AdminMetricsDashboardPage } from './pages/admin/AdminMetricsDashboardPage';
 import { useAuthStore } from './stores/authStore';
 import { trackPageView } from './utils/yandex-metrika';
 
@@ -106,11 +114,21 @@ function App() {
           }
         />
         <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <SettingsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/settings/telegram"
           element={
             <ProtectedRoute>
               <MainLayout>
-                <TelegramSettingsPage />
+                <Navigate to="/settings" replace />
               </MainLayout>
             </ProtectedRoute>
           }
@@ -175,6 +193,68 @@ function App() {
             </ProtectedRoute>
           }
         />
+        {/* Админ-панель */}
+        <Route
+          path="/admin"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <Navigate to="/admin/users" replace />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminUsersPage />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users/:id"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminUserDetailPage />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/plans"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminPlansPage />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/llm-calls"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminLlmCallsPage />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/metrics"
+          element={
+            <AdminProtectedRoute>
+              <AdminLayout>
+                <AdminMetricsDashboardPage />
+              </AdminLayout>
+            </AdminProtectedRoute>
+          }
+        />
+        
         {/* Редиректы со старых маршрутов */}
         <Route path="/vacancies" element={<Navigate to="/resumes" replace />} />
         <Route path="/vacancies/:id" element={<Navigate to="/resumes" replace />} />

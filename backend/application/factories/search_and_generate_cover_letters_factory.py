@@ -21,6 +21,7 @@ from infrastructure.database.session import create_session_factory
 
 def create_search_and_generate_cover_letters_usecase(
     config: AppConfig,
+    unit_of_work=None,
 ) -> SearchAndGenerateCoverLettersUseCase:
     """Фабрика для создания SearchAndGenerateCoverLettersUseCase со всеми зависимостями.
 
@@ -39,8 +40,8 @@ def create_search_and_generate_cover_letters_usecase(
         max_vacancies=config.hh.max_vacancies,
     )
 
-    # Создаем VacancyFilterAgent
-    vacancy_filter_service = VacancyFilterAgent(config.openai)
+    # Создаем VacancyFilterAgent с unit_of_work для логирования вызовов LLM
+    vacancy_filter_service = VacancyFilterAgent(config.openai, unit_of_work=unit_of_work)
 
     # Создаем session_factory для работы с репозиторием мэтчей
     session_factory = create_session_factory(config.database)
@@ -64,8 +65,8 @@ def create_search_and_generate_cover_letters_usecase(
         get_filtered_vacancies_uc=get_filtered_vacancies_uc,
     )
 
-    # Создаем CoverLetterAgent
-    cover_letter_agent = CoverLetterAgent(config.openai)
+    # Создаем CoverLetterAgent с unit_of_work для логирования вызовов LLM
+    cover_letter_agent = CoverLetterAgent(config.openai, unit_of_work=unit_of_work)
 
     # Создаем GenerateCoverLetterUseCase
     generate_cover_letter_uc = GenerateCoverLetterUseCase(

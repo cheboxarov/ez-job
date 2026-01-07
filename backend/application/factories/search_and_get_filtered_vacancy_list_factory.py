@@ -16,6 +16,7 @@ from infrastructure.database.session import create_session_factory
 
 def create_search_and_get_filtered_vacancy_list_usecase(
     config: AppConfig,
+    unit_of_work=None,
 ) -> SearchAndGetFilteredVacancyListUseCase:
     """Фабрика для создания SearchAndGetFilteredVacancyListUseCase со всеми зависимостями.
 
@@ -36,8 +37,8 @@ def create_search_and_get_filtered_vacancy_list_usecase(
         internal_api_base_url=internal_api_base_url,
     )
 
-    # Создаем VacancyListFilterAgent
-    vacancy_list_filter_service = VacancyListFilterAgent(config.openai)
+    # Создаем VacancyListFilterAgent с unit_of_work для логирования вызовов LLM
+    vacancy_list_filter_service = VacancyListFilterAgent(config.openai, unit_of_work=unit_of_work)
 
     # Создаем session_factory для работы с репозиторием мэтчей
     session_factory = create_session_factory(config.database)

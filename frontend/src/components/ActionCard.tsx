@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button, Typography, message, Tooltip } from 'antd';
-import { SendOutlined, RobotOutlined } from '@ant-design/icons';
-import { sendChatMessage } from '../api/chats';
+import { SendOutlined, RobotOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { executeAgentAction } from '../api/agentActions';
 import type { AgentAction } from '../types/api';
 
 const { Paragraph, Text } = Typography;
@@ -14,6 +14,11 @@ interface ActionCardProps {
 
 export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
   const [sending, setSending] = useState(false);
+  const [isSent, setIsSent] = useState(action.data.sended === true);
+
+  useEffect(() => {
+    setIsSent(action.data.sended === true);
+  }, [action.data.sended]);
 
   const handleSend = async () => {
     if (!action.data.message_text) {
@@ -23,7 +28,8 @@ export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
 
     setSending(true);
     try {
-      await sendChatMessage(chatId, action.data.message_text);
+      const updatedAction = await executeAgentAction(action.id);
+      setIsSent(true);
       message.success('Сообщение отправлено');
       onSent?.();
     } catch (err: any) {
@@ -32,6 +38,65 @@ export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
       setSending(false);
     }
   };
+
+  // Не показываем кнопку если уже отправлено
+  if (isSent) {
+    return (
+      <div
+        style={{
+          marginTop: 8,
+          padding: '12px 14px',
+          borderRadius: 16,
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+          border: '1px dashed #86efac',
+          position: 'relative',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <CheckCircleOutlined style={{ color: '#fff', fontSize: 12 }} />
+          </div>
+          
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Text 
+              type="secondary" 
+              style={{ 
+                fontSize: 11, 
+                display: 'block', 
+                marginBottom: 4,
+                color: '#047857',
+                fontWeight: 500,
+              }}
+            >
+              Сообщение отправлено
+            </Text>
+            <Paragraph
+              ellipsis={{ rows: 3, expandable: true, symbol: 'ещё' }}
+              style={{
+                margin: 0,
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: '#065f46',
+              }}
+            >
+              {action.data.message_text}
+            </Paragraph>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

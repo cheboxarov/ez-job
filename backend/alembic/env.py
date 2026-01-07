@@ -24,6 +24,8 @@ from infrastructure.database.models import resume_filter_settings_model  # noqa:
 from infrastructure.database.models import agent_action_model  # noqa: F401
 from infrastructure.database.models import telegram_notification_settings_model  # noqa: F401
 from infrastructure.database.models import telegram_link_token_model  # noqa: F401
+from infrastructure.database.models import llm_call_model  # noqa: F401
+from infrastructure.database.models import user_automation_settings_model  # noqa: F401
 
 target_metadata = Base.metadata
 

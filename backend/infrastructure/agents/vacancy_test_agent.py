@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from typing import Dict, List
+from uuid import UUID
 
 from openai import AsyncOpenAI
 from loguru import logger
@@ -28,6 +29,7 @@ class VacancyTestAgent(BaseAgent, VacancyTestAgentServicePort):
         test: VacancyTest,
         resume: str,
         user_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> Dict[str, str | List[str]]:
         """Генерирует ответы на вопросы теста вакансии на основе резюме кандидата.
 
@@ -105,10 +107,19 @@ class VacancyTestAgent(BaseAgent, VacancyTestAgentServicePort):
         def validate_func(result: Dict[str, str | List[str]]) -> bool:
             return not result
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "generate_test_answers",
+            "vacancy_id": test.vacancy_id if hasattr(test, "vacancy_id") else None,
+            "question_count": len(test.questions) if test.questions else 0,
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
             validate_func=validate_func,
+            user_id=user_id,
+            context=context,
         )
 
     def _build_prompt(

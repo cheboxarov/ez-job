@@ -180,6 +180,37 @@
 **Индексы:**
 - `ix_telegram_link_tokens_token` — на token
 
+### llm_calls
+
+**Назначение:** Логирование всех вызовов LLM для мониторинга и аналитики.
+
+**Поля:**
+- `id` (UUID, PK) — уникальный идентификатор записи
+- `call_id` (UUID, индекс) — идентификатор вызова (один для всех попыток одного вызова)
+- `attempt_number` (INTEGER) — номер попытки (1, 2, 3...)
+- `agent_name` (VARCHAR) — имя агента (MessagesAgent, VacancyFilterAgent и т.д.)
+- `model` (VARCHAR) — модель LLM
+- `user_id` (UUID, FK → users.id, индекс, nullable) — ID пользователя
+- `prompt` (JSONB) — полный массив messages для промпта
+- `response` (TEXT) — полный текст ответа от LLM
+- `temperature` (FLOAT) — температура модели
+- `response_format` (JSONB, nullable) — формат ответа
+- `status` (VARCHAR) — статус: 'success' или 'error'
+- `error_type` (VARCHAR, nullable) — тип ошибки (класс исключения)
+- `error_message` (TEXT, nullable) — текст ошибки
+- `duration_ms` (INTEGER, nullable) — время выполнения в миллисекундах
+- `prompt_tokens` (INTEGER, nullable) — количество токенов в промпте
+- `completion_tokens` (INTEGER, nullable) — количество токенов в ответе
+- `total_tokens` (INTEGER, nullable) — общее количество токенов
+- `response_size_bytes` (INTEGER, nullable) — размер ответа в байтах
+- `context` (JSONB, nullable) — дополнительный контекст (use_case, resume_id, vacancy_id, chat_id и т.д.)
+- `created_at` (TIMESTAMP) — время создания записи
+
+**Индексы:**
+- `ix_llm_calls_call_id` — на call_id (для группировки попыток)
+- `ix_llm_calls_user_id` — на user_id (для фильтрации по пользователю)
+- `ix_llm_calls_created_at` — на created_at (для временных запросов)
+
 ## ER-диаграмма
 
 ```mermaid
@@ -189,6 +220,7 @@ erDiagram
     users ||--o{ vacancy_responses : creates
     users ||--o{ agent_actions : receives
     users ||--|| telegram_notification_settings : has
+    users ||--o{ llm_calls : logs
     
     resumes ||--|| resume_filter_settings : has
     resumes ||--o{ resume_to_vacancy_matches : matches

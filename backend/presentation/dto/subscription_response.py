@@ -64,3 +64,6 @@ class PlansListResponse(BaseModel):
     """DTO для списка планов подписки."""
 
     plans: list[SubscriptionPlanResponse] = Field(..., description="Список планов")
+    total: int = Field(..., description="Общее количество планов")
+    page: int = Field(..., description="Текущая страница")
+    page_size: int = Field(..., description="Размер страницы")

@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
 from loguru import logger
-from sqlalchemy import func, select, cast, Date
+from sqlalchemy import func, select, cast, Date, distinct, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domain.entities.vacancy_response import VacancyResponse
@@ -14,6 +14,7 @@ from domain.interfaces.vacancy_response_repository_port import (
     VacancyResponseRepositoryPort,
 )
 from infrastructure.database.models.vacancy_response_model import VacancyResponseModel
+from infrastructure.database.models.user_subscription_model import UserSubscriptionModel
 
 
 class VacancyResponseRepository(VacancyResponseRepositoryPort):
@@ -225,6 +226,97 @@ class VacancyResponseRepository(VacancyResponseRepositoryPort):
         )
         
         return result_list
+
+    async def get_metrics_by_period(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+        plan_id: UUID | None = None,
+        time_step: str = "day",
+    ) -> list[tuple[datetime, int, int]]:
+        """Получить метрики откликов по периоду с группировкой по времени."""
+        # Определяем функцию для группировки по времени
+        if time_step == "day":
+            time_group = func.date_trunc("day", VacancyResponseModel.created_at)
+        elif time_step == "week":
+            time_group = func.date_trunc("week", VacancyResponseModel.created_at)
+        elif time_step == "month":
+            time_group = func.date_trunc("month", VacancyResponseModel.created_at)
+        else:
+            time_group = func.date_trunc("day", VacancyResponseModel.created_at)
+
+        # Базовый запрос
+        stmt = (
+            select(
+                time_group.label("period_start"),
+                func.count(VacancyResponseModel.id).label("responses_count"),
+                func.count(distinct(VacancyResponseModel.user_id)).label("unique_users"),
+            )
+            .where(
+                and_(
+                    VacancyResponseModel.created_at >= start_date,
+                    VacancyResponseModel.created_at <= end_date,
+                )
+            )
+            .group_by(time_group)
+            .order_by(time_group)
+        )
+
+        # Фильтр по плану подписки
+        if plan_id:
+            stmt = stmt.join(
+                UserSubscriptionModel,
+                VacancyResponseModel.user_id == UserSubscriptionModel.user_id,
+            ).where(UserSubscriptionModel.subscription_plan_id == plan_id)
+
+        result = await self._session.execute(stmt)
+        rows = result.all()
+
+        return [
+            (
+                row.period_start,
+                int(row.responses_count),
+                int(row.unique_users),
+            )
+            for row in rows
+        ]
+
+    async def get_total_metrics(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+        plan_id: UUID | None = None,
+    ) -> tuple[int, int, float]:
+        """Получить суммарные метрики откликов за период."""
+        stmt = (
+            select(
+                func.count(VacancyResponseModel.id).label("responses_count"),
+                func.count(distinct(VacancyResponseModel.user_id)).label("unique_users"),
+            )
+            .where(
+                and_(
+                    VacancyResponseModel.created_at >= start_date,
+                    VacancyResponseModel.created_at <= end_date,
+                )
+            )
+        )
+
+        if plan_id:
+            stmt = stmt.join(
+                UserSubscriptionModel,
+                VacancyResponseModel.user_id == UserSubscriptionModel.user_id,
+            ).where(UserSubscriptionModel.subscription_plan_id == plan_id)
+
+        result = await self._session.execute(stmt)
+        row = result.one()
+
+        responses_count = int(row.responses_count or 0)
+        unique_users = int(row.unique_users or 0)
+        avg_responses_per_user = responses_count / unique_users if unique_users > 0 else 0.0
+
+        return responses_count, unique_users, avg_responses_per_user
 
     def _to_domain(self, model: VacancyResponseModel) -> VacancyResponse:
         """Преобразовать SQLAlchemy модель в доменную сущность.

@@ -147,8 +147,8 @@ class Application:
 
                 logger.info(f"[app] Чаты сгруппированы: {len(chats_by_resume)} групп по резюме, {len(chats_without_resume)} чатов без резюме")
 
-                # Создаем агента
-                messages_agent = MessagesAgent(self._config.openai)
+                # Создаем агента с unit_of_work для логирования
+                messages_agent = MessagesAgent(self._config.openai, unit_of_work=uow)
 
                 # Создаем use case
                 analyze_chats_uc = AnalyzeChatsAndRespondUseCase(messages_agent)

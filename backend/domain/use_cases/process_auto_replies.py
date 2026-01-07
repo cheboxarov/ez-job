@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from typing import Dict, List
 
@@ -385,20 +386,30 @@ class ProcessAutoRepliesUseCase:
 
         vacancy_description = "\n".join(vacancy_description_parts)
 
-        # Генерируем сопроводительное письмо
-        try:
-            cover_letter = await self._cover_letter_generator.generate(
-                resume=resume.content,
-                vacancy_description=vacancy_description,
-                user_params=resume.user_parameters,
-            )
-        except Exception as exc:
-            logger.error(
-                f"Ошибка при генерации письма для вакансии {vacancy.vacancy_id}: {exc}",
-                exc_info=True,
-            )
-            # Используем дефолтное письмо
-            cover_letter = "1"
+        # Создаем unit_of_work для логирования LLM-вызовов при генерации письма
+        llm_unit_of_work_letter = self._create_unit_of_work_factory()
+        
+        # Генерируем сопроводительное письмо с логированием LLM-вызовов
+        cover_letter = "1"
+        async with llm_unit_of_work_letter:
+            # Обновляем unit_of_work в агенте для логирования
+            if hasattr(self._cover_letter_generator, 'set_unit_of_work'):
+                self._cover_letter_generator.set_unit_of_work(llm_unit_of_work_letter)
+            
+            try:
+                cover_letter = await self._cover_letter_generator.generate(
+                    resume=resume.content,
+                    vacancy_description=vacancy_description,
+                    user_params=resume.user_parameters,
+                    user_id=resume.user_id,
+                )
+            except Exception as exc:
+                logger.error(
+                    f"Ошибка при генерации письма для вакансии {vacancy.vacancy_id}: {exc}",
+                    exc_info=True,
+                )
+                # Используем дефолтное письмо
+                cover_letter = "1"
 
         if not cover_letter:
             cover_letter = "1"
@@ -409,57 +420,65 @@ class ProcessAutoRepliesUseCase:
         internal_api_base_url = "https://krasnoyarsk.hh.ru"
         
         if vacancy.has_test:
-            try:
-                # Получаем тест вакансии
-                get_vacancy_test_uc = GetVacancyTestUseCase(self._hh_client)
-                test = await get_vacancy_test_uc.execute(
-                    vacancy_id=vacancy.vacancy_id,
-                    headers=auth_data.headers,
-                    cookies=auth_data.cookies,
-                    internal_api_base_url=internal_api_base_url,
-                )
+            # Создаем unit_of_work для логирования LLM-вызовов при генерации теста
+            llm_unit_of_work_test = self._create_unit_of_work_factory()
+            
+            async with llm_unit_of_work_test:
+                # Обновляем unit_of_work в use case для логирования LLM-вызовов теста
+                self._generate_test_answers_uc.set_unit_of_work(llm_unit_of_work_test)
                 
-                if test is None:
-                    logger.warning(
-                        f"Тест для вакансии {vacancy.vacancy_id} не найден "
-                        f"(возможно, форма с тестом отсутствует в HTML-странице). "
-                        "Пропускаем вакансию."
+                try:
+                    # Получаем тест вакансии
+                    get_vacancy_test_uc = GetVacancyTestUseCase(self._hh_client)
+                    test = await get_vacancy_test_uc.execute(
+                        vacancy_id=vacancy.vacancy_id,
+                        headers=auth_data.headers,
+                        cookies=auth_data.cookies,
+                        internal_api_base_url=internal_api_base_url,
                     )
-                    return
-                
-                # Генерируем ответы на тест
-                test_answers = await self._generate_test_answers_uc.execute(
-                    test=test,
-                    resume=resume.content,
-                    user_params=resume.user_parameters,
-                )
-                
-                if not test_answers:
-                    logger.warning(
-                        f"Не удалось сгенерировать ответы на тест для вакансии {vacancy.vacancy_id}. "
-                        "Пропускаем вакансию."
+                    
+                    if test is None:
+                        logger.warning(
+                            f"Тест для вакансии {vacancy.vacancy_id} не найден "
+                            f"(возможно, форма с тестом отсутствует в HTML-странице). "
+                            "Пропускаем вакансию."
+                        )
+                        return
+                    
+                    # Генерируем ответы на тест
+                    test_answers = await self._generate_test_answers_uc.execute(
+                        test=test,
+                        resume=resume.content,
+                        user_params=resume.user_parameters,
+                        user_id=resume.user_id,
                     )
+                    
+                    if not test_answers:
+                        logger.warning(
+                            f"Не удалось сгенерировать ответы на тест для вакансии {vacancy.vacancy_id}. "
+                            "Пропускаем вакансию."
+                        )
+                        return
+                    
+                    # Подготавливаем метаданные теста
+                    test_metadata = {
+                        "uidPk": test.uid_pk or "",
+                        "guid": test.guid or "",
+                        "startTime": test.start_time or "",
+                        "testRequired": str(test.test_required).lower(),
+                    }
+                    
+                    logger.info(
+                        f"Подготовлены ответы на тест для вакансии {vacancy.vacancy_id}: "
+                        f"{len(test_answers)} ответов"
+                    )
+                except Exception as exc:
+                    logger.error(
+                        f"Ошибка при обработке теста для вакансии {vacancy.vacancy_id}: {exc}",
+                        exc_info=True,
+                    )
+                    # Пропускаем вакансию при ошибке обработки теста
                     return
-                
-                # Подготавливаем метаданные теста
-                test_metadata = {
-                    "uidPk": test.uid_pk or "",
-                    "guid": test.guid or "",
-                    "startTime": test.start_time or "",
-                    "testRequired": str(test.test_required).lower(),
-                }
-                
-                logger.info(
-                    f"Подготовлены ответы на тест для вакансии {vacancy.vacancy_id}: "
-                    f"{len(test_answers)} ответов"
-                )
-            except Exception as exc:
-                logger.error(
-                    f"Ошибка при обработке теста для вакансии {vacancy.vacancy_id}: {exc}",
-                    exc_info=True,
-                )
-                # Пропускаем вакансию при ошибке обработки теста
-                return
 
         # Отправляем отклик и сохраняем в БД (в отдельной транзакции для каждого отклика)
         try:

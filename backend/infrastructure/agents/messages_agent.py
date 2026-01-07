@@ -98,6 +98,14 @@ send_message - используй когда:
 - "Работали ли вы с FastAPI?" → ответ: "да" или "нет"
 Если вопрос требует ответа "да" или "нет", НЕ используй фразы типа "Да, конечно", "Нет, к сожалению", "Да, у меня есть опыт" и т.п. Только одно слово: "да" или "нет".
 
+ИСПОЛЬЗОВАНИЕ ВАРИАНТОВ ОТВЕТОВ (text_buttons):
+- Если в сообщении от работодателя указаны варианты ответов (поле "Варианты ответов" в промпте), ОБЯЗАТЕЛЬНО используй один из предложенных вариантов
+- Выбирай наиболее подходящий вариант на основе резюме кандидата и контекста вопроса
+- Текст ответа должен ТОЧНО совпадать с выбранным вариантом, включая пробелы, регистр и знаки препинания
+- Если ни один вариант не подходит идеально, выбери наиболее близкий по смыслу вариант
+- ВАЖНО: Если вариантов ответов нет (поле "Варианты ответов" отсутствует в промпте) ИЛИ массив пустой, генерируй ответ самостоятельно как обычно, используя стандартную логику генерации ответов
+- Пример: если есть варианты "не работал", "до 6 месяцев", " от 6 мес до 1 года ", "более 1 года" и в резюме указан опыт 2 года, выбери "более 1 года" (точный текст, включая пробелы)
+
 create_event - используй когда:
 - Компания просит назначить созвон/встречу/собеседование (например, "В какое время вам удобно созвониться?", "Когда можем встретиться?", "Предлагаем созвон для знакомства")
 - Компания просит выполнить действие вне чата HeadHunter (пройти анкету в телеграме, на сайте компании, заполнить форму на внешней платформе и т.д.)
@@ -181,10 +189,20 @@ create_event - используй когда:
         def validate_func(result: List[AgentAction]) -> bool:
             return not result
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "analyze_chats_and_generate_responses",
+            "chat_ids": [chat.id for chat in chats],
+            "chat_count": len(chats),
+            "resume_hash": resume_hash,
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
             validate_func=validate_func,
+            user_id=user_id,
+            context=context,
         )
 
     def _build_prompt(
@@ -243,6 +261,10 @@ create_event - используй когда:
                     )
                     author_label = "[ОТ ПОЛЬЗОВАТЕЛЯ]" if is_from_user else "[ОТ РАБОТОДАТЕЛЯ]"
                     lines.append(f"  {author_label} [ID: {msg.id}] [{msg.creation_time}] {participant}: {msg.text}")
+                    # Добавляем варианты ответов, если они есть и не пустые
+                    if msg.text_buttons and len(msg.text_buttons) > 0:
+                        buttons_text = ", ".join(f'"{btn}"' for btn in msg.text_buttons)
+                        lines.append(f"  Варианты ответов: {buttons_text}")
                 lines.append("")
             else:
                 lines.append("Сообщений нет")
@@ -343,6 +365,7 @@ create_event - используй когда:
                 action_data_dict = {
                     "dialog_id": dialog_id,
                     "message_text": message_text.strip(),
+                    "sended": False,
                 }
                 if message_to is not None:
                     action_data_dict["message_to"] = message_to

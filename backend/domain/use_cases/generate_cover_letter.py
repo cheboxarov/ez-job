@@ -1,4 +1,5 @@
 from __future__ import annotations
+from uuid import UUID
 
 from loguru import logger
 
@@ -23,6 +24,7 @@ class GenerateCoverLetterUseCase:
         self,
         vacancy: FilteredVacancyDetail,
         resume: str,
+        user_id: UUID | None = None,
     ) -> str:
         """Генерирует сопроводительное письмо для указанной вакансии.
 
@@ -37,7 +39,7 @@ class GenerateCoverLetterUseCase:
             return ""
 
         try:
-            cover_letter = await self._service.generate(vacancy, resume)
+            cover_letter = await self._service.generate(vacancy, resume, user_id)
             return cover_letter
         except AgentParseError as exc:
             logger.error(

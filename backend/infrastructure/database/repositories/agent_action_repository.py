@@ -111,6 +111,57 @@ class AgentActionRepository(AgentActionRepositoryPort):
         )
         await self._session.execute(stmt)
 
+    async def update(self, action: AgentAction) -> AgentAction:
+        """Обновить действие агента.
+
+        Args:
+            action: Доменная сущность AgentAction с обновленными данными.
+
+        Returns:
+            Обновленная доменная сущность AgentAction.
+
+        Raises:
+            ValueError: Если действие с таким ID не найдено.
+        """
+        stmt = select(AgentActionModel).where(AgentActionModel.id == action.id)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+
+        if model is None:
+            raise ValueError(f"Действие с ID {action.id} не найдено")
+
+        model.type = action.type
+        model.entity_type = action.entity_type
+        model.entity_id = action.entity_id
+        model.created_by = action.created_by
+        model.user_id = action.user_id
+        model.resume_hash = action.resume_hash
+        model.data = action.data
+        model.is_read = action.is_read
+
+        await self._session.flush()
+        await self._session.refresh(model)
+
+        return self._to_domain(model)
+
+    async def get_by_id(self, action_id: UUID) -> AgentAction | None:
+        """Получить действие агента по ID.
+
+        Args:
+            action_id: UUID действия.
+
+        Returns:
+            Доменная сущность AgentAction или None, если не найдено.
+        """
+        stmt = select(AgentActionModel).where(AgentActionModel.id == action_id)
+        result = await self._session.execute(stmt)
+        model = result.scalar_one_or_none()
+
+        if model is None:
+            return None
+
+        return self._to_domain(model)
+
     def _to_domain(self, model: AgentActionModel) -> AgentAction:
         """Преобразовать SQLAlchemy модель в доменную сущность.
 

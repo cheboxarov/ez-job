@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
 from domain.entities.vacancy_response import VacancyResponse
@@ -41,4 +41,46 @@ class VacancyResponseRepositoryPort(ABC):
             
         Returns:
             Список кортежей (дата, количество откликов) для каждого дня в диапазоне.
+        """
+
+    @abstractmethod
+    async def get_metrics_by_period(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+        plan_id: UUID | None = None,
+        time_step: str = "day",
+    ) -> list[tuple[datetime, int, int]]:
+        """Получить метрики откликов по периоду с группировкой по времени.
+
+        Args:
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+            plan_id: Фильтр по ID плана подписки (опционально).
+            time_step: Шаг группировки ('day', 'week', 'month').
+
+        Returns:
+            Список кортежей (дата/время начала периода, количество откликов,
+            количество уникальных пользователей).
+        """
+
+    @abstractmethod
+    async def get_total_metrics(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+        plan_id: UUID | None = None,
+    ) -> tuple[int, int, float]:
+        """Получить суммарные метрики откликов за период.
+
+        Args:
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+            plan_id: Фильтр по ID плана подписки (опционально).
+
+        Returns:
+            Кортеж (общее количество откликов, количество уникальных пользователей,
+            средние отклики на пользователя).
         """

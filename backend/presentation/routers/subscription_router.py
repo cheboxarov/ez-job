@@ -159,21 +159,27 @@ async def get_all_plans(
     """
     try:
         plans = await unit_of_work.subscription_plan_repository.get_all()
+        plans_list = [
+            SubscriptionPlanResponse(
+                id=plan.id,
+                name=plan.name,
+                response_limit=plan.response_limit,
+                reset_period_seconds=plan.reset_period_seconds,
+                duration_days=plan.duration_days,
+                price=float(plan.price),
+            )
+            for plan in plans
+        ]
         return PlansListResponse(
-            plans=[
-                SubscriptionPlanResponse(
-                    id=plan.id,
-                    name=plan.name,
-                    response_limit=plan.response_limit,
-                    reset_period_seconds=plan.reset_period_seconds,
-                    duration_days=plan.duration_days,
-                    price=float(plan.price),
-                )
-                for plan in plans
-            ]
+            plans=plans_list,
+            total=len(plans_list),
+            page=1,
+            page_size=len(plans_list),
         )
     except Exception as exc:
-        logger.error(f"Внутренняя ошибка при получении списка планов: {exc}", exc_info=True)
+        logger.error(
+            "Внутренняя ошибка при получении списка планов", exc_info=True
+        )
         raise HTTPException(
             status_code=500, detail="Внутренняя ошибка при получении списка планов"
         ) from exc

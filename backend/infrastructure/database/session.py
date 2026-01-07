@@ -32,8 +32,8 @@ def create_session_factory(config: DatabaseConfig) -> async_sessionmaker[AsyncSe
             db_url,
             echo=False,  # Включить для отладки SQL запросов
             pool_pre_ping=True,  # Проверка соединений перед использованием
-            pool_size=10,
-            max_overflow=20,
+            pool_size=20,  # Увеличено с 10 для поддержки большего количества параллельных операций
+            max_overflow=30,  # Увеличено с 20, максимум соединений = 50
         )
         session_factory = async_sessionmaker(
             engine,

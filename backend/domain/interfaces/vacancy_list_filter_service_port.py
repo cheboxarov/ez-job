@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import List
+from uuid import UUID
 
 from domain.entities.filtered_vacancy_list import FilteredVacancyListDto
 from domain.entities.vacancy_list import VacancyListItem
@@ -16,6 +17,7 @@ class VacancyListFilterServicePort(ABC):
         vacancies: List[VacancyListItem],
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> List[FilteredVacancyListDto]:
         """Оценить релевантность списка list-вакансий к резюме.
 

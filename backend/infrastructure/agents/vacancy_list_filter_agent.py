@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from typing import List, Sequence
+from uuid import UUID
 
 from openai import AsyncOpenAI
 from loguru import logger
@@ -26,6 +27,7 @@ class VacancyListFilterAgent(BaseAgent, VacancyListFilterServicePort):
         vacancies: List[VacancyListItem],
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> List[FilteredVacancyListDto]:
         if not vacancies:
             return []
@@ -98,10 +100,19 @@ class VacancyListFilterAgent(BaseAgent, VacancyListFilterServicePort):
         def validate_func(result: List[FilteredVacancyListDto]) -> bool:
             return not result
 
+        # Формируем контекст для логирования
+        context = {
+            "use_case": "filter_vacancy_list",
+            "vacancy_count": len(vacancies),
+            "vacancy_ids": [v.vacancy_id for v in vacancies],
+        }
+
         return await self._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
             validate_func=validate_func,
+            user_id=user_id,
+            context=context,
         )
 
     def _build_prompt(

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Dict, List
+from uuid import UUID
 
 from domain.entities.filtered_vacancy_list import (
     FilteredVacancyListDto,
@@ -35,6 +36,7 @@ class FilterVacancyListUseCase:
         vacancies: List[VacancyListItem],
         resume: str,
         user_filter_params: str | None = None,
+        user_id: UUID | None = None,
     ) -> List[FilteredVacancyListItem]:
         if not vacancies:
             return []
@@ -53,7 +55,7 @@ class FilterVacancyListUseCase:
         # Кидаем запросы в нейронку по чанкам асинхронно
         tasks = [
             asyncio.create_task(
-                self._filter_service.filter_vacancy_list(chunk, resume, user_filter_params)
+                self._filter_service.filter_vacancy_list(chunk, resume, user_filter_params, user_id=user_id)
             )
             for chunk in chunks
         ]

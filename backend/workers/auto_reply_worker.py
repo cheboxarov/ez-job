@@ -95,15 +95,9 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
     hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
     respond_to_vacancy_uc = RespondToVacancyUseCase(hh_client)
 
-    search_and_get_filtered_vacancy_list_uc = (
-        create_search_and_get_filtered_vacancy_list_usecase(config)
-    )
-
-    cover_letter_generator = CoverLetterGeneratorAgent(config.openai)
-
-    # Создаем агента для генерации ответов на тесты вакансий
-    vacancy_test_agent = VacancyTestAgent(config.openai)
-    generate_test_answers_uc = GenerateTestAnswersUseCase(vacancy_test_agent)
+    # Фабрика для создания use case с unit_of_work (будет создаваться внутри контекста)
+    def create_search_and_get_filtered_vacancy_list_usecase_with_uow(uow):
+        return create_search_and_get_filtered_vacancy_list_usecase(config, unit_of_work=uow)
 
     # Словарь для отслеживания активных задач по resume_id
     active_tasks: Dict[UUID, asyncio.Task] = {}
@@ -129,6 +123,14 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
                 if shutdown_event.is_set():
                     logger.info(f"Получен сигнал завершения, прерываем обработку резюме {resume_id}")
                     return
+                
+                # Создаем агентов с unit_of_work для логирования вызовов LLM
+                cover_letter_generator = CoverLetterGeneratorAgent(config.openai, unit_of_work=unit_of_work)
+                vacancy_test_agent = VacancyTestAgent(config.openai, unit_of_work=unit_of_work)
+                generate_test_answers_uc = GenerateTestAnswersUseCase(vacancy_test_agent)
+                
+                # Создаем use case с unit_of_work для логирования вызовов LLM
+                search_and_get_filtered_vacancy_list_uc = create_search_and_get_filtered_vacancy_list_usecase_with_uow(unit_of_work)
                 
                 # Создаем Use Case с репозиториями из текущего UnitOfWork
                 process_auto_replies_uc = ProcessAutoRepliesUseCase(
