@@ -84,3 +84,17 @@ class VacancyResponseRepositoryPort(ABC):
             Кортеж (общее количество откликов, количество уникальных пользователей,
             средние отклики на пользователя).
         """
+
+    @abstractmethod
+    async def get_failed_by_resume_and_vacancy_id(
+        self, resume_id: UUID, vacancy_id: int
+    ) -> VacancyResponse | None:
+        """Получить неудачный отклик по resume_id и vacancy_id.
+
+        Args:
+            resume_id: UUID резюме.
+            vacancy_id: ID вакансии.
+
+        Returns:
+            Доменная сущность VacancyResponse с status='failed' или None, если не найдено.
+        """

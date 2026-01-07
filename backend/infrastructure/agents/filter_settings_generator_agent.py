@@ -53,6 +53,7 @@ class FilterSettingsGeneratorAgent(BaseAgent, FilterSettingsGeneratorServicePort
             messages=messages,
             parse_func=self._parse_response,
             validate_func=None,
+            temperature=0.2,  # Низкая температура для стабильного JSON-парсинга
             user_id=user_id,
             context=context,
         )

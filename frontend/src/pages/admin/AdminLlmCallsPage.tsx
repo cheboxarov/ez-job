@@ -218,9 +218,14 @@ export const AdminLlmCallsPage = () => {
       <Drawer
         title="Детали вызова LLM"
         placement="right"
-        width={800}
+        width="90%"
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
+        styles={{
+          body: {
+            padding: '24px',
+          },
+        }}
       >
         {selectedCall && (
           <Space direction="vertical" style={{ width: '100%' }} size="large">
@@ -266,7 +271,15 @@ export const AdminLlmCallsPage = () => {
               )}
               {selectedCall.error_message && (
                 <Descriptions.Item label="Сообщение об ошибке">
-                  {selectedCall.error_message}
+                  <div
+                    style={{
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      maxWidth: '100%',
+                    }}
+                  >
+                    {selectedCall.error_message}
+                  </div>
                 </Descriptions.Item>
               )}
             </Descriptions>
@@ -278,8 +291,16 @@ export const AdminLlmCallsPage = () => {
                   background: '#f5f5f5',
                   padding: '12px',
                   borderRadius: '4px',
-                  overflow: 'auto',
-                  maxHeight: '300px',
+                  overflowX: 'auto',
+                  overflowY: 'auto',
+                  maxHeight: '400px',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'anywhere',
+                  maxWidth: '100%',
+                  fontSize: '12px',
+                  lineHeight: '1.5',
                 }}
               >
                 {JSON.stringify(selectedCall.prompt, null, 2)}
@@ -293,8 +314,16 @@ export const AdminLlmCallsPage = () => {
                   background: '#f5f5f5',
                   padding: '12px',
                   borderRadius: '4px',
-                  overflow: 'auto',
-                  maxHeight: '400px',
+                  overflowX: 'auto',
+                  overflowY: 'auto',
+                  maxHeight: '500px',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  wordWrap: 'break-word',
+                  overflowWrap: 'anywhere',
+                  maxWidth: '100%',
+                  fontSize: '12px',
+                  lineHeight: '1.5',
                 }}
               >
                 {selectedCall.response}

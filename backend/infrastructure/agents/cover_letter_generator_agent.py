@@ -127,6 +127,7 @@ class CoverLetterGeneratorAgent(BaseAgent, CoverLetterGeneratorPort):
             messages=messages,
             parse_func=parse_func,
             validate_func=validate_func,
+            temperature=0.5,  # Повышенная температура для большего разнообразия писем
             user_id=user_id,
             context=context,
         )

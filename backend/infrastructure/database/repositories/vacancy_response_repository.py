@@ -66,6 +66,9 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
                 vacancy_name=vacancy_response.vacancy_name,
                 vacancy_url=vacancy_response.vacancy_url,
                 created_at=vacancy_response.created_at,
+                status=vacancy_response.status,
+                error_status_code=vacancy_response.error_status_code,
+                error_message=vacancy_response.error_message,
             )
             session.add(model)
             await session.flush()
@@ -99,7 +102,10 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
             )
             stmt = (
                 select(VacancyResponseModel)
-                .where(VacancyResponseModel.resume_id == resume_id)
+                .where(
+                    VacancyResponseModel.resume_id == resume_id,
+                    VacancyResponseModel.status == "success",
+                )
                 .order_by(VacancyResponseModel.created_at.desc())
                 .limit(limit)
                 .offset(offset)
@@ -113,7 +119,10 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
             count_stmt = (
                 select(func.count())
                 .select_from(VacancyResponseModel)
-                .where(VacancyResponseModel.resume_id == resume_id)
+                .where(
+                    VacancyResponseModel.resume_id == resume_id,
+                    VacancyResponseModel.status == "success",
+                )
             )
             count_result = await session.execute(count_stmt)
             total = count_result.scalar_one()
@@ -153,7 +162,10 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
             
             stmt = (
                 select(VacancyResponseModel)
-                .where(VacancyResponseModel.resume_hash == resume_hash)
+                .where(
+                    VacancyResponseModel.resume_hash == resume_hash,
+                    VacancyResponseModel.status == "success",
+                )
                 .order_by(VacancyResponseModel.created_at.desc())
                 .limit(limit)
                 .offset(offset)
@@ -169,7 +181,10 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
             count_stmt = (
                 select(func.count())
                 .select_from(VacancyResponseModel)
-                .where(VacancyResponseModel.resume_hash == resume_hash)
+                .where(
+                    VacancyResponseModel.resume_hash == resume_hash,
+                    VacancyResponseModel.status == "success",
+                )
             )
             count_result = await session.execute(count_stmt)
             total = count_result.scalar_one()
@@ -209,6 +224,7 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
                 )
                 .where(
                     VacancyResponseModel.user_id == user_id,
+                    VacancyResponseModel.status == "success",
                     VacancyResponseModel.created_at >= start_datetime,
                     VacancyResponseModel.created_at < end_datetime + timedelta(days=1)
                 )
@@ -266,6 +282,7 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
                 )
                 .where(
                     and_(
+                        VacancyResponseModel.status == "success",
                         VacancyResponseModel.created_at >= start_date,
                         VacancyResponseModel.created_at <= end_date,
                     )
@@ -309,6 +326,7 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
                 )
                 .where(
                     and_(
+                        VacancyResponseModel.status == "success",
                         VacancyResponseModel.created_at >= start_date,
                         VacancyResponseModel.created_at <= end_date,
                     )
@@ -330,6 +348,36 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
 
             return responses_count, unique_users, avg_responses_per_user
 
+    async def get_failed_by_resume_and_vacancy_id(
+        self, resume_id: UUID, vacancy_id: int
+    ) -> VacancyResponse | None:
+        """Получить неудачный отклик по resume_id и vacancy_id.
+
+        Args:
+            resume_id: UUID резюме.
+            vacancy_id: ID вакансии.
+
+        Returns:
+            Доменная сущность VacancyResponse с status='failed' или None, если не найдено.
+        """
+        async with self._get_session() as session:
+            stmt = (
+                select(VacancyResponseModel)
+                .where(
+                    VacancyResponseModel.resume_id == resume_id,
+                    VacancyResponseModel.vacancy_id == vacancy_id,
+                    VacancyResponseModel.status == "failed",
+                )
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            model = result.scalar_one_or_none()
+
+            if model is None:
+                return None
+
+            return self._to_domain(model)
+
     def _to_domain(self, model: VacancyResponseModel) -> VacancyResponse:
         """Преобразовать SQLAlchemy модель в доменную сущность.
 
@@ -349,4 +397,7 @@ class VacancyResponseRepository(BaseRepository, VacancyResponseRepositoryPort):
             vacancy_name=model.vacancy_name,
             vacancy_url=model.vacancy_url,
             created_at=model.created_at,
+            status=model.status,
+            error_status_code=model.error_status_code,
+            error_message=model.error_message,
         )

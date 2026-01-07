@@ -138,6 +138,7 @@ conf = 0.2125 + 0.27 + 0.12 + 0.1425 + 0.08 = 0.825
             messages=messages,
             parse_func=parse_func,
             validate_func=None,
+            temperature=0.1,  # Низкая температура для стабильного JSON-парсинга
             response_format={"type": "json_object"},
             user_id=user_id,
             context=context,

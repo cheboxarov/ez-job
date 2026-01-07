@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from sqlalchemy import ForeignKey, Integer, Text, DateTime, String
+from sqlalchemy import ForeignKey, Integer, Text, DateTime, String, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -41,4 +41,16 @@ class VacancyResponseModel(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String, nullable=False, server_default="success")
+    error_status_code: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_vacancy_responses_resume_vacancy_status",
+            "resume_id",
+            "vacancy_id",
+            "status",
+        ),
     )

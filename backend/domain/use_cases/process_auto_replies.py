@@ -489,6 +489,20 @@ class ProcessAutoRepliesUseCase:
                 )
                 return
             
+            # Проверяем, не было ли уже ошибки для этой пары резюме+вакансия
+            check_uow = self._create_unit_of_work_factory()
+            async with check_uow:
+                failed_response = await check_uow.vacancy_response_repository.get_failed_by_resume_and_vacancy_id(
+                    resume_id=resume.id,
+                    vacancy_id=vacancy.vacancy_id
+                )
+                if failed_response:
+                    logger.info(
+                        f"Для резюме {resume.id} и вакансии {vacancy.vacancy_id} уже была ошибка "
+                        f"(status_code={failed_response.error_status_code}). Пропускаем."
+                    )
+                    return
+            
             logger.info(
                 f"Отправка отклика: vacancy_id={vacancy.vacancy_id}, "
                 f"resume_id={resume.id}, resume_hash={resume.headhunter_hash}, "

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
+import httpx
 from loguru import logger
 
 from domain.entities.vacancy_response import VacancyResponse
@@ -129,6 +131,64 @@ class RespondToVacancyAndSaveUseCase:
                 test_answers=test_answers,
                 test_metadata=test_metadata,
             )
+        except httpx.HTTPStatusError as exc:
+            # Если ошибка 400 Bad Request, сохраняем её в БД
+            if exc.response.status_code == 400:
+                error_status_code = exc.response.status_code
+                try:
+                    # Пытаемся извлечь текст ошибки из ответа
+                    error_body = exc.response.text
+                    # Пытаемся распарсить как JSON, если не получается - сохраняем как текст
+                    try:
+                        error_json = exc.response.json()
+                        error_message = json.dumps(error_json, ensure_ascii=False)
+                    except Exception:
+                        error_message = error_body[:1000] if error_body else str(exc)
+                except Exception:
+                    error_message = str(exc)
+
+                logger.warning(
+                    f"Ошибка 400 при отклике на вакансию vacancy_id={vacancy_id}, "
+                    f"resume_id={resume_id}, user_id={user_id}. Сохраняем в БД."
+                )
+
+                # Сохраняем ошибку в БД
+                try:
+                    failed_response = VacancyResponse(
+                        id=uuid4(),
+                        vacancy_id=vacancy_id,
+                        resume_id=resume_id,
+                        resume_hash=resume_hash,
+                        user_id=user_id,
+                        cover_letter=letter,
+                        vacancy_name=vacancy_name,
+                        vacancy_url=vacancy_url,
+                        created_at=datetime.utcnow(),
+                        status="failed",
+                        error_status_code=error_status_code,
+                        error_message=error_message,
+                    )
+                    await self._create_vacancy_response_uc.execute(failed_response)
+                    logger.info(
+                        f"Сохранена ошибка отклика в БД: vacancy_id={vacancy_id}, "
+                        f"resume_id={resume_id}, error_status_code={error_status_code}"
+                    )
+                except Exception as save_exc:
+                    logger.error(
+                        f"Ошибка при сохранении failed отклика в БД: {save_exc}",
+                        exc_info=True,
+                    )
+
+                # НЕ инкрементируем счетчик откликов при ошибке
+                # Пробрасываем исключение дальше для логирования
+            else:
+                # Для других ошибок просто логируем
+                logger.error(
+                    f"Ошибка при отправке отклика на вакансию vacancy_id={vacancy_id}, "
+                    f"resume_id={resume_id}, user_id={user_id}: {exc}",
+                    exc_info=True,
+                )
+            raise
         except Exception as exc:
             logger.error(
                 f"Ошибка при отправке отклика на вакансию vacancy_id={vacancy_id}, "

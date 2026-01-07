@@ -24,3 +24,6 @@ class VacancyResponse:
     vacancy_name: str
     vacancy_url: str | None = None
     created_at: datetime | None = None
+    status: str = "success"
+    error_status_code: int | None = None
+    error_message: str | None = None
