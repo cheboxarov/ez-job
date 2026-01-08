@@ -161,7 +161,6 @@ export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
             style={{
               borderRadius: 8,
               background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)',
-              border: 'none',
               border: '1px solid #0ea5e9',
               width: 32,
               height: 32,

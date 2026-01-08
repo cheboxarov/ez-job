@@ -1,6 +1,7 @@
 import { Typography, Breadcrumb } from 'antd';
 import { Link } from 'react-router-dom';
 import { HomeOutlined } from '@ant-design/icons';
+import { Helmet } from 'react-helmet-async';
 
 const { Title, Text } = Typography;
 
@@ -17,6 +18,8 @@ interface PageHeaderProps {
   icon?: React.ReactNode;
 }
 
+const BASE_URL = 'https://autoffer.ru';
+
 export const PageHeader = ({ 
   title, 
   subtitle, 
@@ -31,23 +34,57 @@ export const PageHeader = ({
     }))
   ];
 
+  // Генерация структурированных данных BreadcrumbList
+  const generateBreadcrumbSchema = () => {
+    const itemListElement = [
+      {
+        "@type": "ListItem",
+        "position": 1,
+        "name": "Главная",
+        "item": `${BASE_URL}/`
+      },
+      ...breadcrumbs.map((item, index) => ({
+        "@type": "ListItem",
+        "position": index + 2,
+        "name": item.title,
+        "item": item.path ? `${BASE_URL}${item.path}` : undefined
+      })).filter(item => item.item !== undefined)
+    ];
+
+    return {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": itemListElement
+    };
+  };
+
+  const breadcrumbSchema = breadcrumbs.length > 0 ? generateBreadcrumbSchema() : null;
+
   return (
-    <div
-      style={{
-        width: '100%',
-        boxSizing: 'border-box',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-        marginBottom: 20,
-        padding: '16px 20px 16px 32px',
-        background: '#ffffff',
-        borderRadius: 16,
-        border: '1px solid #e5e7eb',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
+    <>
+      {breadcrumbSchema && (
+        <Helmet>
+          <script type="application/ld+json">
+            {JSON.stringify(breadcrumbSchema)}
+          </script>
+        </Helmet>
+      )}
+      <div
+        style={{
+          width: '100%',
+          boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          marginBottom: 20,
+          padding: '16px 20px 16px 32px',
+          background: '#ffffff',
+          borderRadius: 16,
+          border: '1px solid #e5e7eb',
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
       {/* Gradient accent */}
       <div
         style={{
@@ -90,5 +127,6 @@ export const PageHeader = ({
         )}
       </div>
     </div>
+    </>
   );
 };

@@ -1,9 +1,17 @@
 import { Typography } from 'antd';
+import { SEO } from '../components/SEO';
 
 const { Title, Paragraph } = Typography;
 
 export const RegisterPage = () => {
   return (
+    <>
+      <SEO 
+        title="Регистрация"
+        description="Регистрация в AutoOffer больше не нужна. Вход происходит через HeadHunter по номеру телефона. Начните использовать автоматизацию поиска работы уже сегодня."
+        keywords="регистрация, autooffer, регистрация в системе, вход через headhunter"
+        canonical="https://autoffer.ru/register"
+      />
             <div
               style={{
         minHeight: '100vh',
@@ -30,5 +38,6 @@ export const RegisterPage = () => {
         </Paragraph>
           </div>
         </div>
+    </>
   );
 };

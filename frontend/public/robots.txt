@@ -1,7 +1,32 @@
 User-agent: *
 Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /resumes/
+Disallow: /settings/
+Disallow: /chats/
+Disallow: /events/
+Disallow: /statistics/
 
 User-agent: Yandex
 Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /resumes/
+Disallow: /settings/
+Disallow: /chats/
+Disallow: /events/
+Disallow: /statistics/
+Crawl-delay: 1
+
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /admin/
+Disallow: /resumes/
+Disallow: /settings/
+Disallow: /chats/
+Disallow: /events/
+Disallow: /statistics/
 
 Sitemap: https://autoffer.ru/sitemap.xml

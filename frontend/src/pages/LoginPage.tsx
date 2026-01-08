@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { ThreeBackgroundContainer } from '../components/landing/ThreeBackgroundContainer';
 import { Logo } from '../components/Logo';
+import { SEO } from '../components/SEO';
 import { 
   PhoneOutlined,
   ThunderboltOutlined,
@@ -110,9 +111,16 @@ export const LoginPage = () => {
   };
 
   return (
-    <Row style={{ minHeight: '100vh', background: '#ffffff' }}>
-      {/* Левая часть - Форма */}
-      <Col xs={24} md={12} lg={10} xl={8} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+    <>
+      <SEO 
+        title="Вход в систему"
+        description="Войдите в AutoOffer для управления автооткликами на вакансии HeadHunter. Авторизация через номер телефона и код из SMS."
+        keywords="войти, авторизация, вход в систему, autooffer, headhunter, вход"
+        canonical="https://autoffer.ru/login"
+      />
+      <Row style={{ minHeight: '100vh', background: '#ffffff' }}>
+        {/* Левая часть - Форма */}
+        <Col xs={24} md={12} lg={10} xl={8} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ maxWidth: 440, width: '100%', margin: '0 auto', padding: '40px 24px' }}>
           
           {/* Кнопка назад */}
@@ -221,7 +229,6 @@ export const LoginPage = () => {
                   fontWeight: 600, 
                   borderRadius: 8,
                   background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  border: 'none',
                   border: '1px solid #2563eb'
                 }}
               >
@@ -303,7 +310,8 @@ export const LoginPage = () => {
             pointerEvents: 'none',
           }} />
         </div>
-      </Col>
+        </Col>
     </Row>
+    </>
   );
 };
