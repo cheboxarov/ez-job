@@ -131,7 +131,14 @@ export interface VacancyResponsesMetricsResponse {
   total_metrics: VacancyResponseTotalMetrics;
 }
 
+export interface PaidUsersMetrics {
+  paid_users_count: number;
+  total_cost_for_paid_users: number;
+  avg_cost_per_paid_user: number;
+}
+
 export interface CombinedMetricsResponse {
   llm_metrics: LlmUsageMetricsResponse;
   responses_metrics: VacancyResponsesMetricsResponse;
+  paid_users_metrics: PaidUsersMetrics;
 }

@@ -89,6 +89,8 @@ export const AdminMetricsDashboardPage = () => {
         start_date: dateRange[0].toISOString(),
         end_date: dateRange[1].toISOString(),
         time_step: timeStep,
+        input_price_per_million: pricing.inputPricePerMillion,
+        output_price_per_million: pricing.outputPricePerMillion,
       };
 
       if (selectedPlan) {
@@ -291,6 +293,37 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card>
+                  <Statistic
+                    title="Среднее вызовов на пользователя"
+                    value={
+                      metrics.llm_metrics.total_metrics.unique_users > 0
+                        ? (
+                            metrics.llm_metrics.total_metrics.calls_count /
+                            metrics.llm_metrics.total_metrics.unique_users
+                          ).toFixed(1)
+                        : '0'
+                    }
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={6}>
+                <Card>
+                  <Statistic
+                    title="Средние токены за вызов"
+                    value={
+                      metrics.llm_metrics.total_metrics.calls_count > 0
+                        ? (
+                            metrics.llm_metrics.total_metrics.total_tokens /
+                            metrics.llm_metrics.total_metrics.calls_count
+                          ).toFixed(0)
+                        : '0'
+                    }
+                    formatter={(value) => value?.toLocaleString()}
+                  />
+                </Card>
+              </Col>
             </Row>
 
             <Row gutter={16} style={{ marginTop: 16 }}>
@@ -320,6 +353,37 @@ export const AdminMetricsDashboardPage = () => {
               </Col>
             </Row>
 
+            <Row gutter={16} style={{ marginTop: 16 }}>
+              <Col xs={24} sm={12} md={8}>
+                <Card>
+                  <Statistic
+                    title="Платных пользователей"
+                    value={metrics.paid_users_metrics.paid_users_count}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Card>
+                  <Statistic
+                    title="Средняя стоимость LLM на платного пользователя"
+                    value={metrics.paid_users_metrics.avg_cost_per_paid_user}
+                    formatter={(value) => tokenPricingUtils.formatCost(value as number)}
+                    precision={2}
+                  />
+                </Card>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Card>
+                  <Statistic
+                    title="Общая стоимость LLM для платных пользователей"
+                    value={metrics.paid_users_metrics.total_cost_for_paid_users}
+                    formatter={(value) => tokenPricingUtils.formatCost(value as number)}
+                    precision={2}
+                  />
+                </Card>
+              </Col>
+            </Row>
+
             <Card title="Вызовы LLM по периодам">
               <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <BarChart data={llmChartData}>
@@ -342,7 +406,8 @@ export const AdminMetricsDashboardPage = () => {
                   <YAxis yAxisId="left" />
                   <YAxis yAxisId="right" orientation="right" />
                   <Tooltip
-                    formatter={(value: number, name: string) => {
+                    formatter={(value: number | undefined, name: string | undefined) => {
+                      if (value === undefined) return '0';
                       if (name === 'Стоимость') {
                         return tokenPricingUtils.formatCost(value);
                       }

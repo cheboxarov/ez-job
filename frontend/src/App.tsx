@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { ResumesListPage } from './pages/ResumesListPage';
 import { ResumeDetailPage } from './pages/ResumeDetailPage';
+import { ResumeAutolikePage } from './pages/ResumeAutolikePage';
 import { ResumeVacanciesPage } from './pages/ResumeVacanciesPage';
 import { ResumeResponsesPage } from './pages/ResumeResponsesPage';
 import { HhAuthSettingsPage } from './pages/HhAuthSettingsPage';
@@ -99,6 +100,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ResumeResponsesPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resumes/:resumeId/autolike"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ResumeAutolikePage />
               </MainLayout>
             </ProtectedRoute>
           }

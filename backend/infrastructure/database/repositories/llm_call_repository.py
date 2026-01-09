@@ -13,6 +13,7 @@ from domain.entities.llm_call import LlmCall
 from domain.interfaces.llm_call_repository_port import LlmCallRepositoryPort
 from infrastructure.database.models.llm_call_model import LlmCallModel
 from infrastructure.database.models.user_subscription_model import UserSubscriptionModel
+from infrastructure.database.models.subscription_plan_model import SubscriptionPlanModel
 from infrastructure.database.repositories.base_repository import BaseRepository
 
 
@@ -222,6 +223,71 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
             avg_tokens_per_user = total_tokens / unique_users if unique_users > 0 else 0.0
 
             return calls_count, total_tokens, unique_users, avg_tokens_per_user
+
+    async def get_paid_users_llm_metrics(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> tuple[int, int, int]:
+        """Получить метрики LLM для платных пользователей.
+
+        Args:
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+
+        Returns:
+            Кортеж (количество платных пользователей, сумма prompt_tokens,
+            сумма completion_tokens).
+        """
+        async with self._get_session() as session:
+            # Подсчитываем количество уникальных платных пользователей
+            paid_users_stmt = (
+                select(func.count(distinct(UserSubscriptionModel.user_id)))
+                .join(
+                    SubscriptionPlanModel,
+                    UserSubscriptionModel.subscription_plan_id == SubscriptionPlanModel.id,
+                )
+                .where(
+                    and_(
+                        SubscriptionPlanModel.price > 0,
+                        SubscriptionPlanModel.is_active == True,
+                    )
+                )
+            )
+            paid_users_result = await session.execute(paid_users_stmt)
+            paid_users_count = int(paid_users_result.scalar_one() or 0)
+
+            # Подсчитываем сумму токенов для платных пользователей за период
+            tokens_stmt = (
+                select(
+                    func.coalesce(func.sum(LlmCallModel.prompt_tokens), 0).label("total_prompt_tokens"),
+                    func.coalesce(func.sum(LlmCallModel.completion_tokens), 0).label("total_completion_tokens"),
+                )
+                .join(
+                    UserSubscriptionModel,
+                    LlmCallModel.user_id == UserSubscriptionModel.user_id,
+                )
+                .join(
+                    SubscriptionPlanModel,
+                    UserSubscriptionModel.subscription_plan_id == SubscriptionPlanModel.id,
+                )
+                .where(
+                    and_(
+                        SubscriptionPlanModel.price > 0,
+                        SubscriptionPlanModel.is_active == True,
+                        LlmCallModel.created_at >= start_date,
+                        LlmCallModel.created_at <= end_date,
+                    )
+                )
+            )
+            tokens_result = await session.execute(tokens_stmt)
+            row = tokens_result.one()
+
+            total_prompt_tokens = int(row.total_prompt_tokens or 0)
+            total_completion_tokens = int(row.total_completion_tokens or 0)
+
+            return paid_users_count, total_prompt_tokens, total_completion_tokens
 
     def _to_domain(self, model: LlmCallModel) -> LlmCall:
         """Преобразовать SQLAlchemy модель в доменную сущность.

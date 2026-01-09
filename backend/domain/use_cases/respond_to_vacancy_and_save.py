@@ -93,7 +93,7 @@ class RespondToVacancyAndSaveUseCase:
         if self._check_subscription_uc is not None:
             try:
                 user_subscription, plan = await self._check_subscription_uc.execute(
-                    str(user_id)
+                    user_id
                 )
 
                 # Проверяем, не превышен ли лимит

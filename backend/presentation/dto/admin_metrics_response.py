@@ -58,10 +58,25 @@ class VacancyResponsesMetricsResponse(BaseModel):
     total_metrics: VacancyResponseTotalMetrics = Field(..., description="Суммарные метрики")
 
 
+class PaidUsersMetrics(BaseModel):
+    """Метрики платных пользователей."""
+
+    paid_users_count: int = Field(..., description="Количество пользователей с платными планами")
+    total_cost_for_paid_users: float = Field(
+        ..., description="Общая стоимость LLM для платных пользователей"
+    )
+    avg_cost_per_paid_user: float = Field(
+        ..., description="Средняя стоимость LLM на платного пользователя"
+    )
+
+
 class CombinedMetricsResponse(BaseModel):
     """Комбинированный ответ с метриками LLM и откликов."""
 
     llm_metrics: LlmUsageMetricsResponse = Field(..., description="Метрики LLM")
     responses_metrics: VacancyResponsesMetricsResponse = Field(
         ..., description="Метрики откликов"
+    )
+    paid_users_metrics: PaidUsersMetrics = Field(
+        ..., description="Метрики платных пользователей"
     )

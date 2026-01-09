@@ -106,3 +106,21 @@ class LlmCallRepositoryPort(ABC):
             Кортеж (общее количество вызовов, суммарные токены,
             количество уникальных пользователей, средние токены на пользователя).
         """
+
+    @abstractmethod
+    async def get_paid_users_llm_metrics(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> tuple[int, int, int]:
+        """Получить метрики LLM для платных пользователей.
+
+        Args:
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+
+        Returns:
+            Кортеж (количество платных пользователей, сумма prompt_tokens,
+            сумма completion_tokens).
+        """

@@ -359,6 +359,8 @@ async def get_combined_metrics(
     end_date: datetime = Query(..., description="Конечная дата (включительно)"),
     plan_id: UUID | None = Query(None, description="Фильтр по ID плана подписки"),
     time_step: str = Query("day", description="Шаг группировки: day, week, month"),
+    input_price_per_million: float = Query(0.0, description="Стоимость входных токенов за миллион"),
+    output_price_per_million: float = Query(0.0, description="Стоимость выходных токенов за миллион"),
     admin_llm_service: AdminLlmService = Depends(get_admin_llm_service),
 ) -> CombinedMetricsResponse:
     """Получить комбинированные метрики LLM и откликов за период."""
@@ -379,10 +381,20 @@ async def get_combined_metrics(
         time_step=time_step,
     )
 
+    paid_users_count, total_cost_for_paid_users, avg_cost_per_paid_user = (
+        await admin_llm_service.get_paid_users_metrics(
+            start_date=start_date,
+            end_date=end_date,
+            input_price_per_million=input_price_per_million,
+            output_price_per_million=output_price_per_million,
+        )
+    )
+
     from presentation.dto.admin_metrics_response import (
         LlmPeriodMetric,
         LlmTotalMetrics,
         LlmUsageMetricsResponse,
+        PaidUsersMetrics,
         VacancyResponsePeriodMetric,
         VacancyResponseTotalMetrics,
         VacancyResponsesMetricsResponse,
@@ -420,6 +432,11 @@ async def get_combined_metrics(
                 unique_users=responses_total[1],
                 avg_responses_per_user=responses_total[2],
             ),
+        ),
+        paid_users_metrics=PaidUsersMetrics(
+            paid_users_count=paid_users_count,
+            total_cost_for_paid_users=total_cost_for_paid_users,
+            avg_cost_per_paid_user=avg_cost_per_paid_user,
         ),
     )
 

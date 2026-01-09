@@ -457,10 +457,7 @@ class UnitOfWork(UnitOfWorkPort):
     async def commit(self) -> None:
         """Зафиксировать транзакцию."""
         if self._session:
-            from loguru import logger
-            logger.info("Коммит транзакции в UnitOfWork")
             await self._session.commit()
-            logger.info("Транзакция успешно закоммичена")
 
     async def rollback(self) -> None:
         """Откатить транзакцию."""

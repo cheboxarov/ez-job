@@ -9,6 +9,7 @@ from domain.entities.llm_call import LlmCall
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from domain.use_cases.admin.get_llm_call_detail import GetLlmCallDetailUseCase
 from domain.use_cases.admin.get_llm_usage_metrics import GetLlmUsageMetricsUseCase
+from domain.use_cases.admin.get_paid_users_metrics import GetPaidUsersMetricsUseCase
 from domain.use_cases.admin.get_vacancy_responses_metrics import (
     GetVacancyResponsesMetricsUseCase,
 )
@@ -94,3 +95,34 @@ class AdminLlmService:
                 llm_call_repository=self._unit_of_work.standalone_llm_call_repository,
             )
             return await use_case.execute(call_id)
+
+    async def get_paid_users_metrics(
+        self,
+        *,
+        start_date: datetime,
+        end_date: datetime,
+        input_price_per_million: float = 0.0,
+        output_price_per_million: float = 0.0,
+    ) -> tuple[int, float, float]:
+        """Получить метрики платных пользователей.
+
+        Args:
+            start_date: Начальная дата (включительно).
+            end_date: Конечная дата (включительно).
+            input_price_per_million: Стоимость входных токенов за миллион.
+            output_price_per_million: Стоимость выходных токенов за миллион.
+
+        Returns:
+            Кортеж (количество платных пользователей, общая стоимость LLM для платных пользователей,
+            средняя стоимость LLM на платного пользователя).
+        """
+        async with self._unit_of_work:
+            use_case = GetPaidUsersMetricsUseCase(
+                llm_call_repository=self._unit_of_work.standalone_llm_call_repository,
+            )
+            return await use_case.execute(
+                start_date=start_date,
+                end_date=end_date,
+                input_price_per_million=input_price_per_million,
+                output_price_per_million=output_price_per_million,
+            )
