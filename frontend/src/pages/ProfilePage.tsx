@@ -15,6 +15,7 @@ import { useAuthStore } from '../stores/authStore';
 import { useDailyResponsesStore } from '../stores/dailyResponsesStore';
 import { getMySubscriptionPlan } from '../api/subscription';
 import { PageHeader } from '../components/PageHeader';
+import { useWindowSize } from '../hooks/useWindowSize';
 import type { UserSubscriptionResponse } from '../types/api';
 
 const { Text, Title } = Typography;
@@ -53,6 +54,7 @@ export const ProfilePage = () => {
   const [subscriptionData, setSubscriptionData] = useState<UserSubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const { count, limit, remaining, secondsUntilReset, fetchDailyResponses } = useDailyResponsesStore();
+  const { isMobile } = useWindowSize();
 
   useEffect(() => {
     const loadSubscriptionData = async () => {
@@ -80,6 +82,9 @@ export const ProfilePage = () => {
   };
 
   const getPlanConfig = (planName: string) => {
+    // Извлекаем базовое название плана (PLAN_1, PLAN_2, PLAN_3)
+    const basePlanName = planName.replace(/_WEEK|_MONTH|_2MONTHS$/, '');
+    
     const configs: Record<string, { name: string; gradient: string; icon: React.ReactNode; badge: string }> = {
       FREE: { 
         name: 'Бесплатный', 
@@ -106,7 +111,7 @@ export const ProfilePage = () => {
         badge: 'VIP'
       },
     };
-    return configs[planName] || configs.FREE;
+    return configs[basePlanName] || configs.FREE;
   };
 
   const getProgressColor = (percentage: number): string => {
@@ -152,7 +157,7 @@ export const ProfilePage = () => {
         breadcrumbs={[{ title: 'Профиль' }]}
       />
 
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: isMobile ? '0 16px' : '0 24px' }}>
         {loading ? (
           <div style={{ 
             display: 'flex', 
@@ -181,7 +186,7 @@ export const ProfilePage = () => {
               <div
                 style={{
                   background: planConfig.gradient,
-                  padding: '40px 40px 80px',
+                  padding: isMobile ? '24px 16px 60px' : '40px 40px 80px',
                   position: 'relative',
                 }}
               >
@@ -190,8 +195,8 @@ export const ProfilePage = () => {
                   position: 'absolute',
                   top: -50,
                   right: -50,
-                  width: 200,
-                  height: 200,
+                  width: isMobile ? 150 : 200,
+                  height: isMobile ? 150 : 200,
                   background: 'rgba(255,255,255,0.1)',
                   borderRadius: '50%',
                 }} />
@@ -199,8 +204,8 @@ export const ProfilePage = () => {
                   position: 'absolute',
                   bottom: -30,
                   left: '30%',
-                  width: 100,
-                  height: 100,
+                  width: isMobile ? 80 : 100,
+                  height: isMobile ? 80 : 100,
                   background: 'rgba(255,255,255,0.05)',
                   borderRadius: '50%',
                 }} />
@@ -209,15 +214,15 @@ export const ProfilePage = () => {
                   <Col>
                     <div
                       style={{
-                        width: 88,
-                        height: 88,
+                        width: isMobile ? 64 : 88,
+                        height: isMobile ? 64 : 88,
                         background: 'rgba(255,255,255,0.2)',
                         backdropFilter: 'blur(10px)',
                         borderRadius: 20,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 32,
+                        fontSize: isMobile ? 24 : 32,
                         fontWeight: 700,
                         color: 'white',
                         border: '3px solid rgba(255,255,255,0.3)',
@@ -257,7 +262,7 @@ export const ProfilePage = () => {
               </div>
 
               {/* Plan info card overlapping */}
-              <div style={{ padding: '0 32px', marginTop: -48 }}>
+              <div style={{ padding: isMobile ? '0 16px' : '0 32px', marginTop: isMobile ? -32 : -48 }}>
                 <Card
                   bordered={true}
                     style={{
@@ -328,7 +333,7 @@ export const ProfilePage = () => {
             </Card>
 
             {/* Stats Grid */}
-            <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
+            <Row gutter={isMobile ? [16, 16] : [20, 20]} style={{ marginBottom: 24 }}>
               <Col xs={24} sm={12} lg={6}>
                 <Tooltip title="Количество откликов, отправленных сегодня">
                   <Card
@@ -521,6 +526,7 @@ export const ProfilePage = () => {
                 borderRadius: 20,
                 border: '1px solid #e5e7eb',
               }}
+              styles={{ body: { padding: isMobile ? 16 : 24 } }}
             >
               <div style={{ marginBottom: 16 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -553,7 +559,7 @@ export const ProfilePage = () => {
               {subscriptionData.next_reset_at && (
                 <div
                   style={{
-                    padding: '16px 20px',
+                    padding: isMobile ? '12px 16px' : '16px 20px',
                     background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
                     borderRadius: 14,
                     border: '1px solid #e5e7eb',

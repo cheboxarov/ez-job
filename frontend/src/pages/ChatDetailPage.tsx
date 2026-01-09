@@ -6,6 +6,7 @@ import { getChat, sendChatMessage } from '../api/chats';
 import { getAgentActions } from '../api/agentActions';
 import { ActionCard } from '../components/ActionCard';
 import { PageHeader } from '../components/PageHeader';
+import { useWindowSize } from '../hooks/useWindowSize';
 import type { ChatDetailedResponse, ChatMessage, AgentAction } from '../types/api';
 
 const { TextArea } = Input;
@@ -14,6 +15,7 @@ const { Text, Paragraph } = Typography;
 export const ChatDetailPage = () => {
   const navigate = useNavigate();
   const { chatId } = useParams<{ chatId: string }>();
+  const windowSize = useWindowSize();
   const [chat, setChat] = useState<ChatDetailedResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +24,8 @@ export const ChatDetailPage = () => {
   const [actions, setActions] = useState<AgentAction[]>([]);
   const [loadingActions, setLoadingActions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  const isMobile = useMemo(() => windowSize.width < 768, [windowSize.width]);
 
   useEffect(() => {
     if (chatId) {
@@ -148,33 +152,97 @@ export const ChatDetailPage = () => {
     return null;
   }
 
-  return (
-    <div>
-      <PageHeader
-        title={`Чат #${chat.id}`}
-        icon={<MessageOutlined />}
-        breadcrumbs={[
-          { title: 'Чаты', path: '/chats' },
-          { title: `Чат #${chat.id}` }
-        ]}
-      />
+  // Функция для парсинга и подсветки ссылок в тексте
+  const parseLinks = (text: string, isUser: boolean) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts: (string | JSX.Element)[] = [];
+    let lastIndex = 0;
+    let match;
+    let key = 0;
 
+    while ((match = urlRegex.exec(text)) !== null) {
+      // Добавляем текст до ссылки
+      if (match.index > lastIndex) {
+        parts.push(text.substring(lastIndex, match.index));
+      }
+      
+      // Добавляем ссылку
+      const url = match[0];
+      parts.push(
+        <a
+          key={key++}
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            color: isUser ? '#ffffff' : '#2563eb',
+            textDecoration: 'underline',
+            textDecorationColor: isUser ? 'rgba(255, 255, 255, 0.6)' : 'rgba(37, 99, 235, 0.4)',
+            wordBreak: 'break-all',
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.textDecorationColor = isUser ? 'rgba(255, 255, 255, 0.9)' : 'rgba(37, 99, 235, 0.8)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.textDecorationColor = isUser ? 'rgba(255, 255, 255, 0.6)' : 'rgba(37, 99, 235, 0.4)';
+          }}
+        >
+          {url}
+        </a>
+      );
+      lastIndex = match.index + match[0].length;
+    }
+    
+    // Добавляем оставшийся текст
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+    
+    return parts.length > 0 ? parts : [text];
+  };
+
+  return (
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100vh',
+      overflow: 'hidden',
+    }}>
+      {/* Header - фиксированная высота */}
+      <div style={{ flexShrink: 0 }}>
+        <PageHeader
+          title={`Чат #${chat.id}`}
+          icon={<MessageOutlined />}
+          breadcrumbs={[
+            { title: 'Чаты', path: '/chats' },
+            { title: `Чат #${chat.id}` }
+          ]}
+        />
+      </div>
+
+      {/* Messages area - занимает оставшееся пространство и скроллится */}
       <div
         style={{
-          width: '100%',
+          flex: 1,
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          padding: isMobile ? '16px' : '24px',
+          paddingBottom: 0,
         }}
       >
-        {/* Messages area */}
         <div
           style={{
-            marginBottom: 24,
-            padding: '24px',
+            flex: 1,
+            padding: isMobile ? '16px' : '24px',
             background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
             borderRadius: 20,
             display: 'flex',
             flexDirection: 'column',
-            maxHeight: 'calc(100vh - 280px)',
-            minHeight: 500,
+            overflow: 'hidden',
+            marginBottom: isMobile ? 12 : 16,
           }}
         >
           <div
@@ -186,6 +254,7 @@ export const ChatDetailPage = () => {
               flex: 1,
               overflowY: 'auto',
               overflowX: 'hidden',
+              paddingRight: 4,
             }}
           >
             {chat.messages && chat.messages.items.length > 0 ? (
@@ -219,7 +288,7 @@ export const ChatDetailPage = () => {
                 {/* Message bubble */}
                 <div
                   style={{
-                    maxWidth: '75%',
+                    maxWidth: isMobile ? '90%' : '75%',
                     padding: '14px 18px',
                     borderRadius: isUser 
                       ? '20px 20px 4px 20px' 
@@ -242,7 +311,7 @@ export const ChatDetailPage = () => {
                       color: isUser ? '#ffffff' : '#0f172a',
                     }}
                   >
-                    {message.text}
+                    {parseLinks(message.text, isUser)}
                   </Paragraph>
                   
                   <Text 
@@ -262,7 +331,7 @@ export const ChatDetailPage = () => {
                 {actionsByMessageId.has(message.id) && (
                   <div style={{ 
                     marginTop: 8,
-                    maxWidth: '75%',
+                    maxWidth: isMobile ? '90%' : '75%',
                     width: '100%',
                   }}>
                     {actionsByMessageId.get(message.id)!.map((action) => (
@@ -298,52 +367,54 @@ export const ChatDetailPage = () => {
             )}
           </div>
         </div>
+      </div>
 
-        {/* Message input (fixed inside page, без собственной прокрутки) */}
-        <div
-          style={{
-            background: '#ffffff',
-            borderRadius: 16,
-            padding: '16px 20px',
-            border: '1px solid #e5e7eb',
-          }}
-        >
-          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
-            <TextArea
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Введите сообщение..."
-              autoSize={{ minRows: 1, maxRows: 4 }}
-              onPressEnter={(e) => {
-                if (e.shiftKey) return;
-                e.preventDefault();
-                handleSendMessage();
-              }}
-              disabled={sending}
-              style={{
-                flex: 1,
-                borderRadius: 12,
-                resize: 'none',
-                fontSize: 15,
-              }}
-            />
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={handleSendMessage}
-              loading={sending}
-              disabled={!messageText.trim()}
-              style={{
-                height: 44,
-                width: 44,
-                borderRadius: 12,
-                background: messageText.trim()
-                  ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
-                  : undefined,
-                border: messageText.trim() ? '1px solid #2563eb' : undefined,
-              }}
-            />
-          </div>
+      {/* Message input - фиксированная высота, всегда внизу */}
+      <div
+        style={{
+          flexShrink: 0,
+          background: '#ffffff',
+          borderRadius: 16,
+          padding: isMobile ? '12px 16px' : '16px 20px',
+          border: '1px solid #e5e7eb',
+          margin: isMobile ? '0 16px 16px' : '0 24px 24px',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+          <TextArea
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            placeholder="Введите сообщение..."
+            autoSize={{ minRows: 1, maxRows: 4 }}
+            onPressEnter={(e) => {
+              if (e.shiftKey) return;
+              e.preventDefault();
+              handleSendMessage();
+            }}
+            disabled={sending}
+            style={{
+              flex: 1,
+              borderRadius: 12,
+              resize: 'none',
+              fontSize: 15,
+            }}
+          />
+          <Button
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={handleSendMessage}
+            loading={sending}
+            disabled={!messageText.trim()}
+            style={{
+              height: 44,
+              width: 44,
+              borderRadius: 12,
+              background: messageText.trim()
+                ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                : undefined,
+              border: messageText.trim() ? '1px solid #2563eb' : undefined,
+            }}
+          />
         </div>
       </div>
     </div>

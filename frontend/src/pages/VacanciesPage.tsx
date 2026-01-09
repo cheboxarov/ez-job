@@ -38,6 +38,7 @@ import {
 } from '../api/filterSettings';
 import { getAreas, type HhArea } from '../api/dictionaries';
 import { useVacanciesStore } from '../stores/vacanciesStore';
+import { useWindowSize } from '../hooks/useWindowSize';
 import type { VacancyRequest, UserFilterSettings } from '../types/api';
 
 const { Text } = Typography;
@@ -57,6 +58,7 @@ const FILTER_COMPARE_KEYS: (keyof UserFilterSettings)[] = [
 
 export const VacanciesPage = () => {
   const { vacancies, setVacancies } = useVacanciesStore();
+  const { isMobile } = useWindowSize();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [areasTree, setAreasTree] = useState<any[]>([]);
@@ -206,7 +208,7 @@ export const VacanciesPage = () => {
         breadcrumbs={[{ title: 'Поиск вакансий' }]}
       />
 
-      <Row gutter={[24, 24]}>
+      <Row gutter={isMobile ? [16, 16] : [24, 24]}>
         {/* Фильтры */}
         <Col xs={24} md={8} lg={6}>
           <Card
@@ -225,11 +227,11 @@ export const VacanciesPage = () => {
                 >
                   <FilterOutlined style={{ color: 'white', fontSize: 14 }} />
                 </div>
-                <span style={{ fontWeight: 600 }}>Фильтры</span>
+                <span style={{ fontWeight: 600, fontSize: isMobile ? 14 : 16 }}>Фильтры</span>
               </div>
             }
             extra={
-              <Space size="small">
+              <Space size="small" wrap={isMobile}>
                 {isDirty && (
                   <Tooltip title="Сохранить фильтры">
                     <Button
@@ -237,6 +239,7 @@ export const VacanciesPage = () => {
                       icon={<SaveOutlined />}
                       onClick={handleSave}
                       loading={loading}
+                      size={isMobile ? 'small' : 'middle'}
                     />
                   </Tooltip>
                 )}
@@ -246,16 +249,17 @@ export const VacanciesPage = () => {
                     icon={<ExperimentOutlined />}
                     onClick={handleSuggest}
                     loading={loading}
+                    size={isMobile ? 'small' : 'middle'}
                   />
                 </Tooltip>
               </Space>
             }
             bordered={false}
             style={{ 
-              position: 'sticky', 
-              top: 24, 
-              maxHeight: 'calc(100vh - 48px)', 
-              overflowY: 'auto',
+              position: isMobile ? 'relative' : 'sticky', 
+              top: isMobile ? 'auto' : 24, 
+              maxHeight: isMobile ? 'none' : 'calc(100vh - 48px)', 
+              overflowY: isMobile ? 'visible' : 'auto',
               borderRadius: 16,
               border: '1px solid #e5e7eb',
             }}
@@ -341,31 +345,61 @@ export const VacanciesPage = () => {
                   </span>
                 }
               >
-                <Space.Compact style={{ width: '100%' }}>
-                  <Form.Item name="salary" noStyle>
-                    <InputNumber style={{ width: '70%', borderRadius: '10px 0 0 10px' }} placeholder="Минимум" />
-                  </Form.Item>
-                  <Form.Item name="currency" noStyle initialValue="RUR">
-                    <Select style={{ width: '30%' }}>
-                      <Select.Option value="RUR">₽</Select.Option>
-                      <Select.Option value="USD">$</Select.Option>
-                      <Select.Option value="EUR">€</Select.Option>
-                    </Select>
-                  </Form.Item>
-                </Space.Compact>
+                {isMobile ? (
+                  <Space direction="vertical" style={{ width: '100%' }} size="small">
+                    <Form.Item name="salary" noStyle style={{ marginBottom: 0 }}>
+                      <InputNumber style={{ width: '100%', borderRadius: 10 }} placeholder="Минимум" />
+                    </Form.Item>
+                    <Form.Item name="currency" noStyle initialValue="RUR" style={{ marginBottom: 0 }}>
+                      <Select style={{ width: '100%', borderRadius: 10 }}>
+                        <Select.Option value="RUR">₽</Select.Option>
+                        <Select.Option value="USD">$</Select.Option>
+                        <Select.Option value="EUR">€</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Space>
+                ) : (
+                  <Space.Compact style={{ width: '100%' }}>
+                    <Form.Item name="salary" noStyle>
+                      <InputNumber style={{ width: '70%', borderRadius: '10px 0 0 10px' }} placeholder="Минимум" />
+                    </Form.Item>
+                    <Form.Item name="currency" noStyle initialValue="RUR">
+                      <Select style={{ width: '30%' }}>
+                        <Select.Option value="RUR">₽</Select.Option>
+                        <Select.Option value="USD">$</Select.Option>
+                        <Select.Option value="EUR">€</Select.Option>
+                      </Select>
+                    </Form.Item>
+                  </Space.Compact>
+                )}
               </Form.Item>
 
               <Form.Item name="only_with_salary" valuePropName="checked">
                 <Checkbox>Только с указанной зарплатой</Checkbox>
               </Form.Item>
+
+              {isMobile && (
+                <Form.Item>
+                  <GradientButton
+                    type="primary"
+                    icon={<SearchOutlined />}
+                    onClick={handleFind}
+                    loading={loading}
+                    block
+                    style={{ height: 44, borderRadius: 10 }}
+                  >
+                    Найти вакансии
+                  </GradientButton>
+                </Form.Item>
+              )}
             </Form>
           </Card>
         </Col>
 
         {/* Список вакансий */}
         <Col xs={24} md={16} lg={18}>
-          <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
-            {vacancies.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', minHeight: isMobile ? 'auto' : 'calc(100vh - 200px)' }}>
+            {!isMobile && vacancies.length > 0 && (
               <div
                 style={{
                   marginBottom: 20,
@@ -388,8 +422,24 @@ export const VacanciesPage = () => {
               </div>
             )}
 
+            {isMobile && vacancies.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)',
+                  borderRadius: 12,
+                  textAlign: 'center',
+                }}
+              >
+                <Text strong style={{ fontSize: 14, color: '#475569' }}>
+                  Найдено: {vacancies.length}
+                </Text>
+              </div>
+            )}
+
             {loading && (
-              <div style={{ textAlign: 'center', padding: '80px 0' }}>
+              <div style={{ textAlign: 'center', padding: isMobile ? '40px 0' : '80px 0' }}>
                 <Spin size="large" tip="Анализируем вакансии..." />
               </div>
             )}
@@ -400,12 +450,12 @@ export const VacanciesPage = () => {
                 description={error}
                 type="error"
                 showIcon
-                style={{ marginBottom: 24, borderRadius: 12 }}
+                style={{ marginBottom: isMobile ? 16 : 24, borderRadius: 12 }}
               />
             )}
 
             {!loading && !error && vacancies.length > 0 && (
-              <div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 12 : 16 }}>
                 {vacancies.map((vacancy) => (
                   <VacancyCard key={vacancy.vacancy_id} vacancy={vacancy} />
                 ))}
@@ -416,7 +466,7 @@ export const VacanciesPage = () => {
               <EmptyState
                 icon={<SearchOutlined />}
                 title="Пока пусто"
-                description="Настройте параметры поиска слева для получения результатов"
+                description={isMobile ? "Настройте параметры поиска выше для получения результатов" : "Настройте параметры поиска слева для получения результатов"}
               />
             )}
           </div>

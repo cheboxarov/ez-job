@@ -29,6 +29,9 @@ from domain.use_cases.search_and_get_filtered_vacancy_list import (
     SearchAndGetFilteredVacancyListUseCase,
 )
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from infrastructure.database.session import create_session_factory
+from infrastructure.database.repositories.user_hh_auth_data_repository import UserHhAuthDataRepository
+from config import DatabaseConfig
 
 
 class AutoReplyDisabledError(Exception):
@@ -62,6 +65,7 @@ class ProcessAutoRepliesUseCase:
         increment_response_count_uc=None,
         max_vacancies_per_resume: int = 200,
         delay_between_replies_seconds: int = 30,
+        database_config: DatabaseConfig | None = None,
     ) -> None:
         """Инициализация use case.
 
@@ -79,6 +83,7 @@ class ProcessAutoRepliesUseCase:
             increment_response_count_uc: Use case для инкремента счетчика откликов (опционально).
             max_vacancies_per_resume: Максимальное количество вакансий для обработки на одно резюме.
             delay_between_replies_seconds: Задержка между откликами в секундах.
+            database_config: Конфигурация БД для создания standalone репозитория обновления cookies.
         """
         self._resume_repository = resume_repository
         self._user_hh_auth_data_repository = user_hh_auth_data_repository
@@ -93,6 +98,7 @@ class ProcessAutoRepliesUseCase:
         self._increment_response_count_uc = increment_response_count_uc
         self._max_vacancies_per_resume = max_vacancies_per_resume
         self._delay_between_replies_seconds = delay_between_replies_seconds
+        self._database_config = database_config
 
     async def execute(self) -> None:
         """Выполнить обработку автооткликов для всех активных резюме."""
@@ -194,10 +200,21 @@ class ProcessAutoRepliesUseCase:
 
         search_session_id = str(uuid.uuid4())
 
-        # Создаем use case для обновления cookies
-        update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            self._user_hh_auth_data_repository
-        )
+        # Создаем use case для обновления cookies с standalone репозиторием
+        # Это гарантирует, что advisory lock будет держаться только на время обновления cookies,
+        # а не на всё время обработки резюме (что предотвращает deadlock с login_by_code)
+        if self._database_config:
+            # Создаем standalone репозиторий с отдельной session_factory
+            session_factory = create_session_factory(self._database_config)
+            standalone_cookies_repository = UserHhAuthDataRepository(session_factory)
+            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(standalone_cookies_repository)
+            logger.debug(f"Создан UpdateUserHhAuthCookiesUseCase с standalone репозиторием для резюме {resume.id}")
+        else:
+            # Fallback: используем транзакционный репозиторий (не рекомендуется)
+            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
+                self._user_hh_auth_data_repository
+            )
+            logger.warning(f"UpdateUserHhAuthCookiesUseCase создан с транзакционным репозиторием (database_config не передан)")
 
         try:
             vacancies = await self._search_and_get_filtered_vacancy_list_uc.execute(

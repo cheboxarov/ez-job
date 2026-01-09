@@ -4,6 +4,7 @@ import { BarChartOutlined } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getResponsesStatistics } from '../api/vacancies';
 import { PageHeader } from '../components/PageHeader';
+import { useWindowSize } from '../hooks/useWindowSize';
 import type { StatisticsResponse } from '../types/api';
 
 const { Title, Text } = Typography;
@@ -11,6 +12,7 @@ const { Title, Text } = Typography;
 export const StatisticsPage = () => {
   const [statistics, setStatistics] = useState<StatisticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
+  const { isMobile } = useWindowSize();
 
   useEffect(() => {
     loadStatistics();
@@ -65,16 +67,20 @@ export const StatisticsPage = () => {
         breadcrumbs={[{ title: 'Статистика' }]}
       />
 
-      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+      <div style={{ 
+        maxWidth: 1200, 
+        margin: '0 auto',
+        padding: isMobile ? '0 16px' : '0 24px',
+      }}>
         <Card
           bordered={false}
           style={{
             borderRadius: 20,
             border: '1px solid #e5e7eb',
-            marginBottom: 24,
+            marginBottom: isMobile ? 16 : 24,
           }}
         >
-          <div style={{ marginBottom: 24 }}>
+          <div style={{ marginBottom: isMobile ? 16 : 24 }}>
             <Title level={4} style={{ marginBottom: 8, color: '#0f172a' }}>
               Отклики за 7 дней
             </Title>
@@ -84,7 +90,7 @@ export const StatisticsPage = () => {
           </div>
 
           {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={400}>
+            <ResponsiveContainer width="100%" height={isMobile ? 280 : 400}>
               <LineChart
                 data={chartData}
                 margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
@@ -121,7 +127,7 @@ export const StatisticsPage = () => {
           ) : (
             <div style={{ 
               textAlign: 'center', 
-              padding: '60px 20px',
+              padding: isMobile ? '40px 16px' : '60px 20px',
               color: '#94a3b8',
             }}>
               <Text style={{ fontSize: 15 }}>

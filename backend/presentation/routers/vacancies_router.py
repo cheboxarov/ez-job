@@ -109,7 +109,7 @@ async def get_relevant_vacancies(
 
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
 
         vacancies = await vacancies_service.get_relevant_vacancies_from_resume(
@@ -212,7 +212,7 @@ async def get_relevant_vacancy_list(
 
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
 
         # Если min_confidence не передан, используем из конфига

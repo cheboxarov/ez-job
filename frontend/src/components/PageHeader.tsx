@@ -1,9 +1,11 @@
-import { Typography, Breadcrumb } from 'antd';
+import { Typography, Breadcrumb, Grid } from 'antd';
 import { Link } from 'react-router-dom';
 import { HomeOutlined } from '@ant-design/icons';
 import { Helmet } from 'react-helmet-async';
+import { useEffect, useState } from 'react';
 
 const { Title, Text } = Typography;
+const { useBreakpoint } = Grid;
 
 interface BreadcrumbItem {
   title: string;
@@ -27,6 +29,15 @@ export const PageHeader = ({
   actions,
   icon
 }: PageHeaderProps) => {
+  const screens = useBreakpoint();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    if (Object.keys(screens).length > 0) {
+      setIsMobile(!screens.md);
+    }
+  }, [screens]);
+
   const breadcrumbItems = [
     { title: <Link to="/"><HomeOutlined /></Link> },
     ...breadcrumbs.map(item => ({
@@ -77,7 +88,7 @@ export const PageHeader = ({
           flexDirection: 'column',
           gap: 12,
           marginBottom: 20,
-          padding: '16px 20px 16px 32px',
+          padding: isMobile ? '16px' : '16px 20px 16px 32px',
           background: '#ffffff',
           borderRadius: 16,
           border: '1px solid #e5e7eb',
@@ -102,14 +113,14 @@ export const PageHeader = ({
       
       <div style={{ 
         display: 'flex', 
-        alignItems: 'center', 
+        alignItems: isMobile ? 'flex-start' : 'center', 
         justifyContent: 'space-between',
-        flexWrap: 'wrap',
+        flexDirection: isMobile ? 'column' : 'row',
         gap: 16 
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div>
-            <Title level={2} style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#0f172a' }}>
+            <Title level={2} style={{ margin: 0, fontSize: isMobile ? 22 : 26, fontWeight: 700, color: '#0f172a' }}>
               {title}
             </Title>
             {subtitle && (
@@ -121,7 +132,13 @@ export const PageHeader = ({
         </div>
         
         {actions && (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          <div style={{ 
+            display: 'flex', 
+            gap: 12, 
+            alignItems: 'center',
+            width: isMobile ? '100%' : 'auto',
+            flexWrap: 'wrap',
+          }}>
             {actions}
           </div>
         )}

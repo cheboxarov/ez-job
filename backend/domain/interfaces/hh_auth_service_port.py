@@ -58,3 +58,40 @@ class HhAuthServicePort(ABC):
             Exception: При ошибках выполнения запроса к HH API или сохранения в БД.
         """
 
+    @abstractmethod
+    async def get_captcha_key(
+        self,
+        cookies: Dict[str, str],
+        lang: str = "RU",
+    ) -> tuple[Dict[str, Any], Dict[str, str]]:
+        """Получить ключ капчи HH.
+
+        Args:
+            cookies: Текущие cookies HH.
+            lang: Язык капчи (по умолчанию RU).
+
+        Returns:
+            Tuple с результатом (содержит ключ капчи) и обновленными cookies.
+
+        Raises:
+            Exception: При ошибках выполнения запроса к HH API.
+        """
+
+    @abstractmethod
+    async def get_captcha_picture(
+        self,
+        cookies: Dict[str, str],
+        captcha_key: str,
+    ) -> tuple[Dict[str, Any], Dict[str, str]]:
+        """Получить картинку капчи HH в base64.
+
+        Args:
+            cookies: Текущие cookies HH.
+            captcha_key: Ключ капчи, полученный из get_captcha_key.
+
+        Returns:
+            Tuple с результатом (содержит content_type и image_base64) и обновленными cookies.
+
+        Raises:
+            Exception: При ошибках выполнения запроса к HH API.
+        """

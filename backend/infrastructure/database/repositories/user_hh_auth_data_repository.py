@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql import func
 
 from domain.entities.user_hh_auth_data import UserHhAuthData
+from domain.exceptions.lock_not_acquired import LockNotAcquiredError
 from domain.interfaces.user_hh_auth_data_repository_port import (
     UserHhAuthDataRepositoryPort,
 )
@@ -101,17 +102,26 @@ class UserHhAuthDataRepository(BaseRepository, UserHhAuthDataRepositoryPort):
                 _debug_log(
                     "H5",
                     "user_hh_auth_data_repository.get_by_user_id:before_advisory_lock",
-                    "acquiring pg_advisory_xact_lock",
+                    "acquiring pg_try_advisory_xact_lock",
                     {"user_id": str(user_id), "k1": k1, "k2": k2, "session_id": id(session)},
                 )
-                await session.execute(
-                    text("SELECT pg_advisory_xact_lock(:k1, :k2)"),
+                lock_result = await session.execute(
+                    text("SELECT pg_try_advisory_xact_lock(:k1, :k2)"),
                     {"k1": k1, "k2": k2},
                 )
+                is_locked = lock_result.scalar()
+                if not is_locked:
+                    _debug_log(
+                        "H5",
+                        "user_hh_auth_data_repository.get_by_user_id:lock_failed",
+                        "pg_try_advisory_xact_lock failed - lock busy",
+                        {"user_id": str(user_id), "session_id": id(session)},
+                    )
+                    raise LockNotAcquiredError(f"Could not acquire lock for user_id={user_id}")
                 _debug_log(
                     "H5",
                     "user_hh_auth_data_repository.get_by_user_id:after_advisory_lock",
-                    "pg_advisory_xact_lock acquired",
+                    "pg_try_advisory_xact_lock acquired",
                     {"user_id": str(user_id), "session_id": id(session)},
                 )
 

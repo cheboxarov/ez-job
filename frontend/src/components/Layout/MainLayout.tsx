@@ -1,4 +1,4 @@
-import { Layout, Menu, Button, Badge } from 'antd';
+import { Layout, Menu, Button, Badge, Drawer, Grid } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   FileTextOutlined,
@@ -11,13 +11,15 @@ import {
   BarChartOutlined,
   CrownOutlined,
   SafetyOutlined,
+  MenuOutlined,
   } from '@ant-design/icons';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAgentActionsStore } from '../../stores/agentActionsStore';
 import { Logo } from '../Logo';
 
 const { Sider, Content } = Layout;
+const { useBreakpoint } = Grid;
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -28,6 +30,17 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   const { unreadCount, fetchUnreadCount } = useAgentActionsStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const screens = useBreakpoint();
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // Если экраны определились (screens не пустой объект)
+    if (Object.keys(screens).length > 0) {
+      // Считаем мобильным если нет md (т.е. меньше 768px)
+      setIsMobile(!screens.md);
+    }
+  }, [screens]);
 
   useEffect(() => {
     fetchUnreadCount();
@@ -124,6 +137,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   }
 
   const handleMenuClick = ({ key }: { key: string }) => {
+    if (isMobile) {
+      setDrawerVisible(false);
+    }
+    
     if (key === 'support') {
       window.open('https://t.me/wlovemm', '_blank');
       return;
@@ -147,75 +164,115 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
     navigate(key);
   };
 
-  return (
-    <Layout style={{ minHeight: '100vh', background: '#f8fafc' }}>
-      <Sider
-        width={260}
+  const SidebarContent = () => (
+    <>
+      <div
         style={{
-          background: '#ffffff',
-          boxShadow: '4px 0 24px 0 rgba(0, 0, 0, 0.02)',
-          borderRight: '1px solid #f1f5f9',
-          position: 'fixed',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          height: '100vh',
-          overflow: 'auto',
-          zIndex: 1000,
+          padding: '16px 20px 0 20px',
+          marginBottom: 0,
         }}
       >
-        <div
-          style={{
-            padding: '16px 20px 0 20px',
-            marginBottom: 0,
-          }}
-        >
-          <Logo />
-        </div>
+        <Logo />
+      </div>
 
-        <div
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          height: 'calc(100vh - 84px)',
+        }}
+      >
+        <Menu
+          mode="inline"
+          selectedKeys={[
+            location.pathname === '/statistics' ? 'statistics' : 
+            location.pathname === '/events' ? 'events' : 
+            location.pathname.startsWith('/settings') ? '/settings' :
+            location.pathname.startsWith('/admin') ? '/admin/users' :
+            location.pathname
+          ]}
+          items={menuItems}
+          onClick={handleMenuClick}
           style={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: 'calc(100vh - 84px)',
+            borderRight: 0,
+            background: 'transparent',
+            flex: 1,
+            padding: '0 12px',
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+        />
+        
+        <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9' }}>
+          <Button 
+            type="text" 
+            danger 
+            icon={<LogoutOutlined />} 
+            onClick={handleLogout}
+            style={{ width: '100%', textAlign: 'left', paddingLeft: 12, height: 40 }}
+          >
+            Выйти
+          </Button>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <Layout style={{ minHeight: '100vh', background: '#f8fafc' }}>
+      {!isMobile ? (
+        <Sider
+          width={260}
+          style={{
+            background: '#ffffff',
+            boxShadow: '4px 0 24px 0 rgba(0, 0, 0, 0.02)',
+            borderRight: '1px solid #f1f5f9',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            height: '100vh',
+            overflow: 'auto',
+            zIndex: 1000,
           }}
         >
-          <Menu
-            mode="inline"
-            selectedKeys={[
-              location.pathname === '/statistics' ? 'statistics' : 
-              location.pathname === '/events' ? 'events' : 
-              location.pathname.startsWith('/settings') ? '/settings' :
-              location.pathname.startsWith('/admin') ? '/admin/users' :
-              location.pathname
-            ]}
-            items={menuItems}
-            onClick={handleMenuClick}
-            style={{
-              borderRight: 0,
-              background: 'transparent',
-              flex: 1,
-              padding: '0 12px',
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-          />
-          
-          <div style={{ padding: '16px 24px', borderTop: '1px solid #f1f5f9' }}>
+          <SidebarContent />
+        </Sider>
+      ) : (
+        <Drawer
+          placement="left"
+          closable={false}
+          onClose={() => setDrawerVisible(false)}
+          open={drawerVisible}
+          styles={{ body: { padding: 0 } }}
+          width={260}
+        >
+          <SidebarContent />
+        </Drawer>
+      )}
+
+      <Layout style={{ marginLeft: isMobile ? 0 : 260, background: '#fafbfc' }}>
+        {isMobile && (
+          <div style={{ 
+            padding: '16px 24px', 
+            background: '#fff', 
+            borderBottom: '1px solid #f1f5f9', 
+            display: 'flex', 
+            alignItems: 'center',
+            position: 'sticky',
+            top: 0,
+            zIndex: 900
+          }}>
             <Button 
               type="text" 
-              danger 
-              icon={<LogoutOutlined />} 
-              onClick={handleLogout}
-              style={{ width: '100%', textAlign: 'left', paddingLeft: 12, height: 40 }}
-            >
-              Выйти
-            </Button>
+              icon={<MenuOutlined />} 
+              onClick={() => setDrawerVisible(true)}
+              style={{ marginRight: 16 }}
+            />
+            <Logo />
           </div>
-        </div>
-      </Sider>
-      <Layout style={{ marginLeft: 260, background: '#fafbfc' }}>
-        <Content style={{ padding: '20px 24px', width: '100%' }}>
+        )}
+        <Content style={{ padding: isMobile ? '16px' : '20px 24px', width: '100%' }}>
           {children}
         </Content>
       </Layout>

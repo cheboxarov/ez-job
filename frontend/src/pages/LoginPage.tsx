@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Form, Input, Button, Typography, message, Row, Col } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
@@ -17,11 +17,25 @@ export const LoginPage = () => {
   const navigate = useNavigate();
   const { loginWithHhOtp, loading, token } = useAuthStore();
   const [form] = Form.useForm();
-  const [step, setStep] = useState<'phone' | 'code'>('phone');
+  const [step, setStep] = useState<'phone' | 'code' | 'captcha'>('phone');
   const [intermediateCookies, setIntermediateCookies] = useState<Record<string, string> | null>(null);
   const [phoneNumber, setPhoneNumber] = useState<string>('');
   const [sendingCode, setSendingCode] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [captchaState, setCaptchaState] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState<string | null>(null);
+  const [captchaImage, setCaptchaImage] = useState<string | null>(null);
+  const [loadingCaptcha, setLoadingCaptcha] = useState(false);
   const threeContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (token) {
     navigate('/resumes');
@@ -66,6 +80,57 @@ export const LoginPage = () => {
     form.setFieldsValue({ phone: formatted });
   };
 
+  const loadCaptcha = async (cookies: Record<string, string>) => {
+    try {
+      setLoadingCaptcha(true);
+      const { getCaptchaKey, getCaptchaPicture } = await import('../api/hhAuth');
+      
+      // Получаем ключ капчи
+      const keyResponse = await getCaptchaKey(cookies);
+      setCaptchaKey(keyResponse.captchaKey);
+      setIntermediateCookies(keyResponse.cookies);
+      
+      // Получаем картинку капчи
+      const pictureResponse = await getCaptchaPicture(keyResponse.captchaKey, keyResponse.cookies);
+      setCaptchaImage(`data:${pictureResponse.contentType};base64,${pictureResponse.imageBase64}`);
+      setIntermediateCookies(pictureResponse.cookies);
+    } catch (error: any) {
+      message.error(error.response?.data?.detail || 'Ошибка при загрузке капчи');
+      throw error;
+    } finally {
+      setLoadingCaptcha(false);
+    }
+  };
+
+  const sendOtpRequest = async (
+    cleanedPhone: string,
+    captchaData?: { captchaText: string; captchaKey: string; captchaState: string }
+  ) => {
+    const { generateOtp } = await import('../api/hhAuth');
+    const response = await generateOtp(cleanedPhone, intermediateCookies || undefined, captchaData);
+    
+    // Проверяем, требуется ли капча
+    if (response.result?.hhcaptcha?.isBot === true) {
+      setCaptchaState(response.result.hhcaptcha.captchaState);
+      setPhoneNumber(cleanedPhone);
+      setIntermediateCookies(response.cookies);
+      setStep('captcha');
+      // Загружаем капчу
+      await loadCaptcha(response.cookies);
+      return;
+    }
+    
+    // Если капча не требуется, переходим к вводу кода
+    setIntermediateCookies(response.cookies);
+    setPhoneNumber(cleanedPhone);
+    // Очищаем состояние капчи
+    setCaptchaState(null);
+    setCaptchaKey(null);
+    setCaptchaImage(null);
+    setStep('code');
+    message.success('Код отправлен на ваш телефон');
+  };
+
   const handlePhoneSubmit = async (values: { phone: string }) => {
     try {
       // Очищаем номер от всех символов кроме цифр и +
@@ -76,15 +141,41 @@ export const LoginPage = () => {
         return;
       }
       setSendingCode(true);
-      // Запрашиваем OTP через backend (используем тот же роутер, что и в настройках)
-      const { generateOtp } = await import('../api/hhAuth');
-      const response = await generateOtp(cleanedPhone);
-      setIntermediateCookies(response.cookies);
-      setPhoneNumber(cleanedPhone);
-      setStep('code');
-      message.success('Код отправлен на ваш телефон');
+      await sendOtpRequest(cleanedPhone);
     } catch (error: any) {
       message.error(error.response?.data?.detail || 'Ошибка при запросе кода');
+    } finally {
+      setSendingCode(false);
+    }
+  };
+
+  const handleCaptchaSubmit = async (values: { captchaText: string }) => {
+    if (!captchaKey || !captchaState || !intermediateCookies || !phoneNumber) {
+      message.error('Ошибка: данные капчи не найдены');
+      return;
+    }
+    
+    try {
+      setSendingCode(true);
+      await sendOtpRequest(phoneNumber, {
+        captchaText: values.captchaText.trim(),
+        captchaKey: captchaKey,
+        captchaState: captchaState,
+      });
+      // Если успешно, форма переключится на step 'code' или 'captcha' (если снова требуется)
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.detail || 'Ошибка при отправке капчи';
+      message.error(errorMessage);
+      
+      // Если ошибка связана с капчей, обновляем её
+      if (intermediateCookies && (errorMessage.includes('капч') || errorMessage.includes('captcha') || errorMessage.includes('бот'))) {
+        try {
+          await loadCaptcha(intermediateCookies);
+          form.setFieldsValue({ captchaText: '' }); // Очищаем поле ввода
+        } catch (loadError) {
+          // Ошибка уже обработана в loadCaptcha
+        }
+      }
     } finally {
       setSendingCode(false);
     }
@@ -121,7 +212,13 @@ export const LoginPage = () => {
       <Row style={{ minHeight: '100vh', background: '#ffffff' }}>
         {/* Левая часть - Форма */}
         <Col xs={24} md={12} lg={10} xl={8} style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ maxWidth: 440, width: '100%', margin: '0 auto', padding: '40px 24px' }}>
+        <div style={{ 
+          maxWidth: 440, 
+          width: '100%', 
+          margin: '0 auto', 
+          padding: isMobile ? '24px 16px' : '40px 24px', 
+          boxSizing: 'border-box' 
+        }}>
           
           {/* Кнопка назад */}
           <Button
@@ -157,7 +254,7 @@ export const LoginPage = () => {
           <Form
             form={form}
             name="login"
-            onFinish={step === 'phone' ? handlePhoneSubmit : handleCodeSubmit}
+            onFinish={step === 'phone' ? handlePhoneSubmit : step === 'captcha' ? handleCaptchaSubmit : handleCodeSubmit}
             layout="vertical"
             requiredMark={false}
             size="large"
@@ -191,9 +288,69 @@ export const LoginPage = () => {
                   <Input 
                     prefix={<PhoneOutlined style={{ color: '#94a3b8' }} />} 
                     placeholder="+7 ХХХ ХХХ ХХ ХХ" 
-                    style={{ borderRadius: 8, padding: '10px 12px' }}
+                    style={{ borderRadius: 8, padding: '10px 12px', width: '100%', boxSizing: 'border-box' }}
                     onChange={handlePhoneChange}
                     maxLength={20}
+                  />
+                </Form.Item>
+              </>
+            ) : step === 'captcha' ? (
+              <>
+                <Form.Item
+                  label={<span style={{ fontWeight: 500 }}>Подтвердите, что вы не робот</span>}
+                >
+                  {loadingCaptcha ? (
+                    <div style={{ textAlign: 'center', padding: '40px 0' }}>
+                      <Text type="secondary">Загрузка капчи...</Text>
+                    </div>
+                  ) : captchaImage ? (
+                    <div style={{ marginBottom: 16 }}>
+                      <img 
+                        src={captchaImage} 
+                        alt="Капча" 
+                        style={{ 
+                          width: '100%', 
+                          maxWidth: 300, 
+                          height: 'auto', 
+                          border: '1px solid #e5e7eb',
+                          borderRadius: 8,
+                          display: 'block',
+                          margin: '0 auto 12px'
+                        }} 
+                      />
+                      <div style={{ textAlign: 'center' }}>
+                        <Button
+                          type="link"
+                          size="small"
+                          onClick={async () => {
+                            if (intermediateCookies) {
+                              try {
+                                await loadCaptcha(intermediateCookies);
+                              } catch (error) {
+                                // Ошибка уже обработана в loadCaptcha
+                              }
+                            }
+                          }}
+                          disabled={loadingCaptcha}
+                          style={{ padding: 0 }}
+                        >
+                          Обновить картинку
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+                </Form.Item>
+                <Form.Item
+                  name="captchaText"
+                  label={<span style={{ fontWeight: 500 }}>Введите текст с картинки</span>}
+                  rules={[
+                    { required: true, message: 'Пожалуйста, введите текст с картинки' },
+                  ]}
+                >
+                  <Input
+                    placeholder="Введите текст капчи"
+                    style={{ borderRadius: 8, padding: '10px 12px', width: '100%', boxSizing: 'border-box' }}
+                    autoFocus
                   />
                 </Form.Item>
               </>
@@ -210,33 +367,35 @@ export const LoginPage = () => {
                   <Input
                     prefix={<ThunderboltOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="Введите код"
-                    style={{ borderRadius: 8, padding: '10px 12px' }}
+                    style={{ borderRadius: 8, padding: '10px 12px', width: '100%', boxSizing: 'border-box' }}
                   />
                 </Form.Item>
               </>
             )}
 
-            <Form.Item>
+            <Form.Item style={{ marginBottom: 0 }}>
               <Button 
                 type="primary" 
                 htmlType="submit" 
                 block 
-                loading={step === 'phone' ? sendingCode : loading}
-                disabled={step === 'phone' ? sendingCode : loading}
+                loading={step === 'phone' || step === 'captcha' ? sendingCode : loading}
+                disabled={step === 'phone' || step === 'captcha' ? sendingCode || loadingCaptcha : loading}
                 style={{ 
                   height: 48, 
                   fontSize: 16, 
                   fontWeight: 600, 
                   borderRadius: 8,
                   background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
-                  border: '1px solid #2563eb'
+                  border: '1px solid #2563eb',
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}
               >
-                {step === 'phone' ? 'Получить код' : 'Войти'}
+                {step === 'phone' ? 'Получить код' : step === 'captcha' ? 'Отправить' : 'Войти'}
               </Button>
             </Form.Item>
 
-            {step === 'code' && (
+            {(step === 'code' || step === 'captcha') && (
               <div style={{ textAlign: 'center', marginTop: 16 }}>
                 <a
                   onClick={(e) => {
@@ -245,6 +404,9 @@ export const LoginPage = () => {
                     setStep('phone');
                     setIntermediateCookies(null);
                     setPhoneNumber('');
+                    setCaptchaState(null);
+                    setCaptchaKey(null);
+                    setCaptchaImage(null);
                   }}
                   style={{ color: '#2563eb', fontWeight: 500 }}
                 >
@@ -259,20 +421,22 @@ export const LoginPage = () => {
       {/* Правая часть - Bento Grid */}
       <Col xs={0} md={12} lg={14} xl={16} style={{ position: 'relative', overflow: 'hidden' }}>
         {/* 3D Background - контейнер */}
-        <div 
-          ref={threeContainerRef}
-          style={{ 
-            position: 'absolute', 
-            top: 0, 
-            left: 0, 
-            width: '100%', 
-            height: '100%',
-            zIndex: 0,
-            overflow: 'hidden'
-          }}
-        >
-          <ThreeBackgroundContainer containerRef={threeContainerRef} />
-        </div>
+        {!isMobile && (
+          <div 
+            ref={threeContainerRef}
+            style={{ 
+              position: 'absolute', 
+              top: 0, 
+              left: 0, 
+              width: '100%', 
+              height: '100%',
+              zIndex: 0,
+              overflow: 'hidden'
+            }}
+          >
+            <ThreeBackgroundContainer containerRef={threeContainerRef} />
+          </div>
+        )}
         
         <div
           style={{

@@ -215,17 +215,25 @@ async def login_by_code(
         HTTPException: 400 при ошибках валидации, 500 при внутренних ошибках.
     """
     try:
+        logger.info(f"[login_by_code] Начало обработки запроса для телефона {request.phone}")
+        
         # 1. Входим в HH и получаем финальные headers/cookies
+        logger.info(f"[login_by_code] Вызов hh_auth_service.login_by_code...")
         headers, final_cookies = await hh_auth_service.login_by_code(
             phone=request.phone,
             code=request.code,
             cookies=request.cookies,
         )
+        logger.info(f"[login_by_code] Успешно получены headers и cookies после входа в HH. Cookies: {len(final_cookies)} ключей")
         
         # 2. Достаём hh_user_id из cookies.
         # Используем cookie "hhul" (user login), а не "hhuid" (device/session id),
         # чтобы различать разные аккаунты HH в одном браузере.
+        logger.info(f"[login_by_code] Извлечение hh_user_id из телефона...")
         hh_user_id = request.phone.replace("+", "")
+        logger.info(f"[login_by_code] hh_user_id: {hh_user_id}")
+        
+        logger.info(f"[login_by_code] Вызов _debug_log...")
         _debug_log(
             hypothesis_id="H1",
             location="hh_auth_router.login_by_code:after_hh_login",
@@ -238,27 +246,37 @@ async def login_by_code(
                 "hhul_cookie": final_cookies.get("hhul"),
             },
         )
+        logger.info(f"[login_by_code] _debug_log завершен")
+        
         if not hh_user_id:
+            logger.error(f"[login_by_code] hh_user_id пустой, выброс исключения")
             raise HTTPException(
                 status_code=400,
                 detail="Не удалось определить hh_user_id из cookies (нет cookie 'hhul')",
             )
 
         # 3. Ищем/создаём пользователя в БД по hh_user_id
+        logger.info(f"[login_by_code] Загрузка конфига...")
         config = load_config()
+        logger.info(f"[login_by_code] Конфиг загружен, создание session_factory...")
         session_factory = create_session_factory(config.database)
+        logger.info(f"[login_by_code] session_factory создан")
 
         from sqlalchemy import select
 
+        logger.info(f"[login_by_code] Открытие сессии БД...")
         async with session_factory() as session:
+            logger.info(f"[login_by_code] Сессия открыта, выполнение запроса поиска пользователя...")
             result = await session.execute(
                 select(UserModel).where(UserModel.hh_user_id == hh_user_id)
             )
             user: UserModel | None = result.scalar_one_or_none()
+            logger.info(f"[login_by_code] Пользователь найден/не найден: {user is not None}")
 
             if user is None:
                 # Создаём нового пользователя
                 # Email и пароль технические, вход по паролю не используется
+                logger.info(f"[login_by_code] Создание нового пользователя...")
                 synthetic_email = f"hh_{hh_user_id}@hh.ru"
                 user = UserModel(
                     email=synthetic_email,
@@ -276,40 +294,95 @@ async def login_by_code(
                 )
                 session.add(user)
                 branch = "created"
+                logger.info(f"[login_by_code] Новый пользователь добавлен в сессию")
+                # Для нового пользователя user_id будет доступен после flush
             else:
-                # Обновляем сессию и телефон
-                user.hh_headers = headers
-                user.hh_cookies = final_cookies
-                # Телефон можем обновлять всегда, чтобы актуализировать
-                user.phone = request.phone
-                branch = "updated"
+                # Обновляем существующего пользователя - используем FOR UPDATE NOWAIT для предотвращения deadlock
+                logger.info(f"[login_by_code] Обновление существующего пользователя (id: {user.id})...")
+                
+                try:
+                    # Пробуем заблокировать строку с NOWAIT (не ждет, сразу выбрасывает исключение если заблокирована)
+                    logger.info(f"[login_by_code] Чтение пользователя с FOR UPDATE NOWAIT...")
+                    result = await session.execute(
+                        select(UserModel).where(UserModel.id == user.id).with_for_update(nowait=True)
+                    )
+                    user = result.scalar_one()
+                    logger.info(f"[login_by_code] Пользователь заблокирован, обновление полей...")
+                    
+                    user.hh_headers = headers
+                    user.hh_cookies = final_cookies
+                    # Телефон можем обновлять всегда, чтобы актуализировать
+                    user.phone = request.phone
+                    branch = "updated"
+                    logger.info(f"[login_by_code] Пользователь обновлен в сессии")
+                except Exception as exc:
+                    # Если строка заблокирована (OperationalError с кодом 55P03 - lock_not_available)
+                    # или любая другая ошибка при блокировке - пропускаем обновление в БД
+                    error_str = str(exc)
+                    if "55P03" in error_str or "could not obtain lock" in error_str.lower() or "lock_not_available" in error_str.lower():
+                        logger.warning(f"[login_by_code] Не удалось заблокировать строку пользователя (занята другим процессом). Пропускаем запись в БД, но возвращаем успех. Error: {exc}")
+                    else:
+                        logger.warning(f"[login_by_code] Ошибка при блокировке строки пользователя: {exc}. Пропускаем запись в БД, но возвращаем успех.")
+                    
+                    # Мы не обновляем запись в БД, но токен все равно сгенерируем для пользователя
+                    branch = "skipped_lock_busy"
+                    # Важно: если мы не обновили БД, используем данные из памяти для токена
+                    user.hh_headers = headers
+                    user.hh_cookies = final_cookies
+                    user.phone = request.phone
+                    # Сохраняем user_id до rollback, чтобы использовать после отвязки от сессии
+                    user_id_for_token = user.id
+                    # Если lock не получен, пропускаем flush/commit для этого пользователя
+                    # Данные обновлены только в памяти для генерации токена
+                    logger.info(f"[login_by_code] Пропуск flush/commit (lock не получен)")
 
-            await session.flush()
-            await session.refresh(user)
-            await session.commit()
+            # Выполняем flush и commit только если пользователь был создан или обновлен в БД
+            if branch != "skipped_lock_busy":
+                logger.info(f"[login_by_code] Выполнение flush...")
+                await session.flush()
+                logger.info(f"[login_by_code] Flush выполнен, refresh пользователя...")
+                await session.refresh(user)
+                logger.info(f"[login_by_code] Refresh выполнен, коммит транзакции...")
+                await session.commit()
+                logger.info(f"[login_by_code] Коммит выполнен успешно")
+                user_id_for_token = user.id
+            else:
+                # Если lock не получен, просто закрываем транзакцию без изменений
+                logger.info(f"[login_by_code] Закрытие транзакции без изменений (lock был занят)")
+                await session.rollback()
+                logger.info(f"[login_by_code] Транзакция откачена")
+                # После rollback объект user отвязан от сессии, но мы уже сохранили user_id_for_token
 
+        logger.info(f"[login_by_code] Вызов _debug_log после сохранения пользователя...")
         _debug_log(
             hypothesis_id="H2",
             location="hh_auth_router.login_by_code:after_user_persist",
             message="User linked to hhuid",
             data={
                 "branch": branch,
-                "user_id": str(user.id),
+                "user_id": str(user_id_for_token),
                 "hh_user_id": hh_user_id,
             },
         )
+        logger.info(f"[login_by_code] _debug_log после сохранения завершен")
 
         # 4. Генерируем JWT токен для пользователя
-        token_payload = _create_access_token(user)
+        # Создаем простой объект с id для генерации токена (после rollback user может быть отвязан от сессии)
+        logger.info(f"[login_by_code] Генерация JWT токена для пользователя {user_id_for_token}...")
+        # Создаем временный объект UserModel только с id для токена
+        user_for_token = UserModel(id=user_id_for_token)
+        token_payload = _create_access_token(user_for_token)
+        logger.info(f"[login_by_code] JWT токен сгенерирован, возврат ответа")
         return token_payload
     except ValueError as exc:
-        logger.error(f"Ошибка валидации при входе по коду: {exc}", exc_info=True)
+        logger.error(f"[login_by_code] Ошибка валидации при входе по коду: {exc}", exc_info=True)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except HTTPException:
+    except HTTPException as exc:
+        logger.error(f"[login_by_code] HTTPException: status={exc.status_code}, detail={exc.detail}")
         raise
     except Exception as exc:
         logger.error(
-            f"Внутренняя ошибка при входе по OTP коду: {exc}",
+            f"[login_by_code] Внутренняя ошибка при входе по OTP коду: {exc}",
             exc_info=True,
         )
         raise HTTPException(

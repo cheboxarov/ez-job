@@ -15,7 +15,7 @@ import {
   Modal,
   Form,
 } from 'antd';
-import { BarChartOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons';
+import { SettingOutlined } from '@ant-design/icons';
 import {
   LineChart,
   Line,
@@ -49,6 +49,7 @@ export const AdminMetricsDashboardPage = () => {
   const [pricing, setPricing] = useState<TokenPricing>(tokenPricingUtils.getPricing());
   const [pricingModalVisible, setPricingModalVisible] = useState(false);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     loadPlans();
@@ -61,6 +62,15 @@ export const AdminMetricsDashboardPage = () => {
   useEffect(() => {
     const savedPricing = tokenPricingUtils.getPricing();
     setPricing(savedPricing);
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadPlans = async () => {
@@ -166,55 +176,65 @@ export const AdminMetricsDashboardPage = () => {
   }
 
   return (
-    <div>
-      <Title level={2}>Метрики</Title>
+    <div style={{ padding: isMobile ? '0 16px' : '0 24px' }}>
+      <Title level={isMobile ? 3 : 2}>Метрики</Title>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         <Card>
-          <Space wrap>
-            <RangePicker
-              value={dateRange}
-              onChange={(dates) => {
-                if (dates) {
-                  setDateRange(dates as [Dayjs, Dayjs]);
-                }
-              }}
-              format="DD.MM.YYYY"
-            />
-            <Select
-              placeholder="План"
-              value={selectedPlan || undefined}
-              onChange={setSelectedPlan}
-              allowClear
-              style={{ width: 200 }}
-            >
-              {plans.map((plan) => (
-                <Select.Option key={plan.id} value={plan.id}>
-                  {plan.name}
-                </Select.Option>
-              ))}
-            </Select>
-            <Select
-              value={timeStep}
-              onChange={setTimeStep}
-              style={{ width: 150 }}
-            >
-              <Select.Option value="day">По дням</Select.Option>
-              <Select.Option value="week">По неделям</Select.Option>
-              <Select.Option value="month">По месяцам</Select.Option>
-            </Select>
-            <Button
-              icon={<SettingOutlined />}
-              onClick={openPricingModal}
-            >
-              Настройки стоимости
-            </Button>
-          </Space>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={24} md={8} lg={6}>
+              <RangePicker
+                value={dateRange}
+                onChange={(dates) => {
+                  if (dates) {
+                    setDateRange(dates as [Dayjs, Dayjs]);
+                  }
+                }}
+                format="DD.MM.YYYY"
+                style={{ width: '100%' }}
+              />
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={5}>
+              <Select
+                placeholder="План"
+                value={selectedPlan || undefined}
+                onChange={setSelectedPlan}
+                allowClear
+                style={{ width: '100%' }}
+              >
+                {plans.map((plan) => (
+                  <Select.Option key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Col>
+            <Col xs={24} sm={12} md={6} lg={4}>
+              <Select
+                value={timeStep}
+                onChange={setTimeStep}
+                style={{ width: '100%' }}
+              >
+                <Select.Option value="day">По дням</Select.Option>
+                <Select.Option value="week">По неделям</Select.Option>
+                <Select.Option value="month">По месяцам</Select.Option>
+              </Select>
+            </Col>
+            <Col xs={24} sm={24} md={6} lg={5}>
+              <Button
+                icon={<SettingOutlined />}
+                onClick={openPricingModal}
+                style={{ width: '100%' }}
+              >
+                Настройки стоимости
+              </Button>
+            </Col>
+          </Row>
         </Card>
 
         {metrics && (
           <>
             <Row gutter={16}>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Всего вызовов LLM"
@@ -222,7 +242,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Всего токенов"
@@ -231,7 +251,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Общая стоимость"
@@ -241,7 +261,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Средняя стоимость за вызов"
@@ -254,7 +274,7 @@ export const AdminMetricsDashboardPage = () => {
             </Row>
 
             <Row gutter={16}>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Средние токены на пользователя"
@@ -263,7 +283,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={6}>
+              <Col xs={24} sm={12} md={6}>
                 <Card>
                   <Statistic
                     title="Уникальных пользователей (LLM)"
@@ -274,7 +294,7 @@ export const AdminMetricsDashboardPage = () => {
             </Row>
 
             <Row gutter={16} style={{ marginTop: 16 }}>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Card>
                   <Statistic
                     title="Всего откликов"
@@ -282,7 +302,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Card>
                   <Statistic
                     title="Средние отклики на пользователя"
@@ -290,7 +310,7 @@ export const AdminMetricsDashboardPage = () => {
                   />
                 </Card>
               </Col>
-              <Col span={8}>
+              <Col xs={24} sm={12} md={8}>
                 <Card>
                   <Statistic
                     title="Уникальных пользователей (отклики)"
@@ -301,7 +321,7 @@ export const AdminMetricsDashboardPage = () => {
             </Row>
 
             <Card title="Вызовы LLM по периодам">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <BarChart data={llmChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" />
@@ -315,7 +335,7 @@ export const AdminMetricsDashboardPage = () => {
             </Card>
 
             <Card title="Токены LLM по периодам">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <LineChart data={llmChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" />
@@ -351,7 +371,7 @@ export const AdminMetricsDashboardPage = () => {
             </Card>
 
             <Card title="Отклики по периодам">
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
                 <BarChart data={responsesChartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="period" />

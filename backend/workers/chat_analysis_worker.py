@@ -115,7 +115,7 @@ async def process_chats_cycle(config: AppConfig) -> None:
             
             # Создаем use case для обновления cookies
             update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-                uow.user_hh_auth_data_repository
+                uow.standalone_user_hh_auth_data_repository
             )
             
             # Получаем список чатов пользователя

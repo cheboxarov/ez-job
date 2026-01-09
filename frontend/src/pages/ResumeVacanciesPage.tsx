@@ -11,6 +11,7 @@ import { VacancyCard } from '../components/VacancyCard';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { GradientButton } from '../components/GradientButton';
+import { useWindowSize } from '../hooks/useWindowSize';
 import { getRelevantVacancyList } from '../api/vacancies';
 import { getResumeFilterSettings } from '../api/resumeFilterSettings';
 import { getResume } from '../api/resumes';
@@ -22,6 +23,7 @@ const { Title, Text } = Typography;
 export const ResumeVacanciesPage = () => {
   const { resumeId } = useParams<{ resumeId: string }>();
   const navigate = useNavigate();
+  const { isMobile } = useWindowSize();
   const { vacancies, setVacancies } = useVacanciesStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,28 +107,32 @@ export const ResumeVacanciesPage = () => {
           { title: 'Вакансии' }
         ]}
         actions={
-          <Space size="middle">
+          <Space size="middle" wrap={isMobile} style={{ width: isMobile ? '100%' : 'auto' }}>
             {vacancies.length > 0 && (
               <div 
                 style={{ 
-                  padding: '8px 16px', 
+                  padding: isMobile ? '6px 12px' : '8px 16px', 
                   background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
                   borderRadius: 20,
                   border: '1px solid #86efac',
                 }}
               >
-                <Text strong style={{ fontSize: 14, color: '#16a34a' }}>
+                <Text strong style={{ fontSize: isMobile ? 12 : 14, color: '#16a34a' }}>
                   Найдено: {vacancies.length}
                 </Text>
               </div>
             )}
             <Button
               icon={<FileTextOutlined />}
-              size="large"
+              size={isMobile ? 'middle' : 'large'}
               onClick={() => navigate(`/resumes/${resumeId}/responses`)}
               disabled={!resume?.headhunter_hash || loadingResume}
               loading={loadingResume}
-              style={{ borderRadius: 10, height: 44 }}
+              style={{ 
+                borderRadius: 10, 
+                height: isMobile ? 36 : 44,
+                width: isMobile ? '100%' : 'auto'
+              }}
             >
               История откликов
             </Button>
@@ -134,10 +140,15 @@ export const ResumeVacanciesPage = () => {
         }
       />
 
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 200px)' }}>
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column', 
+        minHeight: isMobile ? 'auto' : 'calc(100vh - 200px)',
+        padding: isMobile ? '0 16px' : '0'
+      }}>
 
         {loading && (
-          <div style={{ textAlign: 'center', padding: '100px 0' }}>
+          <div style={{ textAlign: 'center', padding: isMobile ? '60px 0' : '100px 0' }}>
             <Spin size="large" tip="Анализируем вакансии с помощью AI..." />
           </div>
         )}
@@ -196,7 +207,7 @@ export const ResumeVacanciesPage = () => {
         )}
 
         {!loading && !error && !isHhAuthMissing && vacancies.length > 0 && (
-          <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 0 : 0 }}>
             {vacancies.map((vacancy) => (
               <VacancyCard
                 key={vacancy.vacancy_id}

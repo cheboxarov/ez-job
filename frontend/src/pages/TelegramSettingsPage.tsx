@@ -27,6 +27,7 @@ import {
 } from '@ant-design/icons';
 import { PageHeader } from '../components/PageHeader';
 import { GradientButton } from '../components/GradientButton';
+import { useWindowSize } from '../hooks/useWindowSize';
 import {
   getTelegramSettings,
   updateTelegramSettings,
@@ -41,6 +42,7 @@ import type {
 const { Text, Title, Paragraph } = Typography;
 
 export const TelegramSettingsPage = () => {
+  const windowSize = useWindowSize();
   const [settings, setSettings] = useState<TelegramNotificationSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -156,7 +158,11 @@ export const TelegramSettingsPage = () => {
         breadcrumbs={[{ title: 'Настройки', path: '/profile' }, { title: 'Telegram' }]}
       />
 
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ 
+        maxWidth: 800, 
+        margin: '0 auto',
+        padding: windowSize.width < 768 ? '0 16px' : '0 24px'
+      }}>
         {/* Connection Status Card */}
         <Card
           bordered={true}
@@ -168,13 +174,13 @@ export const TelegramSettingsPage = () => {
           styles={{
             header: {
               borderBottom: '1px solid #f1f5f9',
-              padding: '20px 24px',
+              padding: windowSize.width < 768 ? '16px 20px' : '20px 24px',
             },
-            body: { padding: 24 },
+            body: { padding: windowSize.width < 768 ? 16 : 24 },
           }}
         >
           <Row gutter={[24, 24]} align="middle">
-            <Col flex="auto">
+            <Col xs={24} md={18} flex="auto">
               <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                 <div
                   style={{
@@ -207,7 +213,7 @@ export const TelegramSettingsPage = () => {
                 </div>
               </div>
             </Col>
-            <Col>
+            <Col xs={24} md={6} style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Space>
                 {!isLinked ? (
                   <GradientButton
@@ -254,9 +260,9 @@ export const TelegramSettingsPage = () => {
           styles={{
             header: {
               borderBottom: '1px solid #f1f5f9',
-              padding: '20px 24px',
+              padding: windowSize.width < 768 ? '16px 20px' : '20px 24px',
             },
-            body: { padding: 24 },
+            body: { padding: windowSize.width < 768 ? 16 : 24 },
           }}
           title={
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>

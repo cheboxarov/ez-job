@@ -156,7 +156,7 @@ async def execute_agent_action(
     """
     try:
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
         updated_action = await execute_agent_action_by_id_uc.execute(
             action_id=action_id,

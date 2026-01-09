@@ -1,60 +1,178 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'motion/react';
 import styles from '../../pages/LandingPage.module.css';
 
-const plans = [
-  {
-    name: "Стартовый",
-    subtitle: "Для активного поиска",
-    price: "990",
-    period: "за 30 дней",
-    responses: "50",
-    responsesLabel: "откликов за период",
-    resetPeriod: "1 день",
-    features: [
-      "Расширенный поиск",
-      "Приоритетная обработка",
-      "Больше откликов в день"
-    ],
-    isPopular: false,
-    accent: "blue"
-  },
-  {
-    name: "Продвинутый",
-    subtitle: "Для профессионалов",
-    price: "1990",
-    period: "за 30 дней",
-    responses: "100",
-    responsesLabel: "откликов за период",
-    resetPeriod: "1 день",
-    features: [
-      "Все функции Стартового",
-      "Увеличенные лимиты",
-      "Приоритетная поддержка"
-    ],
-    isPopular: false,
-    accent: "purple"
-  },
-  {
-    name: "Максимальный",
-    subtitle: "Максимум возможностей",
-    price: "2990",
-    period: "за 30 дней",
-    responses: "200",
-    responsesLabel: "откликов за период",
-    resetPeriod: "1 день",
-    features: [
-      "Безлимитный доступ",
-      "VIP поддержка",
-      "Эксклюзивные функции"
-    ],
-    isPopular: true,
-    accent: "gold"
-  }
-];
+type PeriodType = 'week' | 'month' | '2months';
+
+const plansByPeriod: Record<PeriodType, Array<{
+  name: string;
+  subtitle: string;
+  price: string;
+  period: string;
+  responses: string;
+  responsesLabel: string;
+  resetPeriod: string;
+  features: string[];
+  isPopular: boolean;
+  accent: string;
+}>> = {
+  week: [
+    {
+      name: "Стартовый",
+      subtitle: "Для активного поиска",
+      price: "350",
+      period: "за 7 дней",
+      responses: "50",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Расширенный поиск",
+        "Приоритетная обработка",
+        "Больше откликов в день"
+      ],
+      isPopular: false,
+      accent: "blue"
+    },
+    {
+      name: "Продвинутый",
+      subtitle: "Для профессионалов",
+      price: "700",
+      period: "за 7 дней",
+      responses: "100",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Все функции Стартового",
+        "Увеличенные лимиты",
+        "Приоритетная поддержка"
+      ],
+      isPopular: false,
+      accent: "purple"
+    },
+    {
+      name: "Максимальный",
+      subtitle: "Максимум возможностей",
+      price: "1050",
+      period: "за 7 дней",
+      responses: "200",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Безлимитный доступ",
+        "VIP поддержка",
+        "Эксклюзивные функции"
+      ],
+      isPopular: true,
+      accent: "gold"
+    }
+  ],
+  month: [
+    {
+      name: "Стартовый",
+      subtitle: "Для активного поиска",
+      price: "990",
+      period: "за 30 дней",
+      responses: "50",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Расширенный поиск",
+        "Приоритетная обработка",
+        "Больше откликов в день"
+      ],
+      isPopular: false,
+      accent: "blue"
+    },
+    {
+      name: "Продвинутый",
+      subtitle: "Для профессионалов",
+      price: "1990",
+      period: "за 30 дней",
+      responses: "100",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Все функции Стартового",
+        "Увеличенные лимиты",
+        "Приоритетная поддержка"
+      ],
+      isPopular: false,
+      accent: "purple"
+    },
+    {
+      name: "Максимальный",
+      subtitle: "Максимум возможностей",
+      price: "2990",
+      period: "за 30 дней",
+      responses: "200",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Безлимитный доступ",
+        "VIP поддержка",
+        "Эксклюзивные функции"
+      ],
+      isPopular: true,
+      accent: "gold"
+    }
+  ],
+  '2months': [
+    {
+      name: "Стартовый",
+      subtitle: "Для активного поиска",
+      price: "1800",
+      period: "за 60 дней",
+      responses: "50",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Расширенный поиск",
+        "Приоритетная обработка",
+        "Больше откликов в день"
+      ],
+      isPopular: false,
+      accent: "blue"
+    },
+    {
+      name: "Продвинутый",
+      subtitle: "Для профессионалов",
+      price: "3600",
+      period: "за 60 дней",
+      responses: "100",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Все функции Стартового",
+        "Увеличенные лимиты",
+        "Приоритетная поддержка"
+      ],
+      isPopular: false,
+      accent: "purple"
+    },
+    {
+      name: "Максимальный",
+      subtitle: "Максимум возможностей",
+      price: "5400",
+      period: "за 60 дней",
+      responses: "200",
+      responsesLabel: "откликов за период",
+      resetPeriod: "1 день",
+      features: [
+        "Безлимитный доступ",
+        "VIP поддержка",
+        "Эксклюзивные функции"
+      ],
+      isPopular: true,
+      accent: "gold"
+    }
+  ]
+};
 
 export const Pricing = () => {
   const navigate = useNavigate();
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
+  const plans = plansByPeriod[selectedPeriod];
 
   return (
     <section className={styles.section} id="pricing">
@@ -62,6 +180,42 @@ export const Pricing = () => {
         <div className={styles.sectionHeader}>
           <h2 className={styles.sectionTitle}>Инвестиция в вашу карьеру</h2>
           <p className={styles.sectionSubtitle}>Выберите тариф, который подходит именно вам</p>
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          marginBottom: 40,
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            background: 'rgba(37, 99, 235, 0.08)',
+            borderRadius: '12px',
+            padding: '4px',
+            gap: '4px',
+          }}>
+            {(['week', 'month', '2months'] as PeriodType[]).map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: selectedPeriod === period 
+                    ? 'linear-gradient(135deg, var(--landing-primary), var(--landing-accent))'
+                    : 'transparent',
+                  color: selectedPeriod === period ? 'white' : 'var(--landing-text-muted)',
+                  fontSize: '14px',
+                  fontWeight: selectedPeriod === period ? 600 : 500,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {period === 'week' ? 'Неделя' : period === 'month' ? 'Месяц' : '2 месяца'}
+              </button>
+            ))}
+          </div>
         </div>
         
         <div className={styles.pricingGrid}>

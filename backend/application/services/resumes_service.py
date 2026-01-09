@@ -171,7 +171,7 @@ class ResumesService(ResumeServicePort):
             use_case = ImportResumeFromHHUseCase(
                 hh_client=hh_client,
                 resume_repository=self._unit_of_work.standalone_resume_repository,
-                user_hh_auth_data_repository=self._unit_of_work.user_hh_auth_data_repository,
+                user_hh_auth_data_repository=self._unit_of_work.standalone_user_hh_auth_data_repository,
             )
             resumes = await use_case.execute(
                 user_id=user_id,
@@ -211,7 +211,7 @@ class ResumesService(ResumeServicePort):
         async with self._unit_of_work:
             # Создаем use case для обновления cookies
             update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-                self._unit_of_work.user_hh_auth_data_repository
+                self._unit_of_work.standalone_user_hh_auth_data_repository
             )
 
             use_case = EditHHResumeUseCase(hh_client=hh_client)
@@ -258,7 +258,7 @@ class ResumesService(ResumeServicePort):
         async with self._unit_of_work:
             # Создаем use case для обновления cookies
             update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-                self._unit_of_work.user_hh_auth_data_repository
+                self._unit_of_work.standalone_user_hh_auth_data_repository
             )
 
             use_case = TouchHHResumeEditUseCase(hh_client=hh_client)

@@ -36,28 +36,33 @@ class HHAuthClient(HHBaseMixin):
         # Анти-бот заголовки и XSRF токен добавляются через _enhance_headers
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
 
-        form_data: Dict[str, Any] = {
-            "login": phone,
-            "otpType": "phone",
-            "operationType": "applicant_otp_auth",
-            "isSignupPage": "false",
-            "captchaText": "",
-        }
+        # Формируем multipart/form-data как в рабочем запросе
+        files_data = [
+            ("login", (None, phone)),
+            ("otpType", (None, "phone")),
+            ("operationType", (None, "applicant_otp_auth")),
+            ("isSignupPage", (None, "false")),
+        ]
         
         if login_trust_flags:
-            form_data["loginTrustFlags"] = login_trust_flags
+            files_data.append(("loginTrustFlags", (None, login_trust_flags)))
 
         if captcha:
-            form_data["captchaKey"] = captcha.get("key", "")
-            form_data["captchaText"] = captcha.get("text", "")
+            files_data.append(("captchaKey", (None, captcha.get("key", ""))))
+            files_data.append(("captchaText", (None, captcha.get("text", ""))))
+            # captchaState обязателен для повторной отправки капчи
+            if captcha.get("captchaState"):
+                files_data.append(("captchaState", (None, captcha.get("captchaState"))))
+        else:
+            files_data.append(("captchaText", (None, "")))
 
-        logger.debug(f"[generate_otp] POST {url} phone={phone} data={form_data}")
+        logger.debug(f"[generate_otp] POST {url} phone={phone} files_data={len(files_data)} fields")
 
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
         ) as client:
             try:
-                resp = await client.post(url, data=form_data)
+                resp = await client.post(url, files=files_data)
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
@@ -256,15 +261,16 @@ class HHAuthClient(HHBaseMixin):
         enhanced_headers = dict(headers)
         enhanced_headers.setdefault("Accept", "application/json")
         enhanced_headers.setdefault("X-Requested-With", "XMLHttpRequest")
+        enhanced_headers.setdefault("Content-Type", "application/x-www-form-urlencoded")
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
         
-        logger.debug(f"[get_captcha_key] GET {url} params={params}")
+        logger.debug(f"[get_captcha_key] POST {url} params={params}")
         
         async with httpx.AsyncClient(
             headers=enhanced_headers, cookies=cookies, timeout=self._timeout
         ) as client:
             try:
-                resp = await client.get(url, params=params)
+                resp = await client.post(url, params=params)
                 resp.raise_for_status()
             except httpx.HTTPStatusError as exc:
                 response = exc.response
@@ -311,8 +317,9 @@ class HHAuthClient(HHBaseMixin):
         params = {"key": captcha_key}
         
         enhanced_headers = dict(headers)
-        enhanced_headers.setdefault("Accept", "application/json")
-        enhanced_headers.setdefault("X-Requested-With", "XMLHttpRequest")
+        enhanced_headers.setdefault("Accept", "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8")
+        enhanced_headers.setdefault("Sec-Fetch-Dest", "image")
+        enhanced_headers.setdefault("Sec-Fetch-Mode", "no-cors")
         enhanced_headers = self._enhance_headers(enhanced_headers, cookies)
         
         logger.debug(f"[get_captcha_picture] GET {url} params={params}")

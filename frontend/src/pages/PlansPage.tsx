@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Card, Typography, message, Row, Col, Spin, Button } from 'antd';
+  import { Card, Typography, message, Row, Col, Spin, Button, Segmented } from 'antd';
 import { 
   CrownOutlined,
   UserOutlined,
@@ -7,7 +7,6 @@ import {
   FireOutlined,
   CheckOutlined,
   ThunderboltOutlined,
-  ClockCircleOutlined,
   SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import { getAllPlans, changePlan, getMySubscriptionPlan } from '../api/subscription';
@@ -17,7 +16,12 @@ import { useAuthStore } from '../stores/authStore';
 
 const { Text, Title } = Typography;
 
+type PeriodType = 'week' | 'month' | '2months';
+
 const getPlanConfig = (planName: string) => {
+  // Извлекаем базовое название плана (PLAN_1, PLAN_2, PLAN_3)
+  const basePlanName = planName.replace(/_WEEK|_MONTH|_2MONTHS$/, '');
+  
   const configs: Record<string, { 
     name: string; 
     gradient: string; 
@@ -34,7 +38,11 @@ const getPlanConfig = (planName: string) => {
       accentColor: '#64748b',
       icon: <UserOutlined />,
       description: 'Для знакомства с сервисом',
-      features: ['Базовый поиск вакансий', 'AI-анализ совместимости', 'Ограниченные отклики'],
+      features: [
+        'Базовый поиск вакансий',
+        'Ограниченный анализ резюме',
+        'До 10 откликов за период',
+      ],
     },
     PLAN_1: { 
       name: 'Стартовый', 
@@ -43,7 +51,16 @@ const getPlanConfig = (planName: string) => {
       accentColor: '#2563eb',
       icon: <RocketOutlined />,
       description: 'Для активного поиска',
-      features: ['Расширенный поиск', 'Приоритетная обработка', 'Больше откликов в день'],
+      features: [
+        'AI-анализ резюме с рекомендациями',
+        'Анализ чатов с работодателями',
+        'Автоответы на вопросы в чатах',
+        'Автоотклики на подходящие вакансии',
+        'Уведомления о собеседованиях и событиях',
+        'Генерация сопроводительных писем',
+        'Умный поиск вакансий',
+        'До 50 откликов за период',
+      ],
     },
     PLAN_2: { 
       name: 'Продвинутый', 
@@ -52,7 +69,12 @@ const getPlanConfig = (planName: string) => {
       accentColor: '#7c3aed',
       icon: <FireOutlined />,
       description: 'Для профессионалов',
-      features: ['Все функции Стартового', 'Увеличенные лимиты', 'Приоритетная поддержка'],
+      features: [
+        'Все функции Стартового',
+        'Увеличенные лимиты откликов (до 100)',
+        'Приоритетная обработка запросов',
+        'Расширенная аналитика',
+      ],
     },
     PLAN_3: { 
       name: 'Максимальный', 
@@ -61,26 +83,15 @@ const getPlanConfig = (planName: string) => {
       accentColor: '#d97706',
       icon: <CrownOutlined />,
       description: 'Максимум возможностей',
-      features: ['Безлимитный доступ', 'VIP поддержка', 'Эксклюзивные функции'],
+      features: [
+        'Все функции Продвинутого',
+        'Безлимитные отклики (до 200)',
+        'VIP поддержка',
+        'Максимальная скорость обработки',
+      ],
     },
   };
-  return configs[planName] || configs.FREE;
-};
-
-const formatResetPeriod = (seconds: number): string => {
-  if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
-    return `${minutes} мин`;
-  }
-  
-  if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
-    return `${hours} ч`;
-  }
-  
-  const days = Math.floor(seconds / 86400);
-  if (days === 1) return '1 день';
-  return `${days} дн`;
+  return configs[basePlanName] || configs.FREE;
 };
 
 export const PlansPage = () => {
@@ -89,7 +100,26 @@ export const PlansPage = () => {
   const [currentPlan, setCurrentPlan] = useState<UserSubscriptionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [changingPlan, setChangingPlan] = useState<string | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodType>('month');
   const isAdmin = user?.is_superuser === true;
+
+  const getDurationDaysForPeriod = (period: PeriodType): number => {
+    switch (period) {
+      case 'week':
+        return 7;
+      case 'month':
+        return 30;
+      case '2months':
+        return 60;
+      default:
+        return 30;
+    }
+  };
+
+  const filteredPlans = plans.filter(plan => {
+    if (plan.name === 'FREE') return false;
+    return plan.duration_days === getDurationDaysForPeriod(selectedPeriod);
+  });
 
   useEffect(() => {
     const loadData = async () => {
@@ -155,8 +185,26 @@ export const PlansPage = () => {
       />
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-        <Row gutter={[24, 24]}>
-          {plans.filter(plan => plan.name !== 'FREE').map((plan) => {
+        <div style={{ 
+          marginBottom: 24, 
+          display: 'flex', 
+          justifyContent: 'center',
+        }}>
+          <Segmented
+            value={selectedPeriod}
+            onChange={(value) => setSelectedPeriod(value as PeriodType)}
+            options={[
+              { label: 'Неделя', value: 'week' },
+              { label: 'Месяц', value: 'month' },
+              { label: '2 месяца', value: '2months' },
+            ]}
+            size="large"
+            style={{ background: '#f8fafc' }}
+          />
+        </div>
+
+        <Row gutter={[24, 24]} justify="center">
+          {filteredPlans.map((plan) => {
             const planConfig = getPlanConfig(plan.name);
             const isCurrentPlan = currentPlan?.plan_name === plan.name;
             const isLoading = changingPlan === plan.name;
@@ -167,7 +215,7 @@ export const PlansPage = () => {
                   bordered={false}
                   style={{
                     borderRadius: 20,
-                    overflow: 'hidden',
+                    overflow: 'visible',
                     border: isCurrentPlan 
                       ? `2px solid ${planConfig.accentColor}` 
                       : '1px solid #e5e7eb',
@@ -177,12 +225,38 @@ export const PlansPage = () => {
                     background: isCurrentPlan ? planConfig.lightBg : 'white',
                     transition: 'all 0.2s ease',
                     boxShadow: 'none',
+                    position: 'relative',
                   }}
                   styles={{ body: { padding: 0, flex: 1, display: 'flex', flexDirection: 'column' } }}
                 >
+                  {/* Badge "Активен" на границе карточки */}
+                  {isCurrentPlan && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -12,
+                        right: 20,
+                        background: planConfig.accentColor,
+                        color: 'white',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: '4px 10px',
+                        borderRadius: 12,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        zIndex: 10,
+                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                      }}
+                    >
+                      <CheckOutlined style={{ fontSize: 10 }} />
+                      Активен
+                    </div>
+                  )}
+
                   {/* Header */}
                   <div style={{ padding: '24px 24px 20px', borderBottom: '1px solid #f1f5f9' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <div
                         style={{
                           width: 44,
@@ -198,33 +272,15 @@ export const PlansPage = () => {
                       >
                         {planConfig.icon}
                       </div>
-                      {isCurrentPlan && (
-                        <div
-                          style={{
-                            marginLeft: 'auto',
-                            background: planConfig.accentColor,
-                            color: 'white',
-                            fontSize: 11,
-                            fontWeight: 600,
-                            padding: '4px 10px',
-                            borderRadius: 12,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                          }}
-                        >
-                          <CheckOutlined style={{ fontSize: 10 }} />
-                          Активен
-                        </div>
-                      )}
+                      <div style={{ flex: 1 }}>
+                        <Title level={4} style={{ margin: 0, fontWeight: 700, fontSize: 18 }}>
+                          {planConfig.name}
+                        </Title>
+                        <Text type="secondary" style={{ fontSize: 13 }}>
+                          {planConfig.description}
+                        </Text>
+                      </div>
                     </div>
-                    
-                    <Title level={4} style={{ margin: '0 0 4px', fontWeight: 700, fontSize: 18 }}>
-                      {planConfig.name}
-                    </Title>
-                    <Text type="secondary" style={{ fontSize: 13 }}>
-                      {planConfig.description}
-                    </Text>
                   </div>
 
                   {/* Price */}
@@ -258,7 +314,7 @@ export const PlansPage = () => {
                       padding: '12px 14px',
                       background: '#f8fafc',
                       borderRadius: 12,
-                      marginBottom: 12,
+                      marginBottom: 20,
                     }}>
                       <ThunderboltOutlined style={{ fontSize: 18, color: planConfig.accentColor }} />
                       <div>
@@ -266,27 +322,7 @@ export const PlansPage = () => {
                           {plan.response_limit} откликов
                         </Text>
                         <Text type="secondary" style={{ fontSize: 12 }}>
-                          за период
-                        </Text>
-                      </div>
-                    </div>
-
-                    <div style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: 10, 
-                      padding: '12px 14px',
-                      background: '#f8fafc',
-                      borderRadius: 12,
-                      marginBottom: 20,
-                    }}>
-                      <ClockCircleOutlined style={{ fontSize: 18, color: planConfig.accentColor }} />
-                      <div>
-                        <Text strong style={{ fontSize: 15, display: 'block', lineHeight: 1.2 }}>
-                          Сброс: {formatResetPeriod(plan.reset_period_seconds)}
-                        </Text>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          период обновления
+                          в день
                         </Text>
                       </div>
                     </div>

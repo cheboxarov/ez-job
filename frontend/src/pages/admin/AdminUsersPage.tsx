@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Table, Input, Typography, Space, Tag, Button } from 'antd';
+import { Table, Input, Typography, Space, Tag, Button, Row, Col } from 'antd';
 import { SearchOutlined, UserOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../api/admin';
@@ -96,24 +96,29 @@ export const AdminUsersPage = () => {
     <div>
       <Title level={2}>Пользователи</Title>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
-        <Space>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={16} md={12} lg={10}>
           <Input
             placeholder="Поиск по телефону"
             prefix={<SearchOutlined />}
             value={phoneSearch}
             onChange={(e) => setPhoneSearch(e.target.value)}
             onPressEnter={handleSearch}
-            style={{ width: 300 }}
+              style={{ width: '100%' }}
           />
-          <Button type="primary" onClick={handleSearch}>
+          </Col>
+          <Col xs={24} sm={8} md={6} lg={4}>
+            <Button type="primary" onClick={handleSearch} style={{ width: '100%' }}>
             Найти
           </Button>
-        </Space>
+          </Col>
+        </Row>
         <Table
           columns={columns}
           dataSource={users}
           loading={loading}
           rowKey="id"
+          scroll={{ x: true }}
           pagination={{
             current: page,
             pageSize: pageSize,

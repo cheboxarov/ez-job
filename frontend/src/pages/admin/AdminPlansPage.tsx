@@ -11,6 +11,8 @@ import {
   Space,
   Tag,
   message,
+  Row,
+  Col,
 } from 'antd';
 import { PlusOutlined, EditOutlined, StopOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -28,10 +30,20 @@ export const AdminPlansPage = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingPlan, setEditingPlan] = useState<AdminPlan | null>(null);
   const [form] = Form.useForm();
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     loadPlans();
   }, [page, pageSize]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const loadPlans = async () => {
     setLoading(true);
@@ -136,6 +148,7 @@ export const AdminPlansPage = () => {
       key: 'reset_period_seconds',
       align: 'center',
       render: (seconds: number) => formatResetPeriod(seconds),
+      responsive: ['md'],
     },
     {
       title: 'Длительность (дней)',
@@ -143,6 +156,7 @@ export const AdminPlansPage = () => {
       key: 'duration_days',
       align: 'center',
       render: (days: number) => (days === 0 ? 'Бессрочно' : days),
+      responsive: ['md'],
     },
     {
       title: 'Цена',
@@ -179,20 +193,30 @@ export const AdminPlansPage = () => {
 
   return (
     <div>
-      <Space style={{ width: '100%', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Title level={2} style={{ margin: 0 }}>
-          Управление планами
-        </Title>
-        <Button type="primary" icon={<PlusOutlined />} onClick={handleCreate}>
-          Создать план
-        </Button>
-      </Space>
+      <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
+        <Col xs={24} md={18}>
+          <Title level={2} style={{ margin: 0 }}>
+            Управление планами
+          </Title>
+        </Col>
+        <Col xs={24} md={6} style={{ textAlign: 'right' }}>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleCreate}
+            block={isMobile}
+          >
+            Создать план
+          </Button>
+        </Col>
+      </Row>
 
       <Table
         columns={columns}
         dataSource={plans}
         loading={loading}
         rowKey="id"
+        scroll={{ x: true }}
         pagination={{
           current: page,
           pageSize: pageSize,
@@ -216,7 +240,8 @@ export const AdminPlansPage = () => {
         }}
         okText="Сохранить"
         cancelText="Отмена"
-        width={600}
+        width={isMobile ? '95%' : 600}
+        style={{ maxWidth: '95vw' }}
       >
         <Form form={form} layout="vertical">
           <Form.Item

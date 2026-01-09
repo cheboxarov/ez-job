@@ -12,6 +12,9 @@ import {
   Tag,
   Descriptions,
   message,
+  Row,
+  Col,
+  Grid,
 } from 'antd';
 import { SearchOutlined, EyeOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -24,6 +27,7 @@ const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 export const AdminLlmCallsPage = () => {
+  const { xs } = Grid.useBreakpoint();
   const [searchParams, setSearchParams] = useSearchParams();
   const [calls, setCalls] = useState<LlmCall[]>([]);
   const [loading, setLoading] = useState(false);
@@ -159,48 +163,60 @@ export const AdminLlmCallsPage = () => {
   ];
 
   return (
-    <div>
+    <div style={{ padding: xs ? '0 16px' : '0 24px' }}>
       <Title level={2}>LLM вызовы</Title>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
-        <Space wrap>
-          <RangePicker
-            value={dateRange}
-            onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null])}
-            showTime
-            format="DD.MM.YYYY HH:mm"
-          />
-          <Input
-            placeholder="ID пользователя"
-            value={userId}
-            onChange={(e) => setUserId(e.target.value)}
-            style={{ width: 200 }}
-          />
-          <Input
-            placeholder="Агент"
-            value={agentName}
-            onChange={(e) => setAgentName(e.target.value)}
-            style={{ width: 200 }}
-          />
-          <Select
-            placeholder="Статус"
-            value={status || undefined}
-            onChange={setStatus}
-            allowClear
-            style={{ width: 150 }}
-          >
-            <Select.Option value="success">Успех</Select.Option>
-            <Select.Option value="error">Ошибка</Select.Option>
-          </Select>
-          <Button type="primary" icon={<SearchOutlined />} onClick={handleFilter}>
-            Применить фильтры
-          </Button>
-        </Space>
+        <Row gutter={[16, 16]}>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <RangePicker
+              value={dateRange}
+              onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null])}
+              showTime
+              format="DD.MM.YYYY HH:mm"
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Input
+              placeholder="ID пользователя"
+              value={userId}
+              onChange={(e) => setUserId(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Input
+              placeholder="Агент"
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+              style={{ width: '100%' }}
+            />
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Select
+              placeholder="Статус"
+              value={status || undefined}
+              onChange={setStatus}
+              allowClear
+              style={{ width: '100%' }}
+            >
+              <Select.Option value="success">Успех</Select.Option>
+              <Select.Option value="error">Ошибка</Select.Option>
+            </Select>
+          </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Button type="primary" icon={<SearchOutlined />} onClick={handleFilter} style={{ width: '100%' }}>
+              Применить фильтры
+            </Button>
+          </Col>
+        </Row>
 
         <Table
           columns={columns}
           dataSource={calls}
           loading={loading}
           rowKey="id"
+          scroll={{ x: true }}
           pagination={{
             current: page,
             pageSize: pageSize,
@@ -218,12 +234,12 @@ export const AdminLlmCallsPage = () => {
       <Drawer
         title="Детали вызова LLM"
         placement="right"
-        width="90%"
+        width={xs ? '100%' : '90%'}
         open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         styles={{
           body: {
-            padding: '24px',
+            padding: xs ? '16px' : '24px',
           },
         }}
       >

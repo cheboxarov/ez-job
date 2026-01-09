@@ -23,9 +23,9 @@ class ChangeUserSubscriptionUseCase:
     Позволяет пользователю выбрать новый тарифный план.
     При смене плана:
     - Обновляется subscription_plan_id
-    - Сбрасываются счетчики откликов
+    - Счетчики откликов сохраняются (не обнуляются)
     - Обновляется срок действия подписки
-    - Устанавливается новая дата начала периода сброса
+    - Период сброса сохраняется (если уже начат)
     """
 
     def __init__(
@@ -57,12 +57,10 @@ class ChangeUserSubscriptionUseCase:
         Raises:
             ValueError: Если план с указанным именем не найден.
         """
-        # Получаем план по имени
         plan = await self._subscription_plan_repository.get_by_name(plan_name)
         if plan is None:
             raise ValueError(f"План подписки '{plan_name}' не найден")
 
-        # Получаем текущую подписку пользователя
         user_subscription = await self._user_subscription_repository.get_by_user_id(
             user_id
         )
@@ -70,12 +68,10 @@ class ChangeUserSubscriptionUseCase:
         now = datetime.now(timezone.utc)
 
         if user_subscription is None:
-            # Подписка не существует - создаем новую
             logger.info(
                 f"Создание новой подписки для пользователя {user_id} с планом {plan_name}"
             )
 
-            # Вычисляем срок действия подписки
             expires_at = None
             if plan.duration_days > 0:
                 expires_at = now + timedelta(days=plan.duration_days)
@@ -98,33 +94,21 @@ class ChangeUserSubscriptionUseCase:
                 f"expires_at: {expires_at}"
             )
         else:
-            # Подписка существует - обновляем план
             old_plan_id = user_subscription.subscription_plan_id
             logger.info(
                 f"Смена плана подписки для пользователя {user_id}: "
                 f"старый план {old_plan_id}, новый план {plan_name}"
             )
 
-            # Обновляем план
             user_subscription.subscription_plan_id = plan.id
 
-            # Сбрасываем счетчики
-            user_subscription.responses_count = 0
-            user_subscription.period_started_at = now
-
-            # Обновляем срок действия подписки
             if plan.name == "FREE":
-                # FREE план - бессрочная подписка
                 user_subscription.expires_at = None
             elif plan.duration_days > 0:
-                # Если у плана есть срок действия, устанавливаем его
                 user_subscription.expires_at = now + timedelta(days=plan.duration_days)
             else:
-                # Если duration_days = 0, делаем подписку бессрочной
                 user_subscription.expires_at = None
 
-            # Обновляем дату начала подписки только если она еще не установлена
-            # или если мы переходим с FREE на платный план
             if user_subscription.started_at is None:
                 user_subscription.started_at = now
 

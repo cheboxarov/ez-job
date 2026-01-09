@@ -119,7 +119,7 @@ class AgentActionService(AgentActionServicePort):
             # Контекст будет закрыт после выполнения действия
             async with self._unit_of_work:
                 update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-                    self._unit_of_work.user_hh_auth_data_repository
+                    self._unit_of_work.standalone_user_hh_auth_data_repository
                 )
 
                 use_case = ExecuteAgentActionUseCase(
@@ -180,7 +180,7 @@ class AgentActionService(AgentActionServicePort):
         if user_id:
             async with self._unit_of_work:
                 update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-                    self._unit_of_work.user_hh_auth_data_repository
+                    self._unit_of_work.standalone_user_hh_auth_data_repository
                 )
 
                 use_case = ExecuteAgentActionUseCase(

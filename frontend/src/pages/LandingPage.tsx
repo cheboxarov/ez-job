@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../stores/authStore';
 import { SEO } from '../components/SEO';
@@ -15,12 +15,22 @@ import styles from './LandingPage.module.css';
 export const LandingPage = () => {
   const navigate = useNavigate();
   const { token } = useAuthStore();
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (token) {
       navigate('/resumes', { replace: true });
     }
   }, [token, navigate]);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   if (token) {
     return null;
@@ -33,7 +43,7 @@ export const LandingPage = () => {
         keywords="поиск работы, headhunter, hh.ru, автоотклики, вакансии, резюме, сопроводительное письмо"
       />
       
-      <ThreeBackground />
+      {!isMobile && <ThreeBackground />}
       
       <Header />
       <main>

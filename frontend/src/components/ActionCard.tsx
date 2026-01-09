@@ -12,7 +12,7 @@ interface ActionCardProps {
   onSent?: () => void;
 }
 
-export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
+export const ActionCard = ({ action, chatId: _chatId, onSent }: ActionCardProps) => {
   const [sending, setSending] = useState(false);
   const [isSent, setIsSent] = useState(action.data.sended === true);
 
@@ -28,7 +28,7 @@ export const ActionCard = ({ action, chatId, onSent }: ActionCardProps) => {
 
     setSending(true);
     try {
-      const updatedAction = await executeAgentAction(action.id);
+      await executeAgentAction(action.id);
       setIsSent(true);
       message.success('Сообщение отправлено');
       onSent?.();

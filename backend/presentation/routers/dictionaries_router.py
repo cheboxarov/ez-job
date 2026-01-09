@@ -33,7 +33,7 @@ async def get_areas(
     try:
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
         return await use_case.execute(
             headers=headers,

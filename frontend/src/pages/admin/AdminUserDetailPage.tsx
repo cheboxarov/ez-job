@@ -13,6 +13,8 @@ import {
   Spin,
   Descriptions,
   Divider,
+  Row,
+  Col,
 } from 'antd';
 import {
   UserOutlined,
@@ -137,7 +139,7 @@ export const AdminUserDetailPage = () => {
     selectedPlan !== userData.subscription?.plan_id;
 
   return (
-    <div>
+    <div style={{ padding: '0 16px' }}>
       <Space direction="vertical" style={{ width: '100%' }} size="large">
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/admin/users')}>
@@ -149,7 +151,7 @@ export const AdminUserDetailPage = () => {
         </Space>
 
         <Card title="Основная информация">
-          <Descriptions column={2}>
+          <Descriptions column={{ xs: 1, sm: 1, md: 2, lg: 2 }}>
             <Descriptions.Item label="ID">{userData.id}</Descriptions.Item>
             <Descriptions.Item label="Email">{userData.email || '-'}</Descriptions.Item>
             <Descriptions.Item label="Телефон">{userData.phone || '-'}</Descriptions.Item>
@@ -181,11 +183,11 @@ export const AdminUserDetailPage = () => {
 
         <Card title="Управление флагами">
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Space>
+            <Space wrap>
               <Text>Активен:</Text>
               <Switch checked={isActive} onChange={setIsActive} />
             </Space>
-            <Space>
+            <Space wrap>
               <Text>Подтверждён:</Text>
               <Switch checked={isVerified} onChange={setIsVerified} />
             </Space>
@@ -203,10 +205,10 @@ export const AdminUserDetailPage = () => {
 
         <Card title="Управление планом">
           <Space direction="vertical" style={{ width: '100%' }}>
-            <Space>
+            <Space wrap style={{ width: '100%' }}>
               <Text>План:</Text>
               <Select
-                style={{ width: 200 }}
+                style={{ width: '100%', maxWidth: 300 }}
                 value={selectedPlan}
                 onChange={setSelectedPlan}
                 placeholder="Выберите план"
@@ -232,18 +234,23 @@ export const AdminUserDetailPage = () => {
         <Divider />
 
         <Card title="Опасная зона" style={{ borderColor: '#ff4d4f' }}>
-          <Space>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => setDeleteModalVisible(true)}
-            >
-              Удалить пользователя
-            </Button>
-            <Text type="secondary">
-              Это действие удалит пользователя и все связанные данные без возможности восстановления.
-            </Text>
-          </Space>
+          <Row gutter={[16, 16]} align="middle">
+            <Col xs={24} sm={24} md={8}>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => setDeleteModalVisible(true)}
+                style={{ width: '100%' }}
+              >
+                Удалить пользователя
+              </Button>
+            </Col>
+            <Col xs={24} sm={24} md={16}>
+              <Text type="secondary">
+                Это действие удалит пользователя и все связанные данные без возможности восстановления.
+              </Text>
+            </Col>
+          </Row>
         </Card>
       </Space>
 

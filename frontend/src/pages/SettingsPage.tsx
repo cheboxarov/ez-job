@@ -55,9 +55,19 @@ export const SettingsPage = () => {
   const [saving, setSaving] = useState(false);
   const [generatingLink, setGeneratingLink] = useState(false);
   const [unlinking, setUnlinking] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     loadSettings();
+  }, []);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
   const loadSettings = async () => {
@@ -178,7 +188,11 @@ export const SettingsPage = () => {
   const isEnabled = telegramSettings.is_enabled && isLinked;
 
   const telegramTab = (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ 
+      maxWidth: 800, 
+      margin: '0 auto',
+      padding: isMobile ? '0 16px' : '0 24px'
+    }}>
       {/* Connection Status Card */}
       <Card
         bordered={true}
@@ -196,7 +210,7 @@ export const SettingsPage = () => {
         }}
       >
         <Row gutter={[24, 24]} align="middle">
-          <Col flex="auto">
+          <Col xs={24} md={16}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div
                 style={{
@@ -229,7 +243,7 @@ export const SettingsPage = () => {
               </div>
             </div>
           </Col>
-          <Col>
+          <Col xs={24} md={8} style={{ display: 'flex', justifyContent: isMobile ? 'flex-start' : 'flex-end' }}>
             <Space>
               {!isLinked ? (
                 <GradientButton
@@ -493,7 +507,11 @@ export const SettingsPage = () => {
   );
 
   const automationTab = (
-    <div style={{ maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ 
+      maxWidth: 800, 
+      margin: '0 auto',
+      padding: isMobile ? '0 16px' : '0 24px'
+    }}>
       <Card
         bordered={true}
         style={{
@@ -558,7 +576,11 @@ export const SettingsPage = () => {
         breadcrumbs={[{ title: 'Профиль', path: '/profile' }, { title: 'Настройки' }]}
       />
 
-      <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+      <div style={{ 
+        maxWidth: 1000, 
+        margin: '0 auto',
+        padding: isMobile ? '0 16px' : '0 24px'
+      }}>
         <Tabs
           defaultActiveKey="notifications"
           items={[

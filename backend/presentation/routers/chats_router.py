@@ -42,7 +42,7 @@ async def list_chats(
     try:
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
 
         # Получаем список непрочитанных чатов
@@ -87,7 +87,7 @@ async def get_chat(
     try:
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
 
         # Получаем детальную информацию о чате
@@ -141,7 +141,7 @@ async def send_chat_message(
     try:
         # Создаем use case для обновления cookies
         update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
-            unit_of_work.user_hh_auth_data_repository
+            unit_of_work.standalone_user_hh_auth_data_repository
         )
 
         # Отправляем сообщение

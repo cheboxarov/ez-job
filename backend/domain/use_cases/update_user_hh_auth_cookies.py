@@ -14,6 +14,7 @@ from uuid import UUID
 from loguru import logger
 
 from domain.entities.user_hh_auth_data import UserHhAuthData
+from domain.exceptions.lock_not_acquired import LockNotAcquiredError
 from domain.interfaces.user_hh_auth_data_repository_port import (
     UserHhAuthDataRepositoryPort,
 )
@@ -128,13 +129,34 @@ class UpdateUserHhAuthCookiesUseCase:
             "about to SELECT FOR UPDATE user auth row",
             {"user_id": str(user_id)},
         )
-        current_auth = await self._repository.get_by_user_id(user_id, with_for_update=True)
-        _debug_log(
-            "H2",
-            "update_user_hh_auth_cookies.execute:after_for_update",
-            "SELECT FOR UPDATE completed",
-            {"user_id": str(user_id), "elapsed_ms": int((time.perf_counter() - started) * 1000)},
-        )
+        try:
+            current_auth = await self._repository.get_by_user_id(user_id, with_for_update=True)
+            _debug_log(
+                "H2",
+                "update_user_hh_auth_cookies.execute:after_for_update",
+                "SELECT FOR UPDATE completed",
+                {"user_id": str(user_id), "elapsed_ms": int((time.perf_counter() - started) * 1000)},
+            )
+        except LockNotAcquiredError:
+            # Не удалось получить блокировку (занята другим процессом)
+            # Пропускаем обновление и возвращаем текущие данные без записи
+            _debug_log(
+                "H7",
+                "update_user_hh_auth_cookies.execute:lock_not_acquired",
+                "skipping DB write - lock busy, returning current data",
+                {
+                    "user_id": str(user_id),
+                    "elapsed_ms": int((time.perf_counter() - started) * 1000),
+                },
+            )
+            logger.debug(
+                f"Could not acquire lock for user_id={user_id}. "
+                "Skipping cookie update, returning current data."
+            )
+            # Возвращаем текущие данные без обновления
+            # Новые cookies будут применены при следующем успешном обновлении
+            return current_auth
+        
         if current_auth is None:
             raise ValueError(
                 f"HH auth data not found for user_id={user_id}. "

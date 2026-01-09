@@ -145,6 +145,7 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
                     generate_test_answers_uc=generate_test_answers_uc,
                     max_vacancies_per_resume=200,
                     delay_between_replies_seconds=30,
+                    database_config=config.database,  # Для создания standalone репозитория обновления cookies
                 )
                 
                 # Обрабатываем только это резюме
