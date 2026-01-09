@@ -64,6 +64,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://api.autoffer.ru}
     container_name: hh_frontend
     ports:
       - "${FRONTEND_PORT:-5173}:80"

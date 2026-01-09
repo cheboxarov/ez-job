@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Аргумент для API URL
+ARG VITE_API_BASE_URL=http://localhost:8000
+
 # Копирование файлов зависимостей
 COPY package*.json ./
 
@@ -11,6 +14,9 @@ RUN npm install --legacy-peer-deps
 
 # Копирование исходного кода
 COPY . .
+
+# Установка переменной окружения для сборки
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 
 # Сборка приложения (vite сам проверяет типы через плагин)
 RUN npx vite build
