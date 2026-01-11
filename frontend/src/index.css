@@ -6,3 +6,18 @@
 .ant-card {
   box-shadow: none !important;
 }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: 
+    radial-gradient(circle at bottom right, rgba(37, 99, 235, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.05) 0%, transparent 40%),
+    #f8fafc;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}

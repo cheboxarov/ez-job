@@ -33,6 +33,7 @@ class OpenAIConfig:
     model: str = "grok-4.1-fast"
     minimal_confidence: float = 0.0
     api_key: str | None = None
+    resume_edit_model: str | None = None
 
 
 @dataclass(slots=True)
@@ -121,6 +122,8 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
     openai_model = os.getenv("OPENAI_MODEL", "gpt-oss-120b:exacto")
     openai_min_conf = _get_env_float("OPENAI_MIN_CONFIDENCE", 0.0)
     openai_api_key = os.getenv("OPENAI_API_KEY")
+    resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "gpt-oss-120b:exacto")
+    # resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "glm-4.7")  # Опциональная модель для чата редактирования резюме
 
     # Нормализуем confidence в диапазон [0.0, 1.0]
     if openai_min_conf < 0.0:
@@ -139,6 +142,7 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
         model=openai_model,
         minimal_confidence=openai_min_conf,
         api_key=openai_api_key,
+        resume_edit_model=resume_edit_model,
     )
 
     # Конфигурация БД

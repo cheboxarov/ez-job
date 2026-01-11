@@ -98,6 +98,42 @@ agent = VacancyTestAgent(config.openai, unit_of_work=uow)
 answers = await agent.generate_test_answers(test, resume, user_id=user_id)
 ```
 
+### Resume Edit DeepAgent
+
+**Назначение:** Интерактивное редактирование резюме с планированием, под-агентами и стримингом.
+
+**Как работает:**
+
+1. Главный DeepAgent строит todo-план и управляет статусами задач.
+2. Делегирует выполнение под-агентам:
+   - question-agent — уточняющие вопросы
+   - patch-agent — генерация патчей
+   - chat-agent — общий диалог
+3. Возвращает структурированный результат (questions/patches/warnings) и обновленный план.
+
+**Использование:**
+
+```python
+from infrastructure.agents.resume_edit.deepagents.resume_edit_deep_agent import (
+    ResumeEditDeepAgentAdapter,
+)
+
+agent = ResumeEditDeepAgentAdapter(config.openai)
+```
+
+**Формат todo-плана:**
+
+```json
+[
+  {
+    "id": "todo-1",
+    "title": "Уточнить детали опыта",
+    "status": "in_progress",
+    "description": "Собрать цифры, метрики, стек"
+  }
+]
+```
+
 ## Интеграция с LLM
 
 Все агенты наследуются от `BaseAgent`, который предоставляет единый интерфейс для работы с LLM через OpenAI-совместимое API (BotHub).

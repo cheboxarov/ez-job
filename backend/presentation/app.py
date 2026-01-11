@@ -187,6 +187,11 @@ from presentation.routers.websocket_router import router as websocket_router
 
 app.include_router(websocket_router)
 
+# Resume Edit WebSocket router
+from presentation.routers.resume_edit_websocket_router import router as resume_edit_websocket_router
+
+app.include_router(resume_edit_websocket_router)
+
 # Telegram router
 from presentation.routers.telegram_router import router as telegram_router
 

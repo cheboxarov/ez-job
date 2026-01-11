@@ -10,11 +10,13 @@ import {
   Row,
   Col,
   Tabs,
+  message,
 } from 'antd';
 import {
   SearchOutlined,
   FileTextOutlined,
   SendOutlined,
+  ArrowLeftOutlined,
 } from '@ant-design/icons';
 import { getResume, evaluateResume } from '../api/resumes';
 import { useDailyResponsesStore } from '../stores/dailyResponsesStore';
@@ -168,12 +170,18 @@ export const ResumeDetailPage = () => {
           onChange={(key) => {
             if (key === 'autolike') {
               navigate(`/resumes/${resumeId}/autolike`);
+            } else if (key === 'edit') {
+              navigate(`/resumes/${resumeId}/edit`);
             }
           }}
           items={[
             {
               key: 'resume',
               label: 'Резюме',
+            },
+            {
+              key: 'edit',
+              label: 'Редактирование',
             },
             {
               key: 'autolike',

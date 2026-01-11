@@ -1,11 +1,9 @@
-import { Typography, Breadcrumb, Grid } from 'antd';
-import { Link } from 'react-router-dom';
-import { HomeOutlined } from '@ant-design/icons';
+import { Breadcrumb, Button } from 'antd';
+import { Link, useNavigate } from 'react-router-dom';
+import { HomeOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { Helmet } from 'react-helmet-async';
 import { useEffect, useState } from 'react';
-
-const { Title, Text } = Typography;
-const { useBreakpoint } = Grid;
+import styles from './PageHeader.module.css';
 
 interface BreadcrumbItem {
   title: string;
@@ -29,20 +27,14 @@ export const PageHeader = ({
   actions,
   icon
 }: PageHeaderProps) => {
-  const screens = useBreakpoint();
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    if (Object.keys(screens).length > 0) {
-      setIsMobile(!screens.md);
-    }
-  }, [screens]);
+  const navigate = useNavigate();
 
   const breadcrumbItems = [
     { title: <Link to="/"><HomeOutlined /></Link> },
     ...breadcrumbs.map(item => ({
       title: item.path ? <Link to={item.path}>{item.title}</Link> : item.title
-    }))
+    })),
+    { title: title }
   ];
 
   // Генерация структурированных данных BreadcrumbList
@@ -59,7 +51,13 @@ export const PageHeader = ({
         "position": index + 2,
         "name": item.title,
         "item": item.path ? `${BASE_URL}${item.path}` : undefined
-      })).filter(item => item.item !== undefined)
+      })).filter(item => item.item !== undefined),
+      {
+        "@type": "ListItem",
+        "position": breadcrumbs.length + 2,
+        "name": title,
+        "item": undefined // Текущая страница
+      }
     ];
 
     return {
@@ -69,81 +67,38 @@ export const PageHeader = ({
     };
   };
 
-  const breadcrumbSchema = breadcrumbs.length > 0 ? generateBreadcrumbSchema() : null;
+  const breadcrumbSchema = generateBreadcrumbSchema();
 
   return (
     <>
-      {breadcrumbSchema && (
-        <Helmet>
-          <script type="application/ld+json">
-            {JSON.stringify(breadcrumbSchema)}
-          </script>
-        </Helmet>
-      )}
-      <div
-        style={{
-          width: '100%',
-          boxSizing: 'border-box',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          marginBottom: 20,
-          padding: isMobile ? '16px' : '16px 20px 16px 32px',
-          background: '#ffffff',
-          borderRadius: 16,
-          border: '1px solid #e5e7eb',
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-      {/* Gradient accent */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 4,
-          background: 'linear-gradient(180deg, #2563eb 0%, #7c3aed 100%)',
-          borderRadius: '16px 0 0 16px',
-        }}
-      />
+      <Helmet>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbSchema)}
+        </script>
+      </Helmet>
       
-      <Breadcrumb items={breadcrumbItems} />
-      
-      <div style={{ 
-        display: 'flex', 
-        alignItems: isMobile ? 'flex-start' : 'center', 
-        justifyContent: 'space-between',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: 16 
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div>
-            <Title level={2} style={{ margin: 0, fontSize: isMobile ? 22 : 26, fontWeight: 700, color: '#0f172a' }}>
-              {title}
-            </Title>
-            {subtitle && (
-              <Text type="secondary" style={{ fontSize: 14, marginTop: 2, display: 'block' }}>
-                {subtitle}
-              </Text>
-            )}
-          </div>
+      <header className={styles.header}>
+        <div className={styles.headerTitle}>
+          {breadcrumbs.length > 0 && (
+            <Button 
+              type="text" 
+              icon={<ArrowLeftOutlined />} 
+              onClick={() => navigate(-1)}
+              style={{ marginRight: 4 }}
+            />
+          )}
+          <Breadcrumb items={breadcrumbItems} />
+          {subtitle && (
+            <span style={{ color: '#64748b', fontWeight: 400, marginLeft: 8, fontSize: 14 }}>
+              / {subtitle}
+            </span>
+          )}
         </div>
-        
-        {actions && (
-          <div style={{ 
-            display: 'flex', 
-            gap: 12, 
-            alignItems: 'center',
-            width: isMobile ? '100%' : 'auto',
-            flexWrap: 'wrap',
-          }}>
-            {actions}
-          </div>
-        )}
-      </div>
-    </div>
+
+        <div className={styles.headerActions}>
+           {actions}
+        </div>
+      </header>
     </>
   );
 };

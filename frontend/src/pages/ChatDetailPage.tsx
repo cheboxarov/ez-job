@@ -1,16 +1,17 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Typography, Spin, Alert, Button, Input, Space } from 'antd';
-import { MessageOutlined, SendOutlined, UserOutlined } from '@ant-design/icons';
+import { Typography, Spin, Alert, Button, Input } from 'antd';
+import { MessageOutlined, SendOutlined } from '@ant-design/icons';
 import { getChat, sendChatMessage } from '../api/chats';
 import { getAgentActions } from '../api/agentActions';
 import { ActionCard } from '../components/ActionCard';
+import { MarkdownMessage } from '../components/MarkdownMessage';
 import { PageHeader } from '../components/PageHeader';
 import { useWindowSize } from '../hooks/useWindowSize';
 import type { ChatDetailedResponse, ChatMessage, AgentAction } from '../types/api';
 
 const { TextArea } = Input;
-const { Text, Paragraph } = Typography;
+const { Text } = Typography;
 
 export const ChatDetailPage = () => {
   const navigate = useNavigate();
@@ -152,57 +153,6 @@ export const ChatDetailPage = () => {
     return null;
   }
 
-  // Функция для парсинга и подсветки ссылок в тексте
-  const parseLinks = (text: string, isUser: boolean) => {
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts: (string | JSX.Element)[] = [];
-    let lastIndex = 0;
-    let match;
-    let key = 0;
-
-    while ((match = urlRegex.exec(text)) !== null) {
-      // Добавляем текст до ссылки
-      if (match.index > lastIndex) {
-        parts.push(text.substring(lastIndex, match.index));
-      }
-      
-      // Добавляем ссылку
-      const url = match[0];
-      parts.push(
-        <a
-          key={key++}
-          href={url}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            color: isUser ? '#ffffff' : '#2563eb',
-            textDecoration: 'underline',
-            textDecorationColor: isUser ? 'rgba(255, 255, 255, 0.6)' : 'rgba(37, 99, 235, 0.4)',
-            wordBreak: 'break-all',
-            fontWeight: 500,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.textDecorationColor = isUser ? 'rgba(255, 255, 255, 0.9)' : 'rgba(37, 99, 235, 0.8)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.textDecorationColor = isUser ? 'rgba(255, 255, 255, 0.6)' : 'rgba(37, 99, 235, 0.4)';
-          }}
-        >
-          {url}
-        </a>
-      );
-      lastIndex = match.index + match[0].length;
-    }
-    
-    // Добавляем оставшийся текст
-    if (lastIndex < text.length) {
-      parts.push(text.substring(lastIndex));
-    }
-    
-    return parts.length > 0 ? parts : [text];
-  };
-
   return (
     <div style={{ 
       display: 'flex', 
@@ -299,20 +249,11 @@ export const ChatDetailPage = () => {
                     color: isUser ? '#ffffff' : '#0f172a',
                     border: isUser ? '1px solid #2563eb' : '1px solid #e5e7eb',
                     position: 'relative',
+                    fontSize: 15,
+                    lineHeight: 1.5,
                   }}
                 >
-                  <Paragraph 
-                    style={{ 
-                      margin: 0, 
-                      whiteSpace: 'pre-wrap', 
-                      wordBreak: 'break-word',
-                      fontSize: 15,
-                      lineHeight: 1.5,
-                      color: isUser ? '#ffffff' : '#0f172a',
-                    }}
-                  >
-                    {parseLinks(message.text, isUser)}
-                  </Paragraph>
+                  <MarkdownMessage content={message.text} variant={isUser ? 'user' : 'assistant'} />
                   
                   <Text 
                     style={{ 

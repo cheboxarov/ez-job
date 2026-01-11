@@ -8,6 +8,7 @@ import { ResumeDetailPage } from './pages/ResumeDetailPage';
 import { ResumeAutolikePage } from './pages/ResumeAutolikePage';
 import { ResumeVacanciesPage } from './pages/ResumeVacanciesPage';
 import { ResumeResponsesPage } from './pages/ResumeResponsesPage';
+import { ResumeEditPage } from './pages/ResumeEditPage';
 import { HhAuthSettingsPage } from './pages/HhAuthSettingsPage';
 import { TelegramSettingsPage } from './pages/TelegramSettingsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -110,6 +111,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <ResumeAutolikePage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/resumes/:resumeId/edit"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <ResumeEditPage />
               </MainLayout>
             </ProtectedRoute>
           }

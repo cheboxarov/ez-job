@@ -219,7 +219,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   );
 
   return (
-    <Layout style={{ minHeight: '100vh', background: '#f8fafc' }}>
+    <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
       {!isMobile ? (
         <Sider
           width={260}
@@ -251,7 +251,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
         </Drawer>
       )}
 
-      <Layout style={{ marginLeft: isMobile ? 0 : 260, background: '#fafbfc' }}>
+      <Layout style={{ marginLeft: isMobile ? 0 : 260, background: 'transparent' }}>
         {isMobile && (
           <div style={{ 
             padding: '16px 24px', 

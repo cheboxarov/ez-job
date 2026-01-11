@@ -4,7 +4,7 @@ import { login as apiLogin, register as apiRegister } from '../api/auth';
 import { getCurrentUser } from '../api/users';
 import { loginByCode as hhLoginByCode } from '../api/hhAuth';
 import { wsClient } from '../api/websocket';
-import { useWebSocketStore } from './websocketStore';
+import { useWebSocketStore } from './websocketStore.tsx';
 
 interface AuthState {
   token: string | null;
