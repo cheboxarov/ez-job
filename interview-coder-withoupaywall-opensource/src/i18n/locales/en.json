@@ -158,5 +158,12 @@
     "errorTitle": "Error",
     "neutralTitle": "Notice",
     "initializing": "Initializing..."
+  },
+  "chat": {
+    "title": "Discuss Solution",
+    "placeholder": "Ask about the solution...",
+    "send": "Send",
+    "thinking": "Thinking...",
+    "error": "Failed to send message"
   }
 }

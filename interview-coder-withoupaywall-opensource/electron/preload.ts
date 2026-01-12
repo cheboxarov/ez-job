@@ -243,7 +243,9 @@ const electronAPI = {
     }
   },
   deleteLastScreenshot: () => ipcRenderer.invoke("delete-last-screenshot"),
-  resetAppData: () => ipcRenderer.invoke("reset-app-data")
+  resetAppData: () => ipcRenderer.invoke("reset-app-data"),
+  sendChatMessage: (message: string, solutionData?: string) => 
+    ipcRenderer.invoke("send-chat-message", message, solutionData)
 }
 
 // Before exposing the API

@@ -87,6 +87,7 @@ export interface ElectronAPI {
   openLink: (url: string) => void
   onApiKeyInvalid: (callback: () => void) => () => void
   removeListener: (eventName: string, callback: (...args: any[]) => void) => void
+  sendChatMessage: (message: string, solutionData?: string) => Promise<{ success: boolean; response?: string; error?: string }>
 }
 
 declare global {

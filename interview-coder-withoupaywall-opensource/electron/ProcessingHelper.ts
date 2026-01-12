@@ -827,6 +827,77 @@ If you include code examples, use proper markdown code blocks with language spec
     }
   }
 
+  public async sendChatMessage(
+    message: string,
+    solutionData?: string
+  ): Promise<{ success: boolean; response?: string; error?: string }> {
+    try {
+      const problemInfo = this.deps.getProblemInfo()
+      const language = await this.getLanguage()
+      const config = configHelper.loadConfig()
+      const languageInstruction = this.getResponseLanguageInstruction(
+        config.interfaceLanguage
+      )
+
+      if (!problemInfo) {
+        return {
+          success: false,
+          error: "No problem information available. Please process a problem first."
+        }
+      }
+
+      // Формируем контекст для чата
+      const contextPrompt = `
+You are helping the user discuss a coding problem solution. Here is the context:
+
+PROBLEM STATEMENT:
+${problemInfo.problem_statement || "Not available"}
+
+CONSTRAINTS:
+${problemInfo.constraints || "Not available"}
+
+EXAMPLE INPUT:
+${problemInfo.example_input || "Not available"}
+
+EXAMPLE OUTPUT:
+${problemInfo.example_output || "Not available"}
+
+${solutionData ? `CURRENT SOLUTION CODE:\n\`\`\`${language}\n${solutionData}\n\`\`\`` : "No solution code available yet."}
+
+LANGUAGE: ${language}
+
+The user is asking about the solution. Please provide a helpful, clear response.
+`
+
+      const messages: OpenAIMessage[] = [
+        {
+          role: "system",
+          content: `${languageInstruction} You are a helpful coding assistant. Answer questions about the problem and solution clearly and concisely.`
+        },
+        {
+          role: "user",
+          content: `${contextPrompt}\n\nUser's question: ${message}`
+        }
+      ]
+
+      const response = await this.callLLM(messages, {
+        maxTokens: 2000,
+        temperature: 0.7
+      })
+
+      return {
+        success: true,
+        response: response
+      }
+    } catch (error: any) {
+      console.error("Error in sendChatMessage:", error)
+      return {
+        success: false,
+        error: this.getApiErrorMessage(error)
+      }
+    }
+  }
+
   public cancelOngoingRequests(): void {
     let wasCancelled = false
 

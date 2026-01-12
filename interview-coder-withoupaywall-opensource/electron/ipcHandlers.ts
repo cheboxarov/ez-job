@@ -394,4 +394,20 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
       return { success: false, error: "Failed to delete last screenshot" }
     }
   })
+
+  // Chat message handler
+  ipcMain.handle("send-chat-message", async (_event, message: string, solutionData?: string) => {
+    try {
+      if (!deps.processingHelper) {
+        return { success: false, error: "Processing helper not available" }
+      }
+      return await deps.processingHelper.sendChatMessage(message, solutionData)
+    } catch (error) {
+      console.error("Error in send-chat-message handler:", error)
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : "Failed to send chat message" 
+      }
+    }
+  })
 }

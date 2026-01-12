@@ -477,12 +477,16 @@ function setWindowDimensions(width: number, height: number): void {
     const primaryDisplay = screen.getPrimaryDisplay()
     const workArea = primaryDisplay.workAreaSize
     const maxWidth = Math.floor(workArea.width * 0.5)
+    const maxHeight = Math.floor(workArea.height * 0.95) // Ограничиваем высоту 95% экрана
+
+    // Ограничиваем высоту, чтобы окно не выходило за пределы экрана
+    const constrainedHeight = Math.min(Math.ceil(height), maxHeight)
 
     state.mainWindow.setBounds({
       x: Math.min(currentX, workArea.width - maxWidth),
       y: currentY,
       width: Math.min(width + 32, maxWidth),
-      height: Math.ceil(height)
+      height: constrainedHeight
     })
   }
 }

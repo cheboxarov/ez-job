@@ -8,6 +8,7 @@ import ScreenshotQueue from "../components/Queue/ScreenshotQueue"
 
 import { ProblemStatementData } from "../types/solutions"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
+import { SolutionChat } from "../components/Solutions/SolutionChat"
 import Debug from "./Debug"
 import { useToast } from "../contexts/toast"
 import { COMMAND_KEY } from "../utils/platform"
@@ -250,9 +251,16 @@ const Solutions: React.FC<SolutionsProps> = ({
         if (isTooltipVisible) {
           contentHeight += tooltipHeight
         }
+        
+        // Ограничиваем максимальную высоту 95% высоты экрана
+        // Это предотвратит выход окна за пределы экрана
+        // Используем screen.availHeight для получения доступной высоты экрана
+        const maxHeight = Math.floor((window.screen?.availHeight || window.screen?.height || 1080) * 0.95)
+        const constrainedHeight = Math.min(contentHeight, maxHeight)
+        
         window.electronAPI.updateContentDimensions({
           width: contentWidth,
-          height: contentHeight
+          height: constrainedHeight
         })
       }
     }
@@ -490,7 +498,7 @@ const Solutions: React.FC<SolutionsProps> = ({
           setLanguage={setLanguage}
         />
       ) : (
-        <div ref={contentRef} className="relative">
+        <div ref={contentRef} className="relative" style={{ maxHeight: '95vh', overflowY: 'auto' }}>
           <div className="space-y-3 px-4 py-3">
           {/* Conditionally render the screenshot queue if solutionData is available */}
           {solutionData && (
@@ -576,6 +584,9 @@ const Solutions: React.FC<SolutionsProps> = ({
                       spaceComplexity={spaceComplexityData}
                       isLoading={!timeComplexityData || !spaceComplexityData}
                     />
+
+                    {/* Chat component */}
+                    <SolutionChat solutionData={solutionData} />
                   </>
                 )}
               </div>
