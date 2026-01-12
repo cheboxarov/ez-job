@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
+from pydantic import BaseModel
+from typing import Literal
 from uuid import UUID
 
 from domain.interfaces.unit_of_work_port import UnitOfWorkPort
@@ -32,7 +34,20 @@ router = APIRouter(prefix="/api/agent-actions", tags=["agent-actions"])
 
 @router.get("", response_model=AgentActionsListResponse)
 async def list_agent_actions(
-    type: str | None = Query(None, description="Фильтр по типу действия"),
+    types: list[str] | None = Query(None, description="Список типов для включения"),
+    exclude_types: list[str] | None = Query(None, description="Список типов для исключения"),
+    event_types: list[str] | None = Query(
+        None, description="Список подтипов событий (для create_event)"
+    ),
+    exclude_event_types: list[str] | None = Query(
+        None, description="Список подтипов для исключения (для create_event)"
+    ),
+    statuses: list[str] | None = Query(
+        None, description="Список статусов (для create_event)"
+    ),
+    type: str | None = Query(
+        None, description="Фильтр по типу действия (deprecated)", deprecated=True
+    ),
     entity_type: str | None = Query(None, description="Фильтр по типу сущности"),
     entity_id: int | None = Query(None, description="Фильтр по ID сущности"),
     current_user: UserModel = Depends(get_current_active_user),
@@ -44,7 +59,12 @@ async def list_agent_actions(
     Автоматически фильтрует по user_id текущего пользователя.
 
     Args:
-        type: Фильтр по типу действия (например, "send_message", "create_event").
+        types: Список типов действий для включения.
+        exclude_types: Список типов действий для исключения.
+        event_types: Список подтипов событий (data["event_type"]) для create_event.
+        exclude_event_types: Список подтипов событий для исключения (data["event_type"]).
+        statuses: Список статусов (data["status"]) для create_event.
+        type: Фильтр по типу действия (deprecated).
         entity_type: Фильтр по типу сущности (например, "hh_dialog").
         entity_id: Фильтр по ID сущности (например, ID диалога).
         current_user: Текущий авторизованный пользователь.
@@ -58,9 +78,16 @@ async def list_agent_actions(
         HTTPException: 500 при внутренней ошибке.
     """
     try:
+        if types is None and type is not None:
+            types = [type]
+
         # Получаем действия с фильтрацией
         actions = await list_agent_actions_uc.execute(
-            type=type,
+            types=types,
+            exclude_types=exclude_types,
+            event_types=event_types,
+            exclude_event_types=exclude_event_types,
+            statuses=statuses,
             entity_type=entity_type,
             entity_id=entity_id,
             created_by=None,  # Не фильтруем по created_by в API
@@ -126,6 +153,45 @@ async def mark_all_agent_actions_as_read(
         ) from exc
 
 
+class UpdateAgentActionStatusRequest(BaseModel):
+    status: Literal["pending", "completed", "declined"]
+
+
+@router.patch("/{action_id}/status", response_model=AgentActionResponse)
+async def update_agent_action_status(
+    action_id: UUID,
+    payload: UpdateAgentActionStatusRequest,
+    current_user: UserModel = Depends(get_current_active_user),
+    agent_action_service: AgentActionServicePort = Depends(get_agent_action_service),
+) -> AgentActionResponse:
+    """Обновить статус события (для fill_form и test_task)."""
+    try:
+        updated_action = await agent_action_service.update_action_status(
+            action_id=action_id,
+            status=payload.status,
+            user_id=current_user.id,
+        )
+        return AgentActionResponse.from_entity(updated_action)
+    except ValueError as exc:
+        error_msg = str(exc)
+        if "не найдено" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg) from exc
+        if "не принадлежит" in error_msg:
+            raise HTTPException(status_code=403, detail=error_msg) from exc
+        raise HTTPException(status_code=400, detail=error_msg) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"Ошибка при обновлении статуса действия агента {action_id}: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Внутренняя ошибка при обновлении статуса действия агента",
+        ) from exc
+
+
 @router.post("/{action_id}/execute", response_model=AgentActionResponse)
 async def execute_agent_action(
     action_id: UUID,
@@ -185,4 +251,3 @@ async def execute_agent_action(
             status_code=500,
             detail="Внутренняя ошибка при выполнении действия агента",
         ) from exc
-

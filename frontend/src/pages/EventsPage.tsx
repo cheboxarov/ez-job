@@ -1,14 +1,34 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Typography, Spin, Alert, Select, Tag, Button } from 'antd';
-import { CalendarOutlined, MessageOutlined, ArrowRightOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { Typography, Spin, Alert, Tag, Button, Radio, Checkbox, Space } from 'antd';
+import {
+  CalendarOutlined,
+  MessageOutlined,
+  ArrowRightOutlined,
+  ClockCircleOutlined,
+  LinkOutlined,
+  ProfileOutlined,
+} from '@ant-design/icons';
 import { PageHeader } from '../components/PageHeader';
 import { EmptyState } from '../components/EmptyState';
 import { useAgentActionsStore } from '../stores/agentActionsStore';
 import { useEventsStore } from '../stores/eventsStore';
+import type { AgentAction } from '../types/api';
 
 const { Text, Title, Paragraph } = Typography;
-const { Option } = Select;
+
+const EVENT_TYPES = [
+  { value: 'send_message', label: 'Отправка сообщений', icon: <MessageOutlined /> },
+  { value: 'create_event', label: 'Создание событий', icon: <CalendarOutlined /> },
+];
+
+const EVENT_SUBTYPES = [
+  { value: 'call_request', label: 'Запрос на созвон', color: 'blue' },
+  { value: 'fill_form', label: 'Заполнение формы', color: 'gold' },
+  { value: 'test_task', label: 'Тестовое задание', color: 'geekblue' },
+  { value: 'external_action_request', label: 'Требуется действие', color: 'orange' },
+  { value: 'question_answered', label: 'Ответ на вопрос', color: 'green' },
+];
 
 type EventGroup = 'today' | 'yesterday' | 'thisWeek' | 'earlier';
 
@@ -87,8 +107,14 @@ const getEventSubtypeLabel = (eventType?: string): string => {
   switch (eventType) {
     case 'call_request':
       return 'Запрос на созвон';
+    case 'fill_form':
+      return 'Заполнение формы';
+    case 'test_task':
+      return 'Тестовое задание';
     case 'external_action_request':
       return 'Требуется действие';
+    case 'question_answered':
+      return 'Ответ на вопрос';
     default:
       return eventType || '';
   }
@@ -98,31 +124,72 @@ const getEventSubtypeColor = (eventType?: string): string => {
   switch (eventType) {
     case 'call_request':
       return 'blue';
+    case 'fill_form':
+      return 'gold';
+    case 'test_task':
+      return 'geekblue';
     case 'external_action_request':
       return 'orange';
+    case 'question_answered':
+      return 'green';
     default:
       return 'default';
+  }
+};
+
+const isTaskEventType = (eventType?: string) =>
+  eventType === 'fill_form' || eventType === 'test_task';
+
+const getEventStatusLabel = (status?: string): string => {
+  switch (status) {
+    case 'completed':
+      return 'Выполнено';
+    case 'declined':
+      return 'Отклонено';
+    default:
+      return 'Ожидает';
+  }
+};
+
+const getEventStatusColor = (status?: string): string => {
+  switch (status) {
+    case 'completed':
+      return 'green';
+    case 'declined':
+      return 'red';
+    default:
+      return 'gold';
   }
 };
 
 export const EventsPage = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const [filterType, setFilterType] = useState<string>('all');
   const { markAllAsRead, fetchUnreadCount } = useAgentActionsStore();
-  const { events, loading, fetchEvents } = useEventsStore();
+  const {
+    events,
+    loading,
+    fetchEvents,
+    filterMode,
+    selectedTypes,
+    selectedEventTypes,
+    setFilterMode,
+    toggleType,
+    toggleEventType,
+    clearFilters,
+  } = useEventsStore();
 
   useEffect(() => {
     const loadEvents = async () => {
       setError(null);
       try {
-        await fetchEvents(filterType);
+        await fetchEvents();
       } catch (err: any) {
         setError(err.response?.data?.detail || 'Ошибка при загрузке событий');
       }
     };
     loadEvents();
-  }, [filterType, fetchEvents]);
+  }, [filterMode, selectedTypes, selectedEventTypes, fetchEvents]);
 
   useEffect(() => {
     const markAndRefresh = async () => {
@@ -167,6 +234,16 @@ export const EventsPage = () => {
     navigate(`/chats/${event.entity_id}`);
   };
 
+  const handleOpenTaskLink = (event: React.MouseEvent, link: string) => {
+    event.stopPropagation();
+    window.open(link, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleOpenTasksPage = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    navigate('/tasks');
+  };
+
   if (loading && events.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '100px 0' }}>
@@ -182,18 +259,6 @@ export const EventsPage = () => {
         subtitle="История действий агентов"
         icon={<CalendarOutlined />}
         breadcrumbs={[{ title: 'События' }]}
-        actions={
-          <Select
-            value={filterType}
-            onChange={setFilterType}
-            style={{ width: 200 }}
-            placeholder="Фильтр по типу"
-          >
-            <Option value="all">Все события</Option>
-            <Option value="send_message">Отправка сообщений</Option>
-            <Option value="create_event">Создание событий</Option>
-          </Select>
-        }
       />
 
       {error && (
@@ -209,6 +274,69 @@ export const EventsPage = () => {
       )}
 
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div
+          style={{
+            marginBottom: 24,
+            padding: '16px 20px',
+            background: '#ffffff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+          }}
+        >
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Radio.Group
+              value={filterMode}
+              onChange={(event) => setFilterMode(event.target.value as 'include' | 'exclude')}
+            >
+              <Radio.Button value="include">Показать только</Radio.Button>
+              <Radio.Button value="exclude">Исключить</Radio.Button>
+            </Radio.Group>
+
+            <div>
+              <Text type="secondary">Типы событий</Text>
+              <div style={{ marginTop: 8 }}>
+                <Space wrap size={12}>
+                  {EVENT_TYPES.map((type) => (
+                    <Checkbox
+                      key={type.value}
+                      checked={selectedTypes.includes(type.value)}
+                      onChange={() => toggleType(type.value)}
+                    >
+                      <Space size={6}>
+                        {type.icon}
+                        {type.label}
+                      </Space>
+                    </Checkbox>
+                  ))}
+                </Space>
+              </div>
+            </div>
+
+            <div>
+              <Text type="secondary">Подтипы create_event</Text>
+              <div style={{ marginTop: 8 }}>
+                <Space wrap size={12}>
+                  {EVENT_SUBTYPES.map((subtype) => (
+                    <Checkbox
+                      key={subtype.value}
+                      checked={selectedEventTypes.includes(subtype.value)}
+                      onChange={() => toggleEventType(subtype.value)}
+                    >
+                      <Tag color={subtype.color} style={{ marginInlineEnd: 0 }}>
+                        {subtype.label}
+                      </Tag>
+                    </Checkbox>
+                  ))}
+                </Space>
+              </div>
+            </div>
+
+            <div>
+              <Button onClick={clearFilters}>Сбросить фильтры</Button>
+            </div>
+          </Space>
+        </div>
+
         {!loading && events.length === 0 && !error && (
           <EmptyState
             icon={<CalendarOutlined style={{ fontSize: 64, color: '#d9d9d9' }} />}
@@ -300,12 +428,22 @@ export const EventsPage = () => {
                                 {getEventTypeLabel(event.type)}
                               </Text>
                               {event.type === 'create_event' && event.data.event_type && (
-                                <Tag 
-                                  color={getEventSubtypeColor(event.data.event_type)}
-                                  style={{ marginTop: 4, borderRadius: 6 }}
-                                >
-                                  {getEventSubtypeLabel(event.data.event_type)}
-                                </Tag>
+                                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 4 }}>
+                                  <Tag
+                                    color={getEventSubtypeColor(event.data.event_type)}
+                                    style={{ borderRadius: 6, marginInlineEnd: 0 }}
+                                  >
+                                    {getEventSubtypeLabel(event.data.event_type)}
+                                  </Tag>
+                                  {isTaskEventType(event.data.event_type) && (
+                                    <Tag
+                                      color={getEventStatusColor(event.data.status)}
+                                      style={{ borderRadius: 6, marginInlineEnd: 0 }}
+                                    >
+                                      {getEventStatusLabel(event.data.status)}
+                                    </Tag>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -334,6 +472,29 @@ export const EventsPage = () => {
                           >
                             {event.data.message}
                           </Paragraph>
+                        )}
+
+                        {event.type === 'create_event' && isTaskEventType(event.data.event_type) && (
+                          <Space size={8} style={{ marginTop: 12, flexWrap: 'wrap' }}>
+                            {event.data.link && (
+                              <Button
+                                size="small"
+                                icon={<LinkOutlined />}
+                                onClick={(e) => handleOpenTaskLink(e, event.data.link)}
+                              >
+                                {event.data.event_type === 'fill_form'
+                                  ? 'Перейти к форме'
+                                  : 'Перейти к заданию'}
+                              </Button>
+                            )}
+                            <Button
+                              size="small"
+                              icon={<ProfileOutlined />}
+                              onClick={handleOpenTasksPage}
+                            >
+                              К заданиям
+                            </Button>
+                          </Space>
                         )}
                       </div>
                     </div>

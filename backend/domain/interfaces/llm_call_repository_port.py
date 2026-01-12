@@ -73,7 +73,7 @@ class LlmCallRepositoryPort(ABC):
         end_date: datetime,
         plan_id: UUID | None = None,
         time_step: str = "day",
-    ) -> list[tuple[datetime, int, int, int]]:
+    ) -> list[tuple[datetime, int, int, int, float]]:
         """Получить метрики LLM по периоду с группировкой по времени.
 
         Args:
@@ -84,7 +84,7 @@ class LlmCallRepositoryPort(ABC):
 
         Returns:
             Список кортежей (дата/время начала периода, количество вызовов,
-            суммарные токены, количество уникальных пользователей).
+            суммарные токены, количество уникальных пользователей, суммарная стоимость).
         """
 
     @abstractmethod
@@ -94,7 +94,7 @@ class LlmCallRepositoryPort(ABC):
         start_date: datetime,
         end_date: datetime,
         plan_id: UUID | None = None,
-    ) -> tuple[int, int, int, float]:
+    ) -> tuple[int, int, int, float, float]:
         """Получить суммарные метрики LLM за период.
 
         Args:
@@ -104,7 +104,7 @@ class LlmCallRepositoryPort(ABC):
 
         Returns:
             Кортеж (общее количество вызовов, суммарные токены,
-            количество уникальных пользователей, средние токены на пользователя).
+            количество уникальных пользователей, средние токены на пользователя, суммарная стоимость).
         """
 
     @abstractmethod
@@ -113,7 +113,7 @@ class LlmCallRepositoryPort(ABC):
         *,
         start_date: datetime,
         end_date: datetime,
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, float]:
         """Получить метрики LLM для платных пользователей.
 
         Args:
@@ -122,5 +122,5 @@ class LlmCallRepositoryPort(ABC):
 
         Returns:
             Кортеж (количество платных пользователей, сумма prompt_tokens,
-            сумма completion_tokens).
+            сумма completion_tokens, суммарная стоимость из БД).
         """

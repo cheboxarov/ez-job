@@ -5,17 +5,12 @@ import {
   Space,
   DatePicker,
   Select,
-  Button,
   Row,
   Col,
   Statistic,
   message,
   Spin,
-  InputNumber,
-  Modal,
-  Form,
 } from 'antd';
-import { SettingOutlined } from '@ant-design/icons';
 import {
   LineChart,
   Line,
@@ -31,7 +26,7 @@ import {
 import dayjs, { type Dayjs } from 'dayjs';
 import { adminApi } from '../../api/admin';
 import type { CombinedMetricsResponse, AdminPlan } from '../../types/admin';
-import { tokenPricingUtils, type TokenPricing } from '../../utils/tokenPricing';
+import { tokenPricingUtils } from '../../utils/tokenPricing';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -46,9 +41,6 @@ export const AdminMetricsDashboardPage = () => {
   ]);
   const [selectedPlan, setSelectedPlan] = useState<string>('');
   const [timeStep, setTimeStep] = useState<'day' | 'week' | 'month'>('day');
-  const [pricing, setPricing] = useState<TokenPricing>(tokenPricingUtils.getPricing());
-  const [pricingModalVisible, setPricingModalVisible] = useState(false);
-  const [form] = Form.useForm();
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -58,11 +50,6 @@ export const AdminMetricsDashboardPage = () => {
   useEffect(() => {
     loadMetrics();
   }, [dateRange, selectedPlan, timeStep]);
-
-  useEffect(() => {
-    const savedPricing = tokenPricingUtils.getPricing();
-    setPricing(savedPricing);
-  }, []);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -89,8 +76,6 @@ export const AdminMetricsDashboardPage = () => {
         start_date: dateRange[0].toISOString(),
         end_date: dateRange[1].toISOString(),
         time_step: timeStep,
-        input_price_per_million: pricing.inputPricePerMillion,
-        output_price_per_million: pricing.outputPricePerMillion,
       };
 
       if (selectedPlan) {
@@ -106,27 +91,6 @@ export const AdminMetricsDashboardPage = () => {
     }
   };
 
-  const handleSavePricing = () => {
-    form.validateFields().then((values) => {
-      const newPricing: TokenPricing = {
-        inputPricePerMillion: values.inputPrice || 0,
-        outputPricePerMillion: values.outputPrice || 0,
-      };
-      tokenPricingUtils.setPricing(newPricing);
-      setPricing(newPricing);
-      setPricingModalVisible(false);
-      message.success('Настройки стоимости сохранены');
-    });
-  };
-
-  const openPricingModal = () => {
-    form.setFieldsValue({
-      inputPrice: pricing.inputPricePerMillion,
-      outputPrice: pricing.outputPricePerMillion,
-    });
-    setPricingModalVisible(true);
-  };
-
   const formatDate = (dateStr: string) => {
     const date = dayjs(dateStr);
     if (timeStep === 'day') return date.format('DD.MM');
@@ -134,28 +98,19 @@ export const AdminMetricsDashboardPage = () => {
     return date.format('MMM YYYY');
   };
 
-  // Приблизительный расчет стоимости на основе total_tokens
-  // Используем соотношение 60/40 для prompt/completion
-  const calculateCostFromTotalTokens = (totalTokens: number): number => {
-    const promptTokens = Math.round(totalTokens * 0.6);
-    const completionTokens = Math.round(totalTokens * 0.4);
-    return tokenPricingUtils.calculateCost(promptTokens, completionTokens, pricing) || 0;
-  };
-
   const llmChartData =
     metrics?.llm_metrics.metrics_by_period.map((m) => {
-      const cost = calculateCostFromTotalTokens(m.total_tokens);
       return {
-      period: formatDate(m.period_start),
-      calls: m.calls_count,
-      tokens: m.total_tokens,
-      users: m.unique_users,
-        cost: cost,
+        period: formatDate(m.period_start),
+        calls: m.calls_count,
+        tokens: m.total_tokens,
+        users: m.unique_users,
+        cost: m.total_cost || 0,
       };
     }) || [];
 
   const totalCost = metrics
-    ? calculateCostFromTotalTokens(metrics.llm_metrics.total_metrics.total_tokens)
+    ? metrics.llm_metrics.total_metrics.total_cost || 0
     : 0;
   const avgCostPerCall =
     metrics && metrics.llm_metrics.total_metrics.calls_count > 0
@@ -220,15 +175,6 @@ export const AdminMetricsDashboardPage = () => {
                 <Select.Option value="week">По неделям</Select.Option>
                 <Select.Option value="month">По месяцам</Select.Option>
               </Select>
-            </Col>
-            <Col xs={24} sm={24} md={6} lg={5}>
-              <Button
-                icon={<SettingOutlined />}
-                onClick={openPricingModal}
-                style={{ width: '100%' }}
-              >
-                Настройки стоимости
-              </Button>
             </Col>
           </Row>
         </Card>
@@ -451,44 +397,6 @@ export const AdminMetricsDashboardPage = () => {
           </>
         )}
       </Space>
-
-      <Modal
-        title="Настройки стоимости токенов"
-        open={pricingModalVisible}
-        onOk={handleSavePricing}
-        onCancel={() => setPricingModalVisible(false)}
-        okText="Сохранить"
-        cancelText="Отмена"
-      >
-        <Form form={form} layout="vertical">
-          <Form.Item
-            label="Стоимость входных токенов за млн"
-            name="inputPrice"
-            rules={[{ required: true, message: 'Укажите стоимость' }]}
-          >
-            <InputNumber
-              min={0}
-              step={0.01}
-              style={{ width: '100%' }}
-              prefix="$"
-              placeholder="0.00"
-            />
-          </Form.Item>
-          <Form.Item
-            label="Стоимость выходных токенов за млн"
-            name="outputPrice"
-            rules={[{ required: true, message: 'Укажите стоимость' }]}
-          >
-            <InputNumber
-              min={0}
-              step={0.01}
-              style={{ width: '100%' }}
-              prefix="$"
-              placeholder="0.00"
-            />
-          </Form.Item>
-        </Form>
-      </Modal>
     </div>
   );
 };

@@ -308,6 +308,13 @@ export interface ParticipantDisplay {
   is_bot: boolean;
 }
 
+export interface ChatFile {
+  url: string;
+  title: string;
+  content_type: string;
+  upload_id: string;
+}
+
 export interface ChatMessage {
   id: number;
   chat_id: number;
@@ -324,6 +331,7 @@ export interface ChatMessage {
   participant_display?: ParticipantDisplay | null;
   participant_id?: string | null;
   resources?: Record<string, string[]> | null;
+  files?: ChatFile[] | null;
 }
 
 export interface ChatDisplayInfo {
@@ -355,6 +363,15 @@ export interface ChatListItem {
 }
 
 // Типы для действий агента
+export type EventType =
+  | 'call_request'
+  | 'external_action_request'
+  | 'question_answered'
+  | 'fill_form'
+  | 'test_task';
+
+export type EventStatus = 'pending' | 'completed' | 'declined';
+
 export interface AgentAction {
   id: string;
   type: string;
@@ -367,8 +384,10 @@ export interface AgentAction {
     dialog_id: number;
     message_to?: number;
     message_text?: string;
-    event_type?: string;
+    event_type?: EventType;
     message?: string;
+    link?: string;
+    status?: EventStatus;
     sended?: boolean;
   };
   created_at: string;
@@ -462,5 +481,3 @@ export interface GenerateTelegramLinkTokenResponse {
 export interface SendTestNotificationResponse {
   success: boolean;
 }
-
-

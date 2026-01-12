@@ -39,9 +39,13 @@ def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> N
             )
             + "\n"
         )
-    except Exception:
+    except Exception as exc:
         # не ломаем основной флоу
-        pass
+        logger.warning(
+            f"Не удалось записать debug лог при обновлении cookies: "
+            f"hypothesis_id={hypothesis_id}, location={location}, "
+            f"message={message}, error={exc}"
+        )
 # endregion
 
 

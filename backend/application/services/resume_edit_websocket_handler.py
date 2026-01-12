@@ -13,6 +13,7 @@ from loguru import logger
 
 from application.services.resume_edit_service import ResumeEditService
 from domain.entities.resume_edit_result import ResumeEditResult
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from infrastructure.agents.resume_edit.deepagents.state_mapper import (
     build_agent_input,
     get_current_task,
@@ -31,19 +32,27 @@ class ResumeEditWebSocketHandler:
     - Отправляет ответы через WebSocket (assistant_message, questions, patches, streaming, error)
     """
 
-    def __init__(self, resume_edit_service: ResumeEditService, deep_agent) -> None:
+    def __init__(
+        self,
+        resume_edit_service: ResumeEditService,
+        deep_agent,
+        unit_of_work: UnitOfWorkPort,
+    ) -> None:
         """Инициализация обработчика.
 
         Args:
             resume_edit_service: Сервис для редактирования резюме.
             deep_agent: DeepAgent (LangGraph) для генерации ответов.
+            unit_of_work: UnitOfWork для логирования вызовов LLM.
         """
         self._resume_edit_service = resume_edit_service
         self._deep_agent = deep_agent
+        self._unit_of_work = unit_of_work
         self._chat_history: dict[UUID, list[dict]] = {}  # resume_id -> history
         self._chat_plan: dict[UUID, list[dict]] = {}  # resume_id -> current plan
         self._processing_flags: dict[UUID, bool] = {}  # resume_id -> is processing
         self._session_loggers: dict[UUID, logger] = {}  # resume_id -> session logger
+        self._generation_tasks: dict[UUID, asyncio.Task] = {}  # resume_id -> generation task
         # Определяем путь к логам: в Docker это /app/logs, локально - logs
         import os
         workdir = os.getcwd()
@@ -79,7 +88,12 @@ class ResumeEditWebSocketHandler:
                     history=history,
                     current_plan=current_plan,
                     current_task=current_task,
+                    user_id=user_id,
                 )
+                run_metadata = {
+                    "user_id": str(user_id),
+                    "context": {"resume_id": str(resume_id)},
+                }
                 final_state = await stream_deep_agent_to_websocket(
                     agent=self._deep_agent,
                     input_data=input_state,
@@ -87,8 +101,13 @@ class ResumeEditWebSocketHandler:
                         websocket, msg_type, data, session_key=session_key
                     ),
                     send_plan_updates=False,
+                    run_metadata=run_metadata,
                 )
-                return state_to_resume_edit_result(final_state)
+                return await state_to_resume_edit_result(
+                    final_state,
+                    unit_of_work=self._unit_of_work,
+                    user_id=user_id,
+                )
             except TypeError as exc:
                 last_exc = exc
                 msg = str(exc)
@@ -108,8 +127,13 @@ class ResumeEditWebSocketHandler:
                         )
                         if resume:
                             resume_text = resume.content
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        logger.warning(
+                            f"Не удалось загрузить резюме при retry генерации: "
+                            f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                            f"error={exc}",
+                            exc_info=True,
+                        )
 
                 if resume_text is not None and not isinstance(resume_text, str):
                     resume_text = str(resume_text)
@@ -200,6 +224,10 @@ class ResumeEditWebSocketHandler:
                         await self._handle_apply_patch(
                             websocket, resume_id, user_id, data.get("data", {})
                         )
+                    elif message_type == "stop_generation":
+                        await self._handle_stop_generation(
+                            websocket, resume_id, user_id, session_key
+                        )
                     else:
                         await self._send_error(
                             websocket, f"Неизвестный тип сообщения: {message_type}", session_key=session_key
@@ -213,13 +241,24 @@ class ResumeEditWebSocketHandler:
                     break
                 except json.JSONDecodeError as exc:
                     logger.error(f"Ошибка парсинга JSON: {exc}")
-                    await self._send_error(websocket, "Неверный формат JSON", session_key=session_key)
+                    try:
+                        await self._send_error(websocket, "Неверный формат JSON", session_key=session_key)
+                    except Exception as send_exc:
+                        logger.warning(
+                            f"Не удалось отправить сообщение об ошибке парсинга JSON: "
+                            f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                            f"error={send_exc}"
+                        )
                 except Exception as exc:
                     logger.error(
                         f"Ошибка при обработке сообщения: {exc}",
                         exc_info=True,
                     )
-                    await self._send_error(websocket, f"Ошибка: {str(exc)}", session_key=session_key)
+                    try:
+                        error_msg = str(exc) if exc else "Неизвестная ошибка"
+                        await self._send_error(websocket, f"Ошибка: {error_msg}", session_key=session_key)
+                    except Exception as send_exc:
+                        logger.warning(f"Не удалось отправить сообщение об ошибке: {send_exc}")
 
         except Exception as exc:
             logger.error(
@@ -242,8 +281,12 @@ class ResumeEditWebSocketHandler:
                     for handler_id in self._session_handler_ids[session_key]:
                         try:
                             logger.remove(handler_id)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            logger.warning(
+                                f"Не удалось удалить handler логгера: "
+                                f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                                f"handler_id={handler_id}, error={exc}"
+                            )
                     del self._session_handler_ids[session_key]
                 
                 # Удаляем логгер из словаря
@@ -253,6 +296,11 @@ class ResumeEditWebSocketHandler:
                 del self._chat_history[session_key]
             if session_key in self._chat_plan:
                 del self._chat_plan[session_key]
+            if session_key in self._generation_tasks:
+                task = self._generation_tasks[session_key]
+                if not task.done():
+                    task.cancel()
+                del self._generation_tasks[session_key]
             logger.info(
                 f"WebSocket соединение закрыто: resume_id={resume_id}, user_id={user_id}"
             )
@@ -285,7 +333,13 @@ class ResumeEditWebSocketHandler:
                 )
                 if resume:
                     resume_text = resume.content
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    f"Не удалось загрузить резюме: "
+                    f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                    f"error={exc}",
+                    exc_info=True,
+                )
                 resume_text = resume_text or ""
         if resume_text is not None and not isinstance(resume_text, str):
             resume_text = str(resume_text)
@@ -305,17 +359,22 @@ class ResumeEditWebSocketHandler:
             )
 
         try:
-            result = await self._generate_edits_with_retry(
-                resume_id=resume_id,
-                user_id=user_id,
-                user_message=message,
-                resume_text=resume_text,
-                history=history,
-                current_plan=current_plan,
-                current_task=current_task,
-                websocket=websocket,
-                session_key=session_key,
+            # Создаем задачу для генерации, чтобы можно было её отменить
+            generation_task = asyncio.create_task(
+                self._generate_edits_with_retry(
+                    resume_id=resume_id,
+                    user_id=user_id,
+                    user_message=message,
+                    resume_text=resume_text,
+                    history=history,
+                    current_plan=current_plan,
+                    current_task=current_task,
+                    websocket=websocket,
+                    session_key=session_key,
+                )
             )
+            self._generation_tasks[session_key] = generation_task
+            result = await generation_task
 
             current_plan = result.plan or current_plan
             self._chat_plan[session_key] = current_plan
@@ -335,13 +394,36 @@ class ResumeEditWebSocketHandler:
             history.append({"user": message, "assistant": result.assistant_message})
             self._chat_history[session_key] = history
 
+        except asyncio.CancelledError:
+            logger.info(f"Генерация правок отменена для сессии {session_key}")
+            try:
+                await self._send_message(
+                    websocket,
+                    "generation_stopped",
+                    {"message": "Генерация остановлена"},
+                    session_key=session_key,
+                )
+            except Exception as send_exc:
+                logger.warning(
+                    f"Не удалось отправить сообщение об остановке генерации: "
+                    f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                    f"error={send_exc}"
+                )
         except Exception as exc:
             logger.error(f"Ошибка при генерации правок: {exc}", exc_info=True)
-            await self._send_error(
-                websocket,
-                f"Ошибка при генерации правок: {str(exc)}",
-                session_key=session_key,
-            )
+            try:
+                error_msg = str(exc) if exc else "Неизвестная ошибка"
+                await self._send_error(
+                    websocket,
+                    f"Ошибка при генерации правок: {error_msg}",
+                    session_key=session_key,
+                )
+            except Exception as send_exc:
+                logger.warning(f"Не удалось отправить сообщение об ошибке: {send_exc}")
+        finally:
+            # Удаляем задачу из словаря
+            if session_key in self._generation_tasks:
+                del self._generation_tasks[session_key]
 
     async def _handle_answer_question(
         self, websocket: WebSocket, resume_id: UUID, user_id: UUID, data: dict
@@ -404,17 +486,22 @@ class ResumeEditWebSocketHandler:
                 )
 
             try:
-                result = await self._generate_edits_with_retry(
-                    resume_id=resume_id,
-                    user_id=user_id,
-                    user_message=user_message,
-                    resume_text=resume_text,
-                    history=history,
-                    current_plan=current_plan,
-                    current_task=current_task,
-                    websocket=websocket,
-                    session_key=session_key,
+                # Создаем задачу для генерации, чтобы можно было её отменить
+                generation_task = asyncio.create_task(
+                    self._generate_edits_with_retry(
+                        resume_id=resume_id,
+                        user_id=user_id,
+                        user_message=user_message,
+                        resume_text=resume_text,
+                        history=history,
+                        current_plan=current_plan,
+                        current_task=current_task,
+                        websocket=websocket,
+                        session_key=session_key,
+                    )
                 )
+                self._generation_tasks[session_key] = generation_task
+                result = await generation_task
 
                 current_plan = result.plan or current_plan
                 self._chat_plan[session_key] = current_plan
@@ -434,17 +521,39 @@ class ResumeEditWebSocketHandler:
                 history.append({"assistant": result.assistant_message})
                 self._chat_history[session_key] = history
 
+            except asyncio.CancelledError:
+                logger.info(f"Генерация правок отменена для сессии {session_key}")
+                try:
+                    await self._send_message(
+                        websocket,
+                        "generation_stopped",
+                        {"message": "Генерация остановлена"},
+                        session_key=session_key,
+                    )
+                except Exception as send_exc:
+                    logger.warning(
+                        f"Не удалось отправить сообщение об остановке генерации: "
+                        f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                        f"error={send_exc}"
+                    )
             except Exception as exc:
                 logger.error(
                     f"Ошибка при продолжении генерации правок: {exc}", exc_info=True
                 )
-                await self._send_error(
-                    websocket,
-                    f"Ошибка при генерации правок: {str(exc)}",
-                    session_key=session_key,
-                )
+                try:
+                    error_msg = str(exc) if exc else "Неизвестная ошибка"
+                    await self._send_error(
+                        websocket,
+                        f"Ошибка при генерации правок: {error_msg}",
+                        session_key=session_key,
+                    )
+                except Exception as send_exc:
+                    logger.warning(f"Не удалось отправить сообщение об ошибке: {send_exc}")
         finally:
             self._processing_flags[session_key] = False
+            # Удаляем задачу из словаря
+            if session_key in self._generation_tasks:
+                del self._generation_tasks[session_key]
 
     async def _handle_answer_all_questions(
         self, websocket: WebSocket, resume_id: UUID, user_id: UUID, data: dict
@@ -493,17 +602,22 @@ class ResumeEditWebSocketHandler:
             history.append({"user": user_message})
 
             try:
-                result = await self._generate_edits_with_retry(
-                    resume_id=resume_id,
-                    user_id=user_id,
-                    user_message=user_message,
-                    resume_text=resume_text,
-                    history=history,
-                    current_plan=current_plan,
-                    current_task=current_task,
-                    websocket=websocket,
-                    session_key=session_key,
+                # Создаем задачу для генерации, чтобы можно было её отменить
+                generation_task = asyncio.create_task(
+                    self._generate_edits_with_retry(
+                        resume_id=resume_id,
+                        user_id=user_id,
+                        user_message=user_message,
+                        resume_text=resume_text,
+                        history=history,
+                        current_plan=current_plan,
+                        current_task=current_task,
+                        websocket=websocket,
+                        session_key=session_key,
+                    )
                 )
+                self._generation_tasks[session_key] = generation_task
+                result = await generation_task
 
                 current_plan = result.plan or current_plan
                 self._chat_plan[session_key] = current_plan
@@ -512,18 +626,40 @@ class ResumeEditWebSocketHandler:
                 history.append({"assistant": result.assistant_message})
                 self._chat_history[session_key] = history
 
+            except asyncio.CancelledError:
+                logger.info(f"Генерация правок отменена для сессии {session_key}")
+                try:
+                    await self._send_message(
+                        websocket,
+                        "generation_stopped",
+                        {"message": "Генерация остановлена"},
+                        session_key=session_key,
+                    )
+                except Exception as send_exc:
+                    logger.warning(
+                        f"Не удалось отправить сообщение об остановке генерации: "
+                        f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                        f"error={send_exc}"
+                    )
             except Exception as exc:
                 logger.error(
                     f"Ошибка при продолжении генерации правок: {exc}", exc_info=True
                 )
-                await self._send_error(
-                    websocket,
-                    f"Ошибка при генерации правок: {str(exc)}",
-                    session_key=session_key,
-                )
+                try:
+                    error_msg = str(exc) if exc else "Неизвестная ошибка"
+                    await self._send_error(
+                        websocket,
+                        f"Ошибка при генерации правок: {error_msg}",
+                        session_key=session_key,
+                    )
+                except Exception as send_exc:
+                    logger.warning(f"Не удалось отправить сообщение об ошибке: {send_exc}")
 
         finally:
             self._processing_flags[session_key] = False
+            # Удаляем задачу из словаря
+            if session_key in self._generation_tasks:
+                del self._generation_tasks[session_key]
 
     async def _handle_apply_patch(
         self, websocket: WebSocket, resume_id: UUID, user_id: UUID, data: dict
@@ -549,6 +685,48 @@ class ResumeEditWebSocketHandler:
             {"patch_id": patch_id, "message": "Patch применен успешно"},
             session_key=session_key,
         )
+
+    async def _handle_stop_generation(
+        self, websocket: WebSocket, resume_id: UUID, user_id: UUID, session_key: UUID
+    ) -> None:
+        """Обработать остановку генерации."""
+        if session_key in self._session_loggers:
+            self._session_loggers[session_key].info(
+                f"=== ОСТАНОВКА ГЕНЕРАЦИИ ===\n"
+                f"timestamp: {datetime.now().isoformat()}"
+            )
+
+        # Устанавливаем флаг остановки
+        self._processing_flags[session_key] = False
+
+        # Отменяем задачу генерации, если она существует
+        if session_key in self._generation_tasks:
+            task = self._generation_tasks[session_key]
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    logger.debug(
+                        f"Задача генерации успешно отменена: "
+                        f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}"
+                    )
+            del self._generation_tasks[session_key]
+
+        # Отправляем подтверждение остановки
+        try:
+            await self._send_message(
+                websocket,
+                "generation_stopped",
+                {"message": "Генерация остановлена"},
+                session_key=session_key,
+            )
+        except Exception as send_exc:
+            logger.warning(
+                f"Не удалось отправить сообщение об остановке генерации: "
+                f"resume_id={resume_id}, user_id={user_id}, session_key={session_key}, "
+                f"error={send_exc}"
+            )
 
     async def _send_result(
         self, websocket: WebSocket, result: ResumeEditResult, session_key: UUID | None = None
@@ -621,25 +799,42 @@ class ResumeEditWebSocketHandler:
         self, websocket: WebSocket, message_type: str, data: dict, session_key: UUID | None = None
     ) -> None:
         """Отправить сообщение через WebSocket."""
-        message = {"type": message_type, "data": data}
-        await websocket.send_json(message)
+        try:
+            # Проверяем состояние WebSocket перед отправкой
+            # В FastAPI WebSocket client_state может быть WebSocketState.CONNECTED, DISCONNECTED, etc.
+            from starlette.websockets import WebSocketState
+            if websocket.client_state != WebSocketState.CONNECTED:
+                logger.warning(
+                    f"Попытка отправить сообщение через закрытый WebSocket: "
+                    f"state={websocket.client_state}, type={message_type}"
+                )
+                return
 
-        if session_key and session_key in self._session_loggers:
-            if message_type == "streaming":
-                if data.get("is_complete"):
+            message = {"type": message_type, "data": data}
+            await websocket.send_json(message)
+
+            if session_key and session_key in self._session_loggers:
+                if message_type == "streaming":
+                    if data.get("is_complete"):
+                        self._session_loggers[session_key].info(
+                            f"=== ИСХОДЯЩЕЕ СООБЩЕНИЕ ===\n"
+                            f"type: {message_type}\n"
+                            f"data: {{'is_complete': true}}\n"
+                            f"timestamp: {datetime.now().isoformat()}"
+                        )
+                else:
                     self._session_loggers[session_key].info(
                         f"=== ИСХОДЯЩЕЕ СООБЩЕНИЕ ===\n"
                         f"type: {message_type}\n"
-                        f"data: {{'is_complete': true}}\n"
+                        f"data: {json.dumps(data, ensure_ascii=False, indent=2)}\n"
                         f"timestamp: {datetime.now().isoformat()}"
                     )
-            else:
-                self._session_loggers[session_key].info(
-                    f"=== ИСХОДЯЩЕЕ СООБЩЕНИЕ ===\n"
-                    f"type: {message_type}\n"
-                    f"data: {json.dumps(data, ensure_ascii=False, indent=2)}\n"
-                    f"timestamp: {datetime.now().isoformat()}"
-                )
+        except Exception as exc:
+            # Логируем ошибку, но не пробрасываем её дальше, чтобы не прерывать обработку
+            logger.warning(
+                f"Не удалось отправить сообщение через WebSocket: {exc}, "
+                f"type={message_type}, session_key={session_key}"
+            )
 
     async def _send_error(
         self, websocket: WebSocket, error_message: str, session_key: UUID | None = None

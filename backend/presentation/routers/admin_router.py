@@ -292,14 +292,16 @@ async def get_llm_usage_metrics(
                 calls_count=calls_count,
                 total_tokens=total_tokens,
                 unique_users=unique_users,
+                total_cost=total_cost,
             )
-            for period_start, calls_count, total_tokens, unique_users in metrics_by_period
+            for period_start, calls_count, total_tokens, unique_users, total_cost in metrics_by_period
         ],
         total_metrics=LlmTotalMetrics(
             calls_count=total_metrics[0],
             total_tokens=total_metrics[1],
             unique_users=total_metrics[2],
             avg_tokens_per_user=total_metrics[3],
+            total_cost=total_metrics[4],
         ),
     )
 
@@ -359,8 +361,6 @@ async def get_combined_metrics(
     end_date: datetime = Query(..., description="Конечная дата (включительно)"),
     plan_id: UUID | None = Query(None, description="Фильтр по ID плана подписки"),
     time_step: str = Query("day", description="Шаг группировки: day, week, month"),
-    input_price_per_million: float = Query(0.0, description="Стоимость входных токенов за миллион"),
-    output_price_per_million: float = Query(0.0, description="Стоимость выходных токенов за миллион"),
     admin_llm_service: AdminLlmService = Depends(get_admin_llm_service),
 ) -> CombinedMetricsResponse:
     """Получить комбинированные метрики LLM и откликов за период."""
@@ -385,8 +385,6 @@ async def get_combined_metrics(
         await admin_llm_service.get_paid_users_metrics(
             start_date=start_date,
             end_date=end_date,
-            input_price_per_million=input_price_per_million,
-            output_price_per_million=output_price_per_million,
         )
     )
 
@@ -408,14 +406,16 @@ async def get_combined_metrics(
                     calls_count=calls_count,
                     total_tokens=total_tokens,
                     unique_users=unique_users,
+                    total_cost=total_cost,
                 )
-                for period_start, calls_count, total_tokens, unique_users in llm_metrics_by_period
+                for period_start, calls_count, total_tokens, unique_users, total_cost in llm_metrics_by_period
             ],
             total_metrics=LlmTotalMetrics(
                 calls_count=llm_total[0],
                 total_tokens=llm_total[1],
                 unique_users=llm_total[2],
                 avg_tokens_per_user=llm_total[3],
+                total_cost=llm_total[4],
             ),
         ),
         responses_metrics=VacancyResponsesMetricsResponse(

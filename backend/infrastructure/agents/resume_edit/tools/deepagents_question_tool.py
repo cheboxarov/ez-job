@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from config import OpenAIConfig
 from domain.entities.resume_edit_question import ResumeEditQuestion
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from infrastructure.agents.base_agent import BaseAgent
 from infrastructure.agents.resume_edit.tools.extract_sections_tool import extract_sections
 from infrastructure.agents.resume_edit.tools.rule_check_tool import (
@@ -26,10 +27,23 @@ class _QuestionToolAgent(BaseAgent):
 
 
 class GenerateQuestionsInput(BaseModel):
-    """Входные данные для генерации вопросов."""
+    """Входные данные для генерации вопросов (resume_text инжектируется)."""
+
+    user_message: str = Field(..., description="Сообщение пользователя.")
+    current_task: dict | None = Field(
+        default=None, description="Текущая задача плана (опционально)."
+    )
+    history: list[dict] | None = Field(
+        default=None, description="История диалога (опционально)."
+    )
+
+
+class GenerateQuestionsFullInput(BaseModel):
+    """Полная схема с resume_text для внутреннего вызова инструмента."""
 
     resume_text: str = Field(..., description="Текст резюме.")
     user_message: str = Field(..., description="Сообщение пользователя.")
+    user_id: UUID | None = Field(default=None, description="ID пользователя (опционально).")
     current_task: dict | None = Field(
         default=None, description="Текущая задача плана (опционально)."
     )
@@ -51,15 +65,18 @@ def _load_prompt() -> str:
         return "Ты AI-ассистент для уточнения деталей резюме."
 
 
-def create_deepagents_question_tool(config: OpenAIConfig):
+def create_deepagents_question_tool(
+    config: OpenAIConfig, unit_of_work: UnitOfWorkPort | None = None
+):
     """Создать инструмент LangChain для генерации вопросов."""
-    helper = _QuestionToolAgent(config)
+    helper = _QuestionToolAgent(config, unit_of_work=unit_of_work)
     prompt = _load_prompt()
 
-    @tool("generate_resume_questions", args_schema=GenerateQuestionsInput)
+    @tool("generate_resume_questions", args_schema=GenerateQuestionsFullInput)
     async def generate_questions_tool(
         resume_text: str,
         user_message: str,
+        user_id: UUID | None = None,
         current_task: dict | None = None,
         history: list[dict] | None = None,
     ) -> dict[str, Any]:
@@ -89,8 +106,8 @@ def create_deepagents_question_tool(config: OpenAIConfig):
 {resume_text}
 
 СЕКЦИИ:
-О себе: {sections.get('about', 'не найдено')[:300]}...
-Опыт: {sections.get('experience', 'не найдено')[:300]}...
+О себе: {sections.get('about', 'не найдено')}
+Опыт: {sections.get('experience', 'не найдено')}
 
 ПРОБЛЕМЫ:
 {json.dumps(rules_check.get('issues', []), ensure_ascii=False, indent=2)}
@@ -107,7 +124,28 @@ def create_deepagents_question_tool(config: OpenAIConfig):
 СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ:
 {user_message}
 """
-        user_prompt = "Сгенерируй уточняющие вопросы в формате JSON."
+        user_prompt = """Сгенерируй уточняющие вопросы в формате JSON.
+
+КРИТИЧЕСКИ ВАЖНО: Верни ТОЛЬКО валидный JSON-объект. НЕ возвращай обычный текст, НЕ возвращай промежуточные размышления.
+
+Обязательный формат ответа:
+{
+  "action": "ask_question",
+  "assistant_message": "Текст сообщения для пользователя",
+  "questions": [
+    {
+      "id": "uuid",
+      "text": "Текст вопроса",
+      "required": true,
+      "suggested_answers": ["вариант 1", "вариант 2", "не знаю, придумай сам"],
+      "allow_multiple": false
+    }
+  ],
+  "patches": [],
+  "warnings": []
+}
+
+Все поля обязательны. Поле "questions" должно содержать минимум 1 вопрос. Поле "patches" всегда пустое []."""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -126,21 +164,6 @@ def create_deepagents_question_tool(config: OpenAIConfig):
                     "warnings": ["Ошибка парсинга ответа LLM"],
                 }
 
-        def validate_func(result: dict[str, Any]) -> bool:
-            if result.get("action") != "ask_question":
-                log.warning(
-                    f"Неверный action от QuestionTool: {result.get('action')}"
-                )
-                return True
-            if not result.get("questions"):
-                log.warning("QuestionTool не вернул вопросы")
-                return True
-            for q in result.get("questions", []):
-                if not q.get("suggested_answers"):
-                    log.warning(f"Вопрос без вариантов ответа: {q.get('text')}")
-                    return True
-            return False
-
         context = {
             "use_case": "resume_edit_question_tool",
             "task_id": current_task.get("id") if current_task else None,
@@ -149,13 +172,35 @@ def create_deepagents_question_tool(config: OpenAIConfig):
         response = await helper._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
-            validate_func=validate_func,
-            temperature=0.7,
+            validate_func=None,  # Валидация после, retry бессмысленен без изменения промпта
+            temperature=0.4,
             response_format={"type": "json_object"},
+            user_id=user_id,
             context=context,
         )
 
+        # Нормализация ответа: исправляем неправильный action
+        if response.get("action") != "ask_question":
+            log.warning(
+                f"Неверный action от QuestionTool: {response.get('action')}, исправляем на ask_question"
+            )
+            response["action"] = "ask_question"
+
+        # Нормализация вопросов: добавляем suggested_answers если отсутствует
+        for q in response.get("questions", []):
+            if not q.get("suggested_answers"):
+                log.warning(f"Вопрос без вариантов ответа: {q.get('text')}, добавляем дефолтные")
+                q["suggested_answers"] = ["Да", "Нет", "Не знаю, придумай сам"]
+
         questions_data = response.get("questions", [])
+
+        # Если вопросов нет, добавляем warning (вместо бессмысленного retry)
+        if not questions_data:
+            log.warning("QuestionTool не вернул вопросы")
+            response.setdefault("warnings", []).append(
+                "Агент не сгенерировал уточняющие вопросы."
+            )
+
         questions: list[ResumeEditQuestion] = []
 
         for q_data in questions_data:

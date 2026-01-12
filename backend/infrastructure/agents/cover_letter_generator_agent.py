@@ -44,7 +44,7 @@ class CoverLetterGeneratorAgent(BaseAgent, CoverLetterGeneratorPort):
 
         prompt = self._build_prompt(resume, vacancy_description, user_params)
         logger.info(
-            f"[{self.AGENT_NAME}] генерирую сопроводительное письмо model={self._config.model}"
+            f"[{self.AGENT_NAME}] генерирую сопроводительное письмо model={self._config.get_model_for_agent(self.AGENT_NAME)}"
         )
 
         messages = [

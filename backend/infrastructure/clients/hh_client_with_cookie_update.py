@@ -43,8 +43,12 @@ def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> N
             )
             + "\n"
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            f"Не удалось записать debug лог в hh_client_with_cookie_update: "
+            f"hypothesis_id={hypothesis_id}, location={location}, "
+            f"message={message}, error={exc}"
+        )
 # endregion
 
 

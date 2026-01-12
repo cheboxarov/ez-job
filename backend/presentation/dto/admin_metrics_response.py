@@ -15,6 +15,7 @@ class LlmPeriodMetric(BaseModel):
     calls_count: int = Field(..., description="Количество вызовов")
     total_tokens: int = Field(..., description="Суммарные токены")
     unique_users: int = Field(..., description="Количество уникальных пользователей")
+    total_cost: float = Field(..., description="Суммарная стоимость в USD")
 
 
 class LlmTotalMetrics(BaseModel):
@@ -24,6 +25,7 @@ class LlmTotalMetrics(BaseModel):
     total_tokens: int = Field(..., description="Суммарные токены")
     unique_users: int = Field(..., description="Количество уникальных пользователей")
     avg_tokens_per_user: float = Field(..., description="Средние токены на пользователя")
+    total_cost: float = Field(..., description="Суммарная стоимость в USD")
 
 
 class LlmUsageMetricsResponse(BaseModel):

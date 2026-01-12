@@ -100,6 +100,7 @@ export interface LlmPeriodMetric {
   calls_count: number;
   total_tokens: number;
   unique_users: number;
+  total_cost: number;
 }
 
 export interface LlmTotalMetrics {
@@ -107,6 +108,7 @@ export interface LlmTotalMetrics {
   total_tokens: number;
   unique_users: number;
   avg_tokens_per_user: number;
+  total_cost: number;
 }
 
 export interface LlmUsageMetricsResponse {

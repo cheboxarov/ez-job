@@ -15,6 +15,8 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.sql import func
 
+from loguru import logger
+
 from domain.entities.user_hh_auth_data import UserHhAuthData
 from domain.exceptions.lock_not_acquired import LockNotAcquiredError
 from domain.interfaces.user_hh_auth_data_repository_port import (
@@ -44,8 +46,11 @@ def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> N
             )
             + "\n"
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning(
+            f"Не удалось записать debug лог: hypothesis_id={hypothesis_id}, "
+            f"location={location}, message={message}, error={exc}"
+        )
 # endregion
 
 

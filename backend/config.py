@@ -34,6 +34,29 @@ class OpenAIConfig:
     minimal_confidence: float = 0.0
     api_key: str | None = None
     resume_edit_model: str | None = None
+    agent_models: dict[str, str] | None = None
+
+    def get_model_for_agent(self, agent_name: str) -> str:
+        """Получить модель для агента с fallback на дефолтную.
+        
+        Args:
+            agent_name: Имя агента (например, "ResumeEvaluatorAgent").
+            
+        Returns:
+            Модель для агента или дефолтная модель, если не задана.
+        """
+        # Для обратной совместимости с ResumeEditDeepAgent
+        if agent_name == "ResumeEditDeepAgent" and self.resume_edit_model:
+            # Проверяем сначала agent_models, потом resume_edit_model
+            if self.agent_models and agent_name in self.agent_models:
+                return self.agent_models[agent_name]
+            return self.resume_edit_model
+        
+        # Для всех остальных агентов
+        if self.agent_models and agent_name in self.agent_models:
+            return self.agent_models[agent_name]
+        
+        return self.model
 
 
 @dataclass(slots=True)
@@ -122,8 +145,20 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
     openai_model = os.getenv("OPENAI_MODEL", "gpt-oss-120b:exacto")
     openai_min_conf = _get_env_float("OPENAI_MIN_CONFIDENCE", 0.0)
     openai_api_key = os.getenv("OPENAI_API_KEY")
-    resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "gpt-oss-120b:exacto")
-    # resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "glm-4.7")  # Опциональная модель для чата редактирования резюме
+    # resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "gpt-oss-120b:exacto")
+    resume_edit_model = os.getenv("RESUME_EDIT_MODEL", "glm-4.7")  # Опциональная модель для чата редактирования резюме
+
+    # Загружаем модели для отдельных агентов из переменных окружения
+    # Формат: AGENT_MODEL_<AgentName>=model_name
+    # Дефолтные модели для агентов
+    agent_models: dict[str, str] = {
+        "ResumeEvaluatorAgent": "glm-4.7",  # GLM модель для анализа резюме
+    }
+    for key, value in os.environ.items():
+        if key.startswith("AGENT_MODEL_"):
+            agent_name = key[len("AGENT_MODEL_"):]
+            if agent_name and value:
+                agent_models[agent_name] = value  # Переменные окружения переопределяют дефолты
 
     # Нормализуем confidence в диапазон [0.0, 1.0]
     if openai_min_conf < 0.0:
@@ -143,6 +178,7 @@ X2LjGaXPbBkAr9b7b+VZlMMCAwEAAQ==
         minimal_confidence=openai_min_conf,
         api_key=openai_api_key,
         resume_edit_model=resume_edit_model,
+        agent_models=agent_models if agent_models else None,
     )
 
     # Конфигурация БД

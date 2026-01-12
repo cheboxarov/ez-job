@@ -122,8 +122,6 @@ export const adminApi = {
     end_date: string;
     plan_id?: string;
     time_step?: 'day' | 'week' | 'month';
-    input_price_per_million?: number;
-    output_price_per_million?: number;
   }): Promise<CombinedMetricsResponse> => {
     const response = await apiClient.get<CombinedMetricsResponse>('/api/admin/metrics', {
       params,

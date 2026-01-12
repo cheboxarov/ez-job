@@ -48,7 +48,7 @@ class VacancyTestAgent(BaseAgent, VacancyTestAgentServicePort):
         prompt = self._build_prompt(test, resume, user_params)
         logger.info(
             f"[{self.AGENT_NAME}] генерирую ответы на тест вакансии ({len(test.questions)} вопросов) "
-            f"model={self._config.model}"
+            f"model={self._config.get_model_for_agent(self.AGENT_NAME)}"
         )
 
         messages = [
@@ -254,7 +254,11 @@ class VacancyTestAgent(BaseAgent, VacancyTestAgentServicePort):
                             answer = json.loads(answer)
                             if not isinstance(answer, list):
                                 answer = []
-                        except Exception:
+                        except Exception as exc:
+                            logger.warning(
+                                f"Не удалось распарсить JSON ответ на тест вакансии: "
+                                f"answer={answer}, error={exc}"
+                            )
                             answer = []
                     else:
                         answer = []

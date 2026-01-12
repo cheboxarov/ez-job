@@ -46,9 +46,13 @@ class AgentAction:
     - dialog_id: int - ID чата
     - event_type: str - тип события:
       * "call_request" - запрос на созвон/встречу/собеседование
-      * "external_action_request" - когда требуется действие вне чата HH (анкета, форма и т.д.)
+      * "fill_form" - заполнить форму/анкету
+      * "test_task" - выполнить тестовое задание
+      * "external_action_request" - когда требуется действие вне чата HH (анкета, форма и т.д.), legacy
       * "question_answered" - когда работодатель отвечает на вопрос, заданный пользователем
     - message: str - краткое описание от LLM, что требуется сделать или куда нас зовут (для call_request и external_action_request), или краткое описание ответа работодателя (для question_answered)
+    - link: str | None - ссылка на форму/задание (для fill_form и test_task)
+    - status: str - статус выполнения ("pending" | "completed" | "declined", для fill_form и test_task)
     """
 
     created_at: datetime

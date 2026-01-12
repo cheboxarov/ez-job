@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import List, Union
 from uuid import UUID, uuid4
 
-from sqlalchemy import select, update, func
+from sqlalchemy import select, update, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from domain.entities.agent_action import AgentAction
@@ -62,7 +62,11 @@ class AgentActionRepository(BaseRepository, AgentActionRepositoryPort):
     async def list(
         self,
         *,
-        type: str | None = None,
+        types: list[str] | None = None,
+        exclude_types: list[str] | None = None,
+        event_types: list[str] | None = None,
+        exclude_event_types: list[str] | None = None,
+        statuses: list[str] | None = None,
         entity_type: str | None = None,
         entity_id: int | None = None,
         created_by: str | None = None,
@@ -70,7 +74,11 @@ class AgentActionRepository(BaseRepository, AgentActionRepositoryPort):
         """Получить список действий с опциональной фильтрацией.
 
         Args:
-            type: Фильтр по типу действия.
+            types: Фильтр по списку типов действий.
+            exclude_types: Исключить указанные типы действий.
+            event_types: Фильтр по подтипам событий (data["event_type"]) для create_event.
+            exclude_event_types: Исключить указанные подтипы событий (data["event_type"]).
+            statuses: Фильтр по статусам (data["status"]) для create_event.
             entity_type: Фильтр по типу сущности.
             entity_id: Фильтр по ID сущности.
             created_by: Фильтр по идентификатору агента.
@@ -82,14 +90,55 @@ class AgentActionRepository(BaseRepository, AgentActionRepositoryPort):
             stmt = select(AgentActionModel)
 
             # Динамически добавляем фильтры
-            if type is not None:
-                stmt = stmt.where(AgentActionModel.type == type)
+            if types:
+                stmt = stmt.where(AgentActionModel.type.in_(types))
+            if exclude_types:
+                stmt = stmt.where(AgentActionModel.type.notin_(exclude_types))
             if entity_type is not None:
                 stmt = stmt.where(AgentActionModel.entity_type == entity_type)
             if entity_id is not None:
                 stmt = stmt.where(AgentActionModel.entity_id == entity_id)
             if created_by is not None:
                 stmt = stmt.where(AgentActionModel.created_by == created_by)
+            if event_types:
+                has_types = bool(types)
+                has_other_types = any(item != "create_event" for item in types or [])
+                event_type_condition = AgentActionModel.data["event_type"].astext.in_(event_types)
+                if has_types and has_other_types:
+                    stmt = stmt.where(
+                        or_(
+                            AgentActionModel.type != "create_event",
+                            event_type_condition,
+                        )
+                    )
+                else:
+                    stmt = stmt.where(
+                        AgentActionModel.type == "create_event",
+                        event_type_condition,
+                    )
+            if exclude_event_types:
+                stmt = stmt.where(
+                    or_(
+                        AgentActionModel.type != "create_event",
+                        AgentActionModel.data["event_type"].astext.notin_(exclude_event_types),
+                    )
+                )
+            if statuses:
+                has_types = bool(types)
+                has_other_types = any(item != "create_event" for item in types or [])
+                status_condition = AgentActionModel.data["status"].astext.in_(statuses)
+                if has_types and has_other_types:
+                    stmt = stmt.where(
+                        or_(
+                            AgentActionModel.type != "create_event",
+                            status_condition,
+                        )
+                    )
+                else:
+                    stmt = stmt.where(
+                        AgentActionModel.type == "create_event",
+                        status_condition,
+                    )
 
             # Сортируем по дате создания (новые сначала)
             stmt = stmt.order_by(AgentActionModel.created_at.desc())
@@ -195,4 +244,3 @@ class AgentActionRepository(BaseRepository, AgentActionRepositoryPort):
             updated_at=model.updated_at,
             is_read=model.is_read,
         )
-

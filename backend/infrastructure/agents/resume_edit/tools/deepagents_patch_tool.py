@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from loguru import logger
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from config import OpenAIConfig
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from infrastructure.agents.base_agent import BaseAgent
 from infrastructure.agents.resume_edit.tools.build_patch_tool import (
     build_patches_from_changes,
@@ -35,10 +36,23 @@ class _PatchToolAgent(BaseAgent):
 
 
 class GeneratePatchesInput(BaseModel):
-    """Входные данные для генерации патчей."""
+    """Входные данные для генерации патчей (resume_text инжектируется)."""
+
+    user_message: str = Field(..., description="Сообщение пользователя.")
+    current_task: dict | None = Field(
+        default=None, description="Текущая задача плана (опционально)."
+    )
+    history: list[dict] | None = Field(
+        default=None, description="История диалога (опционально)."
+    )
+
+
+class GeneratePatchesFullInput(BaseModel):
+    """Полная схема с resume_text для внутреннего вызова инструмента."""
 
     resume_text: str = Field(..., description="Текст резюме.")
     user_message: str = Field(..., description="Сообщение пользователя.")
+    user_id: UUID | None = Field(default=None, description="ID пользователя (опционально).")
     current_task: dict | None = Field(
         default=None, description="Текущая задача плана (опционально)."
     )
@@ -58,15 +72,18 @@ def _load_prompt() -> str:
         return "Ты AI-ассистент для внесения правок в резюме."
 
 
-def create_deepagents_patch_tool(config: OpenAIConfig):
+def create_deepagents_patch_tool(
+    config: OpenAIConfig, unit_of_work: UnitOfWorkPort | None = None
+):
     """Создать инструмент LangChain для генерации патчей."""
-    helper = _PatchToolAgent(config)
+    helper = _PatchToolAgent(config, unit_of_work=unit_of_work)
     prompt = _load_prompt()
 
-    @tool("generate_resume_patches", args_schema=GeneratePatchesInput)
+    @tool("generate_resume_patches", args_schema=GeneratePatchesFullInput)
     async def generate_patches_tool(
         resume_text: str,
         user_message: str,
+        user_id: UUID | None = None,
         current_task: dict | None = None,
         history: list[dict] | None = None,
     ) -> dict[str, Any]:
@@ -97,8 +114,8 @@ def create_deepagents_patch_tool(config: OpenAIConfig):
 {numbered_resume}
 
 СЕКЦИИ:
-О себе: {sections.get('about', 'не найдено')[:300]}...
-Опыт: {sections.get('experience', 'не найдено')[:300]}...
+О себе: {sections.get('about', 'не найдено')}
+Опыт: {sections.get('experience', 'не найдено')}
 
 ПРОБЛЕМЫ:
 {json.dumps(rules_check.get('issues', []), ensure_ascii=False, indent=2)}
@@ -115,7 +132,30 @@ def create_deepagents_patch_tool(config: OpenAIConfig):
 СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЯ (ДАННЫЕ ДЛЯ ПРАВОК):
 {user_message}
 """
-        user_prompt = "Сгенерируй патчи в формате JSON."
+        user_prompt = """Сгенерируй патчи в формате JSON.
+
+КРИТИЧЕСКИ ВАЖНО: Верни ТОЛЬКО валидный JSON-объект. НЕ возвращай обычный текст, НЕ возвращай промежуточные размышления.
+
+Обязательный формат ответа:
+{
+  "action": "generate_patches",
+  "assistant_message": "Текст сообщения для пользователя",
+  "questions": [],
+  "patches": [
+    {
+      "id": "uuid",
+      "type": "replace" | "insert" | "delete",
+      "start_line": 5,
+      "end_line": 7,
+      "old_text": "старый текст (точная копия из резюме)",
+      "new_text": "новый текст (БЕЗ MARKDOWN, null для delete)",
+      "reason": "Причина изменения"
+    }
+  ],
+  "warnings": []
+}
+
+Все поля обязательны. Поле "questions" всегда пустое []. Поле "patches" может быть пустым [], если не хватает данных (тогда укажи причину в "warnings")."""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -134,17 +174,6 @@ def create_deepagents_patch_tool(config: OpenAIConfig):
                     "warnings": ["Ошибка парсинга ответа LLM"],
                 }
 
-        def validate_func(result: dict[str, Any]) -> bool:
-            if result.get("action") != "generate_patches":
-                log.warning(
-                    f"Неверный action от PatchTool: {result.get('action')}"
-                )
-                return True
-            if not result.get("patches") and not result.get("warnings"):
-                log.warning("PatchTool вернул пустой список патчей без предупреждений")
-                return True
-            return False
-
         context = {
             "use_case": "resume_edit_patch_tool",
             "task_id": current_task.get("id") if current_task else None,
@@ -153,11 +182,19 @@ def create_deepagents_patch_tool(config: OpenAIConfig):
         response = await helper._call_llm_with_retry(
             messages=messages,
             parse_func=parse_func,
-            validate_func=validate_func,
-            temperature=0.2,
+            validate_func=None,  # Валидация после, retry бессмысленен без изменения промпта
+            temperature=0.4,
             response_format={"type": "json_object"},
+            user_id=user_id,
             context=context,
         )
+
+        # Нормализация ответа: исправляем неправильный action
+        if response.get("action") != "generate_patches":
+            log.warning(
+                f"Неверный action от PatchTool: {response.get('action')}, исправляем на generate_patches"
+            )
+            response["action"] = "generate_patches"
 
         patches_data = response.get("patches", [])
         if not patches_data:

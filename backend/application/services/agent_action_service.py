@@ -13,6 +13,7 @@ from domain.use_cases.execute_agent_action import ExecuteAgentActionUseCase
 from domain.use_cases.list_agent_actions import ListAgentActionsUseCase
 from domain.use_cases.send_chat_message import SendChatMessageUseCase
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
+from domain.use_cases.update_agent_action_status import UpdateAgentActionStatusUseCase
 
 
 class AgentActionService(AgentActionServicePort):
@@ -56,7 +57,11 @@ class AgentActionService(AgentActionServicePort):
     async def list_actions(
         self,
         *,
-        type: str | None = None,
+        types: list[str] | None = None,
+        exclude_types: list[str] | None = None,
+        event_types: list[str] | None = None,
+        exclude_event_types: list[str] | None = None,
+        statuses: list[str] | None = None,
         entity_type: str | None = None,
         entity_id: int | None = None,
         created_by: str | None = None,
@@ -64,7 +69,11 @@ class AgentActionService(AgentActionServicePort):
         """Получить список действий агента с опциональной фильтрацией.
 
         Args:
-            type: Фильтр по типу действия (например, "send_message", "create_event").
+            types: Фильтр по списку типов действий (например, ["send_message", "create_event"]).
+            exclude_types: Исключить указанные типы действий.
+            event_types: Фильтр по подтипам событий (data["event_type"]) для create_event.
+            exclude_event_types: Исключить указанные подтипы событий (data["event_type"]).
+            statuses: Фильтр по статусам (data["status"]) для create_event.
             entity_type: Фильтр по типу сущности (например, "hh_dialog").
             entity_id: Фильтр по ID сущности (например, ID диалога).
             created_by: Фильтр по идентификатору агента (например, "messages_agent").
@@ -80,7 +89,11 @@ class AgentActionService(AgentActionServicePort):
                 self._unit_of_work.standalone_agent_action_repository
             )
             return await use_case.execute(
-                type=type,
+                types=types,
+                exclude_types=exclude_types,
+                event_types=event_types,
+                exclude_event_types=exclude_event_types,
+                statuses=statuses,
                 entity_type=entity_type,
                 entity_id=entity_id,
                 created_by=created_by,
@@ -225,3 +238,22 @@ class AgentActionService(AgentActionServicePort):
             await self._unit_of_work.standalone_agent_action_repository.mark_all_as_read(user_id)
             await self._unit_of_work.commit()
 
+    async def update_action_status(
+        self,
+        *,
+        action_id: UUID,
+        status: str,
+        user_id: UUID,
+    ) -> AgentAction:
+        """Обновить статус события (fill_form/test_task)."""
+        async with self._unit_of_work:
+            use_case = UpdateAgentActionStatusUseCase(
+                self._unit_of_work.standalone_agent_action_repository
+            )
+            updated_action = await use_case.execute(
+                action_id=action_id,
+                status=status,
+                user_id=user_id,
+            )
+            await self._unit_of_work.commit()
+            return updated_action

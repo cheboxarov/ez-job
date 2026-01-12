@@ -83,8 +83,8 @@ class ResumeEditPlannerAgent(BaseAgent):
 Запрос пользователя: {user_message}
 
 Секции резюме:
-О себе: {sections.get('about', 'не найдено')[:200]}...
-Опыт: {sections.get('experience', 'не найдено')[:200]}...
+О себе: {sections.get('about', 'не найдено')}
+Опыт: {sections.get('experience', 'не найдено')}
 
 Проблемы с правилами:
 {json.dumps(rules_check.get('issues', []), ensure_ascii=False, indent=2)}

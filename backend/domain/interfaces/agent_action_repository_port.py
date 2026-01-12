@@ -31,7 +31,11 @@ class AgentActionRepositoryPort(ABC):
     async def list(
         self,
         *,
-        type: str | None = None,
+        types: list[str] | None = None,
+        exclude_types: list[str] | None = None,
+        event_types: list[str] | None = None,
+        exclude_event_types: list[str] | None = None,
+        statuses: list[str] | None = None,
         entity_type: str | None = None,
         entity_id: int | None = None,
         created_by: str | None = None,
@@ -42,7 +46,11 @@ class AgentActionRepositoryPort(ABC):
         Если все параметры None, возвращаются все действия.
 
         Args:
-            type: Фильтр по типу действия (например, "send_message", "create_event").
+            types: Фильтр по списку типов действий (например, ["send_message", "create_event"]).
+            exclude_types: Исключить указанные типы действий.
+            event_types: Фильтр по подтипам событий (data["event_type"]) для create_event.
+            exclude_event_types: Исключить указанные подтипы событий (data["event_type"]).
+            statuses: Фильтр по статусам (data["status"]) для create_event.
             entity_type: Фильтр по типу сущности (например, "hh_dialog").
             entity_id: Фильтр по ID сущности (например, ID диалога).
             created_by: Фильтр по идентификатору агента (например, "messages_agent").

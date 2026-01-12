@@ -2,23 +2,25 @@ import { create } from 'zustand';
 import { notification, Button } from 'antd';
 import {
   wsClient,
-  type AgentAction,
+  type AgentAction as WebSocketAgentAction,
   type VacancyResponseCreatedPayload,
 } from '../api/websocket';
+import type { AgentAction as ApiAgentAction } from '../types/api';
 import { useAgentActionsStore } from './agentActionsStore';
 import { useDailyResponsesStore } from './dailyResponsesStore';
 import { useEventsStore } from './eventsStore';
+import { useTasksStore } from './tasksStore';
 import { useVacancyResponsesStore } from './vacancyResponsesStore';
 import { playNotificationSound } from '../utils/notificationSound';
 
 interface WebSocketState {
   isConnected: boolean;
-  lastAgentAction: AgentAction | null;
+  lastAgentAction: WebSocketAgentAction | null;
   lastVacancyResponse: VacancyResponseCreatedPayload | null;
 
   connect: () => void;
   disconnect: () => void;
-  setLastAgentAction: (action: AgentAction) => void;
+  setLastAgentAction: (action: WebSocketAgentAction) => void;
   setLastVacancyResponse: (response: VacancyResponseCreatedPayload) => void;
 }
 
@@ -34,25 +36,39 @@ const getNotificationTitle = (type: string): string => {
   }
 };
 
-const getNotificationDescription = (payload: AgentAction): string => {
+const getNotificationDescription = (payload: WebSocketAgentAction): string => {
   if (payload.type === 'send_message' && payload.data.message_text) {
     const messagePreview = payload.data.message_text.length > 100
       ? payload.data.message_text.substring(0, 100) + '...'
       : payload.data.message_text;
     return messagePreview;
   }
-  if (payload.type === 'create_event' && payload.data.event_type) {
+  const eventType =
+    typeof (payload.data as { event_type?: unknown }).event_type === 'string'
+      ? (payload.data as { event_type?: string }).event_type
+      : undefined;
+  if (payload.type === 'create_event' && eventType) {
     const eventTypeLabels: Record<string, string> = {
       call_request: 'Запрос на созвон',
       external_action_request: 'Требуется действие',
+      fill_form: 'Заполнение формы',
+      test_task: 'Тестовое задание',
+      question_answered: 'Ответ на вопрос',
     };
-    const eventLabel = eventTypeLabels[payload.data.event_type] || payload.data.event_type;
+    const eventLabel = eventTypeLabels[eventType] || eventType;
     return `Событие: ${eventLabel}`;
   }
   return 'Агент выполнил новое действие';
 };
 
-const getNotificationActionUrl = (payload: AgentAction): string => {
+const getNotificationActionUrl = (payload: WebSocketAgentAction): string => {
+  const eventType =
+    typeof (payload.data as { event_type?: unknown }).event_type === 'string'
+      ? (payload.data as { event_type?: string }).event_type
+      : undefined;
+  if (payload.type === 'create_event' && (eventType === 'fill_form' || eventType === 'test_task')) {
+    return '/tasks';
+  }
   if (payload.entity_type === 'hh_dialog') {
     return `/chats/${payload.entity_id}`;
   }
@@ -76,7 +92,7 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
     }
 
     // Подписываемся на agent_action_created
-    unsubscribeAgentAction = wsClient.on<AgentAction>(
+    unsubscribeAgentAction = wsClient.on<WebSocketAgentAction>(
       'agent_action_created',
       (payload) => {
         // Воспроизводим звук
@@ -110,6 +126,14 @@ export const useWebSocketStore = create<WebSocketState>((set, get) => {
         // Обновляем stores
         useAgentActionsStore.getState().incrementUnreadCount();
         useEventsStore.getState().addEventToTop(payload);
+        const eventType =
+          typeof (payload.data as { event_type?: unknown }).event_type === 'string'
+            ? (payload.data as { event_type?: string }).event_type
+            : undefined;
+        if (payload.type === 'create_event' && (eventType === 'fill_form' || eventType === 'test_task')) {
+          useTasksStore.getState().incrementPendingCount();
+          useTasksStore.getState().addTaskToTop(payload as unknown as ApiAgentAction);
+        }
 
         // Обновляем локальное состояние
         set({ lastAgentAction: payload });

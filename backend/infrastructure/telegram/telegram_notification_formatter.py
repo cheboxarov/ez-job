@@ -36,6 +36,10 @@ class TelegramNotificationFormatter:
             event_type = action.data.get("event_type")
             if event_type == "call_request":
                 return self._format_call_request(action)
+            elif event_type == "fill_form":
+                return self._format_fill_form(action)
+            elif event_type == "test_task":
+                return self._format_test_task(action)
             elif event_type == "external_action_request":
                 return self._format_external_action(action)
             elif event_type == "question_answered":
@@ -94,19 +98,23 @@ class TelegramNotificationFormatter:
         text = f"📋 <b>Требуется заполнить форму</b>\n\n"
         text += f"{self._escape_html(message)}"
 
-        chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
-        keyboard = None
-        if self._is_valid_telegram_url(chat_url):
-            keyboard = {
-                "inline_keyboard": [[{"text": "Открыть чат", "url": chat_url}]],
-            }
-        else:
-            logger.warning(
-                f"Пропущено создание кнопки для external_action action {action.id}: "
-                f"URL {chat_url} содержит localhost или внутренний IP"
-            )
+        return text, self._build_task_keyboard(action, "Перейти к форме")
 
-        return text, keyboard
+    def _format_fill_form(self, action: AgentAction) -> tuple[str, dict | None]:
+        """Форматировать запрос на заполнение формы."""
+        message = action.data.get("message", "")
+        text = f"📝 <b>Заполнить форму</b>\n\n"
+        text += f"{self._escape_html(message)}"
+
+        return text, self._build_task_keyboard(action, "Перейти к форме")
+
+    def _format_test_task(self, action: AgentAction) -> tuple[str, dict | None]:
+        """Форматировать запрос на тестовое задание."""
+        message = action.data.get("message", "")
+        text = f"📋 <b>Тестовое задание</b>\n\n"
+        text += f"{self._escape_html(message)}"
+
+        return text, self._build_task_keyboard(action, "Перейти к заданию")
 
     def _format_message_suggestion(self, action: AgentAction) -> tuple[str, dict | None]:
         """Форматировать предложение сообщения для отправки."""
@@ -149,6 +157,34 @@ class TelegramNotificationFormatter:
             )
 
         return text, keyboard
+
+    def _build_task_keyboard(self, action: AgentAction, link_label: str) -> dict | None:
+        """Сформировать inline-клавиатуру для заданий."""
+        keyboard_rows = []
+
+        link = action.data.get("link")
+        if isinstance(link, str) and link:
+            if self._is_valid_telegram_url(link):
+                keyboard_rows.append([{"text": link_label, "url": link}])
+            else:
+                logger.warning(
+                    f"Пропущено создание кнопки для action {action.id}: "
+                    f"URL {link} содержит localhost или внутренний IP"
+                )
+
+        chat_url = f"{self._frontend_url}/chats/{action.entity_id}"
+        if self._is_valid_telegram_url(chat_url):
+            keyboard_rows.append([{"text": "Открыть чат", "url": chat_url}])
+        else:
+            logger.warning(
+                f"Пропущено создание кнопки для action {action.id}: "
+                f"URL {chat_url} содержит localhost или внутренний IP"
+            )
+
+        if not keyboard_rows:
+            return None
+
+        return {"inline_keyboard": keyboard_rows}
 
     def _format_default_action(self, action: AgentAction) -> tuple[str, dict | None]:
         """Форматировать действие по умолчанию."""

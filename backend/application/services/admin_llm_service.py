@@ -101,16 +101,12 @@ class AdminLlmService:
         *,
         start_date: datetime,
         end_date: datetime,
-        input_price_per_million: float = 0.0,
-        output_price_per_million: float = 0.0,
     ) -> tuple[int, float, float]:
         """Получить метрики платных пользователей.
 
         Args:
             start_date: Начальная дата (включительно).
             end_date: Конечная дата (включительно).
-            input_price_per_million: Стоимость входных токенов за миллион.
-            output_price_per_million: Стоимость выходных токенов за миллион.
 
         Returns:
             Кортеж (количество платных пользователей, общая стоимость LLM для платных пользователей,
@@ -123,6 +119,4 @@ class AdminLlmService:
             return await use_case.execute(
                 start_date=start_date,
                 end_date=end_date,
-                input_price_per_million=input_price_per_million,
-                output_price_per_million=output_price_per_million,
             )

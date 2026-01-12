@@ -34,7 +34,7 @@ class VacancyFilterAgent(BaseAgent, VacancyFilterServicePort):
 
         prompt = self._build_prompt(vacancies, resume, user_filter_params)
         logger.info(
-            f"[{self.AGENT_NAME}] filtering {len(vacancies)} vacancies model={self._config.model}"
+            f"[{self.AGENT_NAME}] filtering {len(vacancies)} vacancies model={self._config.get_model_for_agent(self.AGENT_NAME)}"
         )
 
         messages = [

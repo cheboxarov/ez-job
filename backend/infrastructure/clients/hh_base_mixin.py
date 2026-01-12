@@ -40,9 +40,11 @@ def _fetch_hh_front_build_version(cache_slot: int) -> str:
         match = re.search(r'build:\s*"([^"]+)"', text)
         if match:
             return match.group(1)
-    except Exception:
+    except Exception as exc:
         # В случае ошибок просто вернем пустую строку, чтобы не ломать запросы
-        pass
+        logger.debug(
+            f"Не удалось получить build версию HH фронта (не критично): {exc}"
+        )
 
     return ""
 

@@ -22,7 +22,7 @@ class GetLlmUsageMetricsUseCase:
         end_date: datetime,
         plan_id: UUID | None = None,
         time_step: str = "day",
-    ) -> tuple[list[tuple[datetime, int, int, int]], tuple[int, int, int, float]]:
+    ) -> tuple[list[tuple[datetime, int, int, int, float]], tuple[int, int, int, float, float]]:
         """Получить метрики использования LLM.
 
         Args:
@@ -33,8 +33,8 @@ class GetLlmUsageMetricsUseCase:
 
         Returns:
             Кортеж из:
-            - списка метрик по периодам (дата, вызовы, токены, пользователи)
-            - суммарных метрик (вызовы, токены, пользователи, средние токены на пользователя).
+            - списка метрик по периодам (дата, вызовы, токены, пользователи, стоимость)
+            - суммарных метрик (вызовы, токены, пользователи, средние токены на пользователя, стоимость).
         """
         metrics_by_period = await self.llm_call_repository.get_metrics_by_period(
             start_date=start_date,

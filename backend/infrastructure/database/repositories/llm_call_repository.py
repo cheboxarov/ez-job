@@ -134,7 +134,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
         end_date: datetime,
         plan_id: UUID | None = None,
         time_step: str = "day",
-    ) -> list[tuple[datetime, int, int, int]]:
+    ) -> list[tuple[datetime, int, int, int, float]]:
         """Получить метрики LLM по периоду с группировкой по времени."""
         async with self._get_session() as session:
             # Определяем функцию для группировки по времени
@@ -154,6 +154,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
                     func.count(LlmCallModel.id).label("calls_count"),
                     func.coalesce(func.sum(LlmCallModel.total_tokens), 0).label("total_tokens"),
                     func.count(distinct(LlmCallModel.user_id)).label("unique_users"),
+                    func.coalesce(func.sum(LlmCallModel.cost_usd), 0.0).label("total_cost"),
                 )
                 .where(
                     and_(
@@ -181,6 +182,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
                     int(row.calls_count),
                     int(row.total_tokens or 0),
                     int(row.unique_users),
+                    float(row.total_cost or 0.0),
                 )
                 for row in rows
             ]
@@ -191,7 +193,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
         start_date: datetime,
         end_date: datetime,
         plan_id: UUID | None = None,
-    ) -> tuple[int, int, int, float]:
+    ) -> tuple[int, int, int, float, float]:
         """Получить суммарные метрики LLM за период."""
         async with self._get_session() as session:
             stmt = (
@@ -199,6 +201,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
                     func.count(LlmCallModel.id).label("calls_count"),
                     func.coalesce(func.sum(LlmCallModel.total_tokens), 0).label("total_tokens"),
                     func.count(distinct(LlmCallModel.user_id)).label("unique_users"),
+                    func.coalesce(func.sum(LlmCallModel.cost_usd), 0.0).label("total_cost"),
                 )
                 .where(
                     and_(
@@ -221,15 +224,16 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
             total_tokens = int(row.total_tokens or 0)
             unique_users = int(row.unique_users or 0)
             avg_tokens_per_user = total_tokens / unique_users if unique_users > 0 else 0.0
+            total_cost = float(row.total_cost or 0.0)
 
-            return calls_count, total_tokens, unique_users, avg_tokens_per_user
+            return calls_count, total_tokens, unique_users, avg_tokens_per_user, total_cost
 
     async def get_paid_users_llm_metrics(
         self,
         *,
         start_date: datetime,
         end_date: datetime,
-    ) -> tuple[int, int, int]:
+    ) -> tuple[int, int, int, float]:
         """Получить метрики LLM для платных пользователей.
 
         Args:
@@ -238,7 +242,7 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
 
         Returns:
             Кортеж (количество платных пользователей, сумма prompt_tokens,
-            сумма completion_tokens).
+            сумма completion_tokens, суммарная стоимость из БД).
         """
         async with self._get_session() as session:
             # Подсчитываем количество уникальных платных пользователей
@@ -258,11 +262,12 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
             paid_users_result = await session.execute(paid_users_stmt)
             paid_users_count = int(paid_users_result.scalar_one() or 0)
 
-            # Подсчитываем сумму токенов для платных пользователей за период
+            # Подсчитываем сумму токенов и стоимости для платных пользователей за период
             tokens_stmt = (
                 select(
                     func.coalesce(func.sum(LlmCallModel.prompt_tokens), 0).label("total_prompt_tokens"),
                     func.coalesce(func.sum(LlmCallModel.completion_tokens), 0).label("total_completion_tokens"),
+                    func.coalesce(func.sum(LlmCallModel.cost_usd), 0.0).label("total_cost"),
                 )
                 .join(
                     UserSubscriptionModel,
@@ -286,8 +291,9 @@ class LlmCallRepository(BaseRepository, LlmCallRepositoryPort):
 
             total_prompt_tokens = int(row.total_prompt_tokens or 0)
             total_completion_tokens = int(row.total_completion_tokens or 0)
+            total_cost = float(row.total_cost or 0.0)
 
-            return paid_users_count, total_prompt_tokens, total_completion_tokens
+            return paid_users_count, total_prompt_tokens, total_completion_tokens, total_cost
 
     def _to_domain(self, model: LlmCallModel) -> LlmCall:
         """Преобразовать SQLAlchemy модель в доменную сущность.

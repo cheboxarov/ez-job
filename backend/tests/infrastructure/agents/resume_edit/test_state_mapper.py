@@ -3,7 +3,11 @@ from infrastructure.agents.resume_edit.deepagents.state_mapper import (
 )
 
 
-def test_state_to_resume_edit_result_with_structured_response():
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_state_to_resume_edit_result_with_structured_response():
     state = {
         "structured_response": {
             "action": "generate_patches",
@@ -33,7 +37,7 @@ def test_state_to_resume_edit_result_with_structured_response():
         "todos": [{"content": "Шаг 1", "status": "in_progress"}],
     }
 
-    result = state_to_resume_edit_result(state)
+    result = await state_to_resume_edit_result(state, unit_of_work=None, user_id=None)
     assert result.assistant_message == "Готово."
     assert len(result.patches) == 1
     assert len(result.questions) == 1

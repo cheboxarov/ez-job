@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type Key } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   Table,
@@ -36,6 +36,8 @@ export const AdminLlmCallsPage = () => {
   const [pageSize, setPageSize] = useState(20);
   const [selectedCall, setSelectedCall] = useState<LlmCall | null>(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedRowKeys, setSelectedRowKeys] = useState<Key[]>([]);
+  const [selectedRows, setSelectedRows] = useState<LlmCall[]>([]);
 
   // Filters
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null]>([null, null]);
@@ -92,6 +94,40 @@ export const AdminLlmCallsPage = () => {
     loadCalls();
   };
 
+  const handleCopySelected = async () => {
+    if (selectedRows.length === 0) return;
+    const payload = selectedRows.map((call) => ({
+      id: call.id,
+      call_id: call.call_id,
+      attempt_number: call.attempt_number,
+      agent_name: call.agent_name,
+      model: call.model,
+      user_id: call.user_id,
+      status: call.status,
+      temperature: call.temperature,
+      response_format: call.response_format,
+      duration_ms: call.duration_ms,
+      prompt_tokens: call.prompt_tokens,
+      completion_tokens: call.completion_tokens,
+      total_tokens: call.total_tokens,
+      response_size_bytes: call.response_size_bytes,
+      cost_usd: call.cost_usd,
+      context: call.context,
+      created_at: call.created_at,
+      error_type: call.error_type,
+      error_message: call.error_message,
+      prompt: call.prompt,
+      response: call.response,
+    }));
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      message.success(`Скопировано вызовов: ${selectedRows.length}`);
+    } catch (error) {
+      console.error('Ошибка копирования:', error);
+      message.error('Не удалось скопировать данные');
+    }
+  };
+
   const columns: ColumnsType<LlmCall> = [
     {
       title: 'Дата',
@@ -134,11 +170,10 @@ export const AdminLlmCallsPage = () => {
       title: 'Стоимость',
       key: 'cost',
       render: (_: any, record: LlmCall) => {
-        const cost = tokenPricingUtils.calculateCost(
-          record.prompt_tokens,
-          record.completion_tokens
-        );
-        return tokenPricingUtils.formatCost(cost);
+        if (record.cost_usd !== null && record.cost_usd !== undefined) {
+          return tokenPricingUtils.formatCost(record.cost_usd);
+        }
+        return '—';
       },
     },
     {
@@ -209,6 +244,15 @@ export const AdminLlmCallsPage = () => {
               Применить фильтры
             </Button>
           </Col>
+          <Col xs={24} sm={12} md={8} lg={6}>
+            <Button
+              onClick={handleCopySelected}
+              disabled={selectedRows.length === 0}
+              style={{ width: '100%' }}
+            >
+              Скопировать выбранные
+            </Button>
+          </Col>
         </Row>
 
         <Table
@@ -216,6 +260,13 @@ export const AdminLlmCallsPage = () => {
           dataSource={calls}
           loading={loading}
           rowKey="id"
+          rowSelection={{
+            selectedRowKeys,
+            onChange: (keys, rows) => {
+              setSelectedRowKeys(keys);
+              setSelectedRows(rows);
+            },
+          }}
           scroll={{ x: true }}
           pagination={{
             current: page,
@@ -269,12 +320,9 @@ export const AdminLlmCallsPage = () => {
                 {selectedCall.total_tokens?.toLocaleString() || '-'}
               </Descriptions.Item>
               <Descriptions.Item label="Стоимость">
-                {tokenPricingUtils.formatCost(
-                  tokenPricingUtils.calculateCost(
-                    selectedCall.prompt_tokens,
-                    selectedCall.completion_tokens
-                  )
-                )}
+                {selectedCall.cost_usd !== null && selectedCall.cost_usd !== undefined
+                  ? tokenPricingUtils.formatCost(selectedCall.cost_usd)
+                  : '—'}
               </Descriptions.Item>
               <Descriptions.Item label="Длительность">
                 {selectedCall.duration_ms ? `${(selectedCall.duration_ms / 1000).toFixed(2)}s` : '-'}

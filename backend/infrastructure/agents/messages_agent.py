@@ -52,7 +52,7 @@ class MessagesAgent(BaseAgent, MessagesAgentServicePort):
 
         prompt = self._build_prompt(chats, resume, user_parameters)
         logger.info(
-            f"[{self.AGENT_NAME}] Анализирую {len(chats)} чатов, model={self._config.model}"
+            f"[{self.AGENT_NAME}] Анализирую {len(chats)} чатов, model={self._config.get_model_for_agent(self.AGENT_NAME)}"
         )
 
         messages = [
@@ -108,7 +108,8 @@ send_message - используй когда:
 
 create_event - используй когда:
 - Компания просит назначить созвон/встречу/собеседование (например, "В какое время вам удобно созвониться?", "Когда можем встретиться?", "Предлагаем созвон для знакомства")
-- Компания просит выполнить действие вне чата HeadHunter (пройти анкету в телеграме, на сайте компании, заполнить форму на внешней платформе и т.д.)
+- Компания просит заполнить анкету/форму/опросник или оставить данные на внешнем сайте
+- Компания просит выполнить тестовое задание, пройти тест или решить задачу
 - Последнее сообщение в чате от работодателя (не от пользователя) является ответом на вопрос, который был задан пользователем ранее в диалоге
 - Требуется создать событие для отслеживания или напоминания
 - Любая ситуация, которая требует создания события с определенным типом
@@ -117,8 +118,13 @@ create_event - используй когда:
 
 Типы событий (event_type):
 - "call_request" - когда компания просит назначить созвон/встречу/собеседование (например, "В какое время вам удобно созвониться?", "Предлагаем созвон для знакомства")
-- "external_action_request" - когда компания просит выполнить действие вне чата (пройти анкету в телеграм-боте, на сайте компании, заполнить форму и т.д.)
+- "fill_form" - когда компания просит заполнить анкету/форму/опросник или оставить данные на внешнем сайте
+- "test_task" - когда компания просит выполнить тестовое задание, пройти тест или решить задачу
 - "question_answered" - когда последнее сообщение от работодателя является ответом на вопрос, который был задан пользователем ранее в диалоге
+
+Для "fill_form" и "test_task":
+- Если в сообщении есть ссылка (URL), вынеси ее в поле "link"
+- Обязательно укажи поле "status" со значением "pending"
 
 Критерии для создания события "question_answered":
 - Последнее сообщение в чате от работодателя (помечено как [ОТ РАБОТОДАТЕЛЯ], НЕ [ОТ ПОЛЬЗОВАТЕЛЯ])
@@ -149,8 +155,20 @@ create_event - используй когда:
     "type": "create_event",
     "data": {
       "dialog_id": 789,
-      "event_type": "external_action_request",
-      "message": "Компания просит пройти анкету в телеграм-боте @company_bot"
+      "event_type": "fill_form",
+      "message": "Компания просит заполнить анкету кандидата",
+      "link": "https://forms.gle/example",
+      "status": "pending"
+    }
+  },
+  {
+    "type": "create_event",
+    "data": {
+      "dialog_id": 790,
+      "event_type": "test_task",
+      "message": "Компания просит выполнить тестовое задание по ссылке",
+      "link": "https://company.example/test-task",
+      "status": "pending"
     }
   },
   {
@@ -171,9 +189,12 @@ create_event - используй когда:
 - message_text - текст ответа на русском языке (ОБЯЗАТЕЛЬНО для send_message)
 - event_type - тип события, строка (для create_event). Используй:
   * "call_request" - для запросов на созвон/встречу/собеседование
-  * "external_action_request" - для действий вне чата HH (анкеты, формы и т.д.)
+  * "fill_form" - для просьбы заполнить форму/анкету/опросник или оставить данные на внешнем сайте
+  * "test_task" - для просьбы выполнить тестовое задание, пройти тест или решить задачу
   * "question_answered" - когда работодатель ответил на вопрос пользователя
 - message - краткое описание на русском языке, что требуется сделать или куда нас зовут (для create_event). Для "question_answered" укажи краткое описание ответа работодателя на вопрос пользователя
+- link - ссылка на форму/задание, если она есть в сообщении (только для "fill_form" и "test_task")
+- status - статус выполнения ("pending") для "fill_form" и "test_task"
 
 Никакого другого текста, комментариев или форматирования, только JSON-массив.""",
             },
@@ -315,6 +336,14 @@ create_event - используй когда:
         # Валидируем и создаем действия
         actions: List[AgentAction] = []
         chat_ids = {chat.id for chat in chats}
+        allowed_event_types = {
+            "call_request",
+            "external_action_request",
+            "question_answered",
+            "fill_form",
+            "test_task",
+        }
+        allowed_statuses = {"pending", "completed", "declined"}
 
         for item in data:
             if not isinstance(item, dict):
@@ -394,9 +423,43 @@ create_event - используй когда:
                     logger.warning(f"[messages_agent] Неверный event_type для dialog_id {dialog_id}")
                     continue
 
+                event_type = event_type.strip()
+
+                if event_type not in allowed_event_types:
+                    logger.warning(
+                        f"[messages_agent] Недопустимый event_type для dialog_id {dialog_id}: {event_type}"
+                    )
+                    continue
+
                 if not isinstance(message, str) or not message.strip():
                     logger.warning(f"[messages_agent] Неверный message для create_event dialog_id {dialog_id}")
                     continue
+
+                action_payload = {
+                    "dialog_id": dialog_id,
+                    "event_type": event_type,
+                    "message": message.strip(),
+                }
+
+                if event_type in {"fill_form", "test_task"}:
+                    link = action_data.get("link")
+                    if isinstance(link, str):
+                        link = link.strip()
+                    else:
+                        link = None
+                    status = action_data.get("status", "pending")
+                    if isinstance(status, str):
+                        status = status.strip().lower()
+                    else:
+                        status = "pending"
+                    if status not in allowed_statuses:
+                        logger.warning(
+                            f"[messages_agent] Неверный status для dialog_id {dialog_id}: {status}"
+                        )
+                        status = "pending"
+                    action_payload["status"] = status
+                    if link:
+                        action_payload["link"] = link
 
                 actions.append(
                     AgentAction(
@@ -407,11 +470,7 @@ create_event - используй когда:
                         created_by="messages_agent",
                         user_id=user_id,
                         resume_hash=resume_hash,
-                        data={
-                            "dialog_id": dialog_id,
-                            "event_type": event_type.strip(),
-                            "message": message.strip(),
-                        },
+                        data=action_payload,
                         created_at=datetime.now(),
                         updated_at=datetime.now(),
                     )
@@ -421,4 +480,3 @@ create_event - используй когда:
                 continue
 
         return actions
-

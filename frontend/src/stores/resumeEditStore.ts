@@ -7,6 +7,7 @@ import type {
   StreamingData,
   PlanData,
   PlanTask,
+  GenerationStoppedData,
 } from '../api/resumeEditWebSocket';
 
 export interface ResumeEditPatch {
@@ -28,6 +29,7 @@ export interface ResumeEditQuestion {
 }
 
 interface ChatMessage {
+  id: string;
   type: 'user' | 'assistant' | 'question' | 'system' | 'checkpoint';
   content: string;
   questionId?: string;
@@ -155,6 +157,7 @@ interface ResumeEditState {
   
   // Статус обработки
   is_processing: boolean;
+  generation_timeout_timer: NodeJS.Timeout | null;
 
   // Действия
   initialize: (resumeId: string, originalText: string) => void;
@@ -171,6 +174,7 @@ interface ResumeEditState {
   addChatMessage: (message: ChatMessage) => void;
   setPendingQuestions: (questions: ResumeEditQuestion[]) => void;
   setDraftPatches: (patches: ResumeEditPatch[]) => void;
+  stopGeneration: () => void;
 }
 
 export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
@@ -186,9 +190,15 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
   pending_questions: [],
   current_plan: [],
   is_processing: false,
+  generation_timeout_timer: null,
 
   // Инициализация
   initialize: (resumeId: string, originalText: string) => {
+    // Очищаем таймаут, если он был установлен
+    const state = get();
+    if (state.generation_timeout_timer) {
+      clearTimeout(state.generation_timeout_timer);
+    }
     set({
       original_resume_text: originalText,
       current_resume_text: originalText,
@@ -199,6 +209,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       pending_questions: [],
       current_plan: [],
       is_processing: false,
+      generation_timeout_timer: null,
     });
     get().connectWebSocket(resumeId);
   },
@@ -210,11 +221,18 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     // Обработчики событий
     client.on<AssistantMessageData>('assistant_message', (data) => {
       get().addChatMessage({
+        id: crypto.randomUUID(),
         type: 'assistant',
         content: data.message,
         timestamp: new Date(),
       });
       set({ streaming_message: '', is_processing: false });
+      // Очищаем таймаут при получении ответа
+      const state = get();
+      if (state.generation_timeout_timer) {
+        clearTimeout(state.generation_timeout_timer);
+        set({ generation_timeout_timer: null });
+      }
     });
 
     client.on<QuestionsData>('questions', (data) => {
@@ -230,6 +248,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       // Добавляем вопросы в чат
       data.questions.forEach((q) => {
         get().addChatMessage({
+          id: crypto.randomUUID(),
           type: 'question',
           content: q.text,
           questionId: q.id,
@@ -257,6 +276,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
         if (added > 0) parts.push(`добавлено: ${added}`);
         if (updated > 0) parts.push(`обновлено: ${updated}`);
         get().addChatMessage({
+          id: crypto.randomUUID(),
           type: 'checkpoint',
           content: `Правки обновлены (${parts.join(', ')}). Всего на рассмотрении: ${merged.length}.`,
           timestamp: new Date(),
@@ -272,6 +292,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       const systemMessages = buildPlanSystemMessages(prevPlan || [], nextPlan);
       systemMessages.forEach((content) => {
         get().addChatMessage({
+          id: crypto.randomUUID(),
           type: 'checkpoint',
           content,
           timestamp: new Date(),
@@ -282,6 +303,12 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     client.on<StreamingData>('streaming', (data) => {
       if (data.is_complete) {
         set({ streaming_message: '' });
+        // Очищаем таймаут при завершении генерации
+        const state = get();
+        if (state.generation_timeout_timer) {
+          clearTimeout(state.generation_timeout_timer);
+          set({ generation_timeout_timer: null });
+        }
       } else {
         set((state) => ({
           streaming_message: (state.streaming_message || '') + data.chunk,
@@ -289,17 +316,39 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       }
     });
 
+    client.on<GenerationStoppedData>('generation_stopped', (data) => {
+      get().addChatMessage({
+        id: crypto.randomUUID(),
+        type: 'system',
+        content: data.message || 'Генерация остановлена пользователем',
+        timestamp: new Date(),
+      });
+      set({ 
+        streaming_message: '', 
+        is_processing: false,
+        generation_timeout_timer: null,
+      });
+    });
+
     client.on('error', (data: { message: string }) => {
       get().addChatMessage({
+        id: crypto.randomUUID(),
         type: 'system',
         content: `Ошибка: ${data.message}`,
         timestamp: new Date(),
       });
       set({ is_processing: false });
+      // Очищаем таймаут при ошибке
+      const state = get();
+      if (state.generation_timeout_timer) {
+        clearTimeout(state.generation_timeout_timer);
+        set({ generation_timeout_timer: null });
+      }
     });
 
     client.on<{ patch_id: string; message: string }>('patch_applied', (data) => {
       get().addChatMessage({
+        id: crypto.randomUUID(),
         type: 'checkpoint',
         content: data?.message || `Правка применена: ${data?.patch_id || ''}`,
         timestamp: new Date(),
@@ -331,6 +380,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     
     set({ is_processing: true });
     get().addChatMessage({
+      id: crypto.randomUUID(),
       type: 'user',
       content: message,
       timestamp: new Date(),
@@ -339,6 +389,21 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     const client = get().websocket_client;
     if (client) {
       client.sendMessage(message, get().current_resume_text);
+      
+      // Устанавливаем таймаут генерации (5 минут)
+      const timeoutTimer = setTimeout(() => {
+        const state = get();
+        if (state.is_processing) {
+          state.stopGeneration();
+          state.addChatMessage({
+            id: crypto.randomUUID(),
+            type: 'system',
+            content: 'Превышено время ожидания ответа. Генерация остановлена.',
+            timestamp: new Date(),
+          });
+        }
+      }, 300000);
+      set({ generation_timeout_timer: timeoutTimer });
     }
   },
 
@@ -351,6 +416,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     const question = get().pending_questions.find((q) => q.id === questionId);
     if (question) {
       get().addChatMessage({
+        id: crypto.randomUUID(),
         type: 'user',
         content: `Ответ на вопрос: ${answer}`,
         timestamp: new Date(),
@@ -374,9 +440,13 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
   answerAllQuestions: (answers: Array<{ questionId: string; answer: string }>) => {
     if (get().is_processing) return;
 
-    set({ is_processing: true });
-    
+    // Очищаем существующий таймаут, если есть
     const state = get();
+    if (state.generation_timeout_timer) {
+      clearTimeout(state.generation_timeout_timer);
+    }
+
+    set({ is_processing: true, streaming_message: '' });
     
     // Формируем сообщение со всеми ответами
     const answersText = answers
@@ -387,6 +457,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       .join('\n');
     
     get().addChatMessage({
+      id: crypto.randomUUID(),
       type: 'user',
       content: `Ответы на вопросы:\n${answersText}`,
       timestamp: new Date(),
@@ -397,6 +468,21 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
       // Получаем текущий текст резюме для отправки
       const resumeText = state.current_resume_text || state.original_resume_text;
       client.answerAllQuestions(answers, resumeText);
+      
+      // Устанавливаем таймаут генерации (5 минут)
+      const timeoutTimer = setTimeout(() => {
+        const currentState = get();
+        if (currentState.is_processing) {
+          currentState.stopGeneration();
+          currentState.addChatMessage({
+            id: crypto.randomUUID(),
+            type: 'system',
+            content: 'Превышено время ожидания ответа. Генерация остановлена.',
+            timestamp: new Date(),
+          });
+        }
+      }, 300000);
+      set({ generation_timeout_timer: timeoutTimer });
     }
 
     // Очищаем все вопросы из pending
@@ -418,6 +504,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     const newText = applyPatchToText(baseText, patch);
     if (newText === null) {
       get().addChatMessage({
+        id: crypto.randomUUID(),
         type: 'system',
         content:
           'Не удалось применить правку автоматически: не найден точный фрагмент в тексте. ' +
@@ -434,6 +521,7 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
     });
 
     get().addChatMessage({
+      id: crypto.randomUUID(),
       type: 'checkpoint',
       content: `Правка применена локально: ${patch.reason || patch.id}`,
       timestamp: new Date(),
@@ -481,9 +569,34 @@ export const useResumeEditStore = create<ResumeEditState>((set, get) => ({
 
   // Добавление сообщения в чат
   addChatMessage: (message: ChatMessage) => {
-    set((state) => ({
-      chat_history: [...state.chat_history, message],
-    }));
+    set((state) => {
+      // Проверяем, нет ли уже сообщения с таким id (дедупликация)
+      const existingIds = new Set(state.chat_history.map((msg) => msg.id));
+      if (existingIds.has(message.id)) {
+        return state; // Сообщение уже есть, не добавляем
+      }
+      return {
+        chat_history: [...state.chat_history, message],
+      };
+    });
+  },
+
+  // Остановка генерации
+  stopGeneration: () => {
+    const client = get().websocket_client;
+    if (client) {
+      client.stopGeneration();
+    }
+    // Очищаем таймаут
+    const state = get();
+    if (state.generation_timeout_timer) {
+      clearTimeout(state.generation_timeout_timer);
+    }
+    set({ 
+      streaming_message: '', 
+      is_processing: false,
+      generation_timeout_timer: null,
+    });
   },
 
   // Установка pending вопросов

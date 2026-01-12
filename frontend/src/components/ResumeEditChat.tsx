@@ -10,6 +10,7 @@ import {
   UnorderedListOutlined,
   LoadingOutlined,
   CheckCircleOutlined,
+  StopOutlined,
 } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'motion/react';
 import { useResumeEditStore } from '../stores/resumeEditStore';
@@ -34,8 +35,10 @@ export const ResumeEditChat = () => {
     websocket_connected,
     pending_questions,
     current_plan,
+    is_processing,
     sendMessage,
     answerAllQuestions,
+    stopGeneration,
   } = useResumeEditStore();
 
   // Автоскролл к концу сообщений
@@ -197,7 +200,7 @@ export const ResumeEditChat = () => {
         )}
 
         <AnimatePresence>
-          {chat_history.map((msg, index) => {
+          {chat_history.map((msg) => {
             const isUser = msg.type === 'user';
             const isQuestion = msg.type === 'question';
             const isCheckpoint = msg.type === 'checkpoint';
@@ -208,7 +211,7 @@ export const ResumeEditChat = () => {
             if (isCheckpoint) {
               return (
                 <motion.div
-                  key={index}
+                  key={msg.id}
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   className={styles.checkpointRow}
@@ -225,7 +228,7 @@ export const ResumeEditChat = () => {
 
             return (
               <motion.div
-                key={index}
+                key={msg.id}
                 initial={{ opacity: 0, y: 20, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={`${styles.message} ${isUser ? styles.messageUser : styles.messageBot}`}
@@ -383,31 +386,57 @@ export const ResumeEditChat = () => {
         </div>
       ) : (
         <>
-          <QuickActions onAction={handleQuickAction} disabled={!websocket_connected || !!streaming_message} />
+          <QuickActions onAction={handleQuickAction} disabled={!websocket_connected || is_processing || !!streaming_message} />
           <div className={styles.chatInputArea}>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <TextArea
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
-                onPressEnter={(e) => {
-                  if (!e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Опишите желаемые изменения..."
-                autoSize={{ minRows: 1, maxRows: 4 }}
-                style={{ borderRadius: 12, resize: 'none' }}
-              />
-              <Button
-                type="primary"
-                shape="circle"
-                icon={<SendOutlined />}
-                size="large"
-                onClick={() => handleSend()}
-                disabled={!websocket_connected || !messageText.trim()}
-              />
-            </div>
+            {is_processing || streaming_message ? (
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{ 
+                  flex: 1, 
+                  padding: '12px 16px', 
+                  background: 'rgba(0, 0, 0, 0.02)', 
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  color: 'var(--text-secondary)'
+                }}>
+                  <LoadingOutlined style={{ fontSize: 16 }} />
+                  <span>Генерация ответа...</span>
+                </div>
+                <Button
+                  type="primary"
+                  danger
+                  shape="circle"
+                  icon={<StopOutlined />}
+                  size="large"
+                  onClick={() => stopGeneration()}
+                />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 12 }}>
+                <TextArea
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  onPressEnter={(e) => {
+                    if (!e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Опишите желаемые изменения..."
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  style={{ borderRadius: 12, resize: 'none' }}
+                />
+                <Button
+                  type="primary"
+                  shape="circle"
+                  icon={<SendOutlined />}
+                  size="large"
+                  onClick={() => handleSend()}
+                  disabled={!websocket_connected || !messageText.trim()}
+                />
+              </div>
+            )}
           </div>
         </>
       )}

@@ -5,6 +5,7 @@ import { MessageOutlined, SendOutlined } from '@ant-design/icons';
 import { getChat, sendChatMessage } from '../api/chats';
 import { getAgentActions } from '../api/agentActions';
 import { ActionCard } from '../components/ActionCard';
+import { FileAttachment } from '../components/FileAttachment';
 import { MarkdownMessage } from '../components/MarkdownMessage';
 import { PageHeader } from '../components/PageHeader';
 import { useWindowSize } from '../hooks/useWindowSize';
@@ -52,7 +53,7 @@ export const ChatDetailPage = () => {
     setLoadingActions(true);
     try {
       const response = await getAgentActions({
-        type: 'send_message',
+        types: ['send_message'],
         entity_type: 'hh_dialog',
         entity_id: chatId,
       });
@@ -209,89 +210,112 @@ export const ChatDetailPage = () => {
           >
             {chat.messages && chat.messages.items.length > 0 ? (
               chat.messages.items.map((message: ChatMessage) => {
-            if (!message.text?.trim()) {
-              return null;
-            }
-            const isUser = isUserMessage(message);
-            return (
-              <div
-                key={message.id}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: isUser ? 'flex-end' : 'flex-start',
-                }}
-              >
-                {/* Sender name */}
-                <Text 
-                  type="secondary" 
-                  style={{ 
-                    fontSize: 12, 
-                    marginBottom: 6,
-                    marginLeft: isUser ? 0 : 16,
-                    marginRight: isUser ? 16 : 0,
-                  }}
-                >
-                  {message.participant_display?.name || 'Участник'}
-                </Text>
-                
-                {/* Message bubble */}
-                <div
-                  style={{
-                    maxWidth: isMobile ? '90%' : '75%',
-                    padding: '14px 18px',
-                    borderRadius: isUser 
-                      ? '20px 20px 4px 20px' 
-                      : '20px 20px 20px 4px',
-                    background: isUser
-                      ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
-                      : '#ffffff',
-                    color: isUser ? '#ffffff' : '#0f172a',
-                    border: isUser ? '1px solid #2563eb' : '1px solid #e5e7eb',
-                    position: 'relative',
-                    fontSize: 15,
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <MarkdownMessage content={message.text} variant={isUser ? 'user' : 'assistant'} />
-                  
-                  <Text 
-                    style={{ 
-                      fontSize: 11, 
-                      marginTop: 8,
-                      display: 'block',
-                      textAlign: 'right',
-                      color: isUser ? 'rgba(255,255,255,0.7)' : '#94a3b8',
+                const hasText = Boolean(message.text?.trim());
+                const hasFiles = Boolean(message.files && message.files.length > 0);
+                if (!hasText && !hasFiles) {
+                  return null;
+                }
+                const isUser = isUserMessage(message);
+                return (
+                  <div
+                    key={message.id}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: isUser ? 'flex-end' : 'flex-start',
                     }}
                   >
-                    {formatTimeShort(message.creation_time)}
-                  </Text>
-                </div>
+                    {/* Sender name */}
+                    <Text 
+                      type="secondary" 
+                      style={{ 
+                        fontSize: 12, 
+                        marginBottom: 6,
+                        marginLeft: isUser ? 0 : 16,
+                        marginRight: isUser ? 16 : 0,
+                      }}
+                    >
+                      {message.participant_display?.name || 'Участник'}
+                    </Text>
+                    
+                    {/* Message bubble */}
+                    <div
+                      style={{
+                        maxWidth: isMobile ? '90%' : '75%',
+                        padding: '14px 18px',
+                        borderRadius: isUser 
+                          ? '20px 20px 4px 20px' 
+                          : '20px 20px 20px 4px',
+                        background: isUser
+                          ? 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)'
+                          : '#ffffff',
+                        color: isUser ? '#ffffff' : '#0f172a',
+                        border: isUser ? '1px solid #2563eb' : '1px solid #e5e7eb',
+                        position: 'relative',
+                        fontSize: 15,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      {hasText && (
+                        <MarkdownMessage content={message.text} variant={isUser ? 'user' : 'assistant'} />
+                      )}
 
-                {/* Action cards for this message */}
-                {actionsByMessageId.has(message.id) && (
-                  <div style={{ 
-                    marginTop: 8,
-                    maxWidth: isMobile ? '90%' : '75%',
-                    width: '100%',
-                  }}>
-                    {actionsByMessageId.get(message.id)!.map((action) => (
-                      <ActionCard
-                        key={action.id}
-                        action={action}
-                        chatId={parseInt(chatId || '0', 10)}
-                        onSent={() => {
-                          if (chatId) {
-                            loadChat(parseInt(chatId, 10));
-                          }
+                      {hasFiles && (
+                        <div
+                          style={{
+                            marginTop: hasText ? 12 : 0,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 8,
+                          }}
+                        >
+                          {message.files!.map((file, index) => (
+                            <FileAttachment
+                              key={file.upload_id || `${message.id}-${index}`}
+                              file={file}
+                              variant={isUser ? 'user' : 'assistant'}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      
+                      <Text 
+                        style={{ 
+                          fontSize: 11, 
+                          marginTop: 8,
+                          display: 'block',
+                          textAlign: 'right',
+                          color: isUser ? 'rgba(255,255,255,0.7)' : '#94a3b8',
                         }}
-                      />
-                    ))}
+                      >
+                        {formatTimeShort(message.creation_time)}
+                      </Text>
+                    </div>
+
+                    {/* Action cards for this message */}
+                    {actionsByMessageId.has(message.id) && (
+                      <div style={{ 
+                        marginTop: 8,
+                        maxWidth: isMobile ? '90%' : '75%',
+                        width: '100%',
+                      }}>
+                        {actionsByMessageId.get(message.id)!.map((action) => (
+                          <ActionCard
+                            key={action.id}
+                            action={action}
+                            chatId={parseInt(chatId || '0', 10)}
+                            onSent={() => {
+                              if (chatId) {
+                                loadChat(parseInt(chatId, 10));
+                              }
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              );
-            })
+                );
+              })
             ) : (
               <div
                 style={{

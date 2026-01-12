@@ -18,6 +18,7 @@ import { StatisticsPage } from './pages/StatisticsPage';
 import { ChatsListPage } from './pages/ChatsListPage';
 import { ChatDetailPage } from './pages/ChatDetailPage';
 import { EventsPage } from './pages/EventsPage';
+import { TasksPage } from './pages/TasksPage';
 import { MainLayout } from './components/Layout/MainLayout';
 import { ProtectedRoute } from './components/Layout/ProtectedRoute';
 import { AdminLayout } from './components/Layout/AdminLayout';
@@ -191,6 +192,16 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <EventsPage />
+              </MainLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/tasks"
+          element={
+            <ProtectedRoute>
+              <MainLayout>
+                <TasksPage />
               </MainLayout>
             </ProtectedRoute>
           }

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
+from domain.entities.hh_chat_file import HHChatFile
+
 
 @dataclass(slots=True)
 class HHWorkflowTransition:
@@ -43,3 +45,4 @@ class HHChatMessage:
     participant_id: Optional[str] = None
     resources: Optional[Dict[str, List[str]]] = None
     text_buttons: Optional[List[str]] = None
+    files: Optional[List[HHChatFile]] = None

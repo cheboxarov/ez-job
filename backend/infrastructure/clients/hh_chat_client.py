@@ -10,6 +10,7 @@ import httpx
 from loguru import logger
 
 from domain.entities.hh_chat_detailed import HHChatDetailed, HHChatMessages
+from domain.entities.hh_chat_file import HHChatFile
 from domain.entities.hh_chat_message import (
     HHChatMessage,
     HHParticipantDisplay,
@@ -439,6 +440,36 @@ class HHChatClient(HHBaseMixin):
         if not isinstance(resources, dict):
             resources = None
 
+        files = None
+        files_raw = raw.get("files")
+        if isinstance(files_raw, list) and files_raw:
+            files = []
+            for file_raw in files_raw:
+                if not isinstance(file_raw, dict):
+                    continue
+                url = file_raw.get("url") or ""
+                title = file_raw.get("title") or ""
+                content_type = file_raw.get("content_type") or ""
+                upload_id = file_raw.get("upload_id") or ""
+                preview = file_raw.get("preview")
+                if not isinstance(preview, dict):
+                    preview = None
+                properties = file_raw.get("properties")
+                if not isinstance(properties, dict):
+                    properties = None
+                files.append(
+                    HHChatFile(
+                        url=url,
+                        title=title,
+                        content_type=content_type,
+                        upload_id=upload_id,
+                        preview=preview,
+                        properties=properties,
+                    )
+                )
+            if not files:
+                files = None
+
         # Извлекаем варианты ответов из actions.text_buttons
         text_buttons = None
         actions_raw = raw.get("actions")
@@ -473,6 +504,7 @@ class HHChatClient(HHBaseMixin):
             participant_id=participant_id,
             resources=resources,
             text_buttons=text_buttons,
+            files=files,
         )
 
     @staticmethod
@@ -666,4 +698,3 @@ class HHChatClient(HHBaseMixin):
             online_until_time=online_until_time,
             block_chat_info=block_chat_info,
         )
-

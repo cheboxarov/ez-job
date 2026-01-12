@@ -31,10 +31,12 @@ async def get_resume_edit_websocket_handler() -> ResumeEditWebSocketHandler:
 
     config = load_config()
     unit_of_work = create_unit_of_work(config.database)
-    deep_agent = create_resume_edit_deep_agent(config.openai)
-    agent_adapter = ResumeEditDeepAgentAdapter(config.openai, agent=deep_agent)
+    deep_agent = create_resume_edit_deep_agent(config.openai, unit_of_work=unit_of_work)
+    agent_adapter = ResumeEditDeepAgentAdapter(
+        config.openai, agent=deep_agent, unit_of_work=unit_of_work
+    )
     service = ResumeEditService(unit_of_work, agent_adapter)
-    return ResumeEditWebSocketHandler(service, deep_agent)
+    return ResumeEditWebSocketHandler(service, deep_agent, unit_of_work)
 
 
 @router.websocket("/ws/resume-edit/{resume_id}")
@@ -85,5 +87,8 @@ async def resume_edit_websocket_endpoint(
         )
         try:
             await websocket.close(code=1011, reason="Internal server error")
-        except Exception:
-            pass
+        except Exception as close_exc:
+            logger.warning(
+                f"Не удалось закрыть WebSocket соединение: "
+                f"resume_id={resume_id}, user_id={user_id}, error={close_exc}"
+            )

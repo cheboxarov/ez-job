@@ -3,10 +3,15 @@ import type {
   AgentActionsListResponse,
   AgentActionsUnreadCountResponse,
   AgentAction,
+  EventStatus,
 } from '../types/api';
 
 export interface GetAgentActionsParams {
-  type?: string;
+  types?: string[];
+  exclude_types?: string[];
+  event_types?: string[];
+  exclude_event_types?: string[];
+  statuses?: EventStatus[];
   entity_type?: string;
   entity_id?: number;
 }
@@ -15,9 +20,20 @@ export const getAgentActions = async (
   params?: GetAgentActionsParams
 ): Promise<AgentActionsListResponse> => {
   const queryParams = new URLSearchParams();
-  if (params?.type) {
-    queryParams.append('type', params.type);
-  }
+  const appendListParam = (key: string, values?: string[]) => {
+    if (!values || values.length === 0) {
+      return;
+    }
+    values.forEach((value) => {
+      queryParams.append(key, value);
+    });
+  };
+
+  appendListParam('types', params?.types);
+  appendListParam('exclude_types', params?.exclude_types);
+  appendListParam('event_types', params?.event_types);
+  appendListParam('exclude_event_types', params?.exclude_event_types);
+  appendListParam('statuses', params?.statuses);
   if (params?.entity_type) {
     queryParams.append('entity_type', params.entity_type);
   }
@@ -46,6 +62,17 @@ export const markAllAgentActionsAsRead = async (): Promise<void> => {
 export const executeAgentAction = async (actionId: string): Promise<AgentAction> => {
   const response = await apiClient.post<AgentAction>(
     `/api/agent-actions/${actionId}/execute`
+  );
+  return response.data;
+};
+
+export const updateAgentActionStatus = async (
+  actionId: string,
+  status: EventStatus
+): Promise<AgentAction> => {
+  const response = await apiClient.patch<AgentAction>(
+    `/api/agent-actions/${actionId}/status`,
+    { status }
   );
   return response.data;
 };

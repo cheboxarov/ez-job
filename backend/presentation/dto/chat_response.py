@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from domain.entities.hh_chat_detailed import HHChatDetailed, HHChatMessages
+from domain.entities.hh_chat_file import HHChatFile
 from domain.entities.hh_chat_message import (
     HHChatMessage,
     HHParticipantDisplay,
@@ -31,6 +32,25 @@ class ParticipantDisplayResponse(BaseModel):
     is_bot: bool = Field(..., description="Является ли ботом")
 
 
+class ChatFileResponse(BaseModel):
+    """DTO для файла в сообщении чата."""
+
+    url: str = Field(..., description="Ссылка на файл")
+    title: str = Field(..., description="Название файла")
+    content_type: str = Field(..., description="MIME-тип")
+    upload_id: str = Field(..., description="ID загрузки файла")
+
+    @classmethod
+    def from_entity(cls, chat_file: HHChatFile) -> "ChatFileResponse":
+        """Создает DTO из доменной сущности файла."""
+        return cls(
+            url=chat_file.url,
+            title=chat_file.title,
+            content_type=chat_file.content_type,
+            upload_id=chat_file.upload_id,
+        )
+
+
 class ChatMessageResponse(BaseModel):
     """DTO для сообщения в чате."""
 
@@ -53,6 +73,7 @@ class ChatMessageResponse(BaseModel):
     )
     participant_id: Optional[str] = Field(None, description="ID участника")
     resources: Optional[Dict[str, List[str]]] = Field(None, description="Ресурсы")
+    files: Optional[List[ChatFileResponse]] = Field(None, description="Файлы")
 
     @classmethod
     def from_entity(cls, message: HHChatMessage) -> "ChatMessageResponse":
@@ -80,6 +101,10 @@ class ChatMessageResponse(BaseModel):
                 is_bot=message.participant_display.is_bot,
             )
 
+        files = None
+        if message.files:
+            files = [ChatFileResponse.from_entity(chat_file) for chat_file in message.files]
+
         return cls(
             id=message.id,
             chat_id=message.chat_id,
@@ -96,6 +121,7 @@ class ChatMessageResponse(BaseModel):
             participant_display=participant_display,
             participant_id=message.participant_id,
             resources=message.resources,
+            files=files,
         )
 
 
@@ -321,4 +347,3 @@ class SendChatMessageResponse(BaseModel):
 
     success: bool = Field(..., description="Успешно ли отправлено сообщение")
     data: Optional[Dict[str, Any]] = Field(None, description="Данные ответа API")
-

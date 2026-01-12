@@ -24,7 +24,11 @@ class ListAgentActionsUseCase:
     async def execute(
         self,
         *,
-        type: str | None = None,
+        types: list[str] | None = None,
+        exclude_types: list[str] | None = None,
+        event_types: list[str] | None = None,
+        exclude_event_types: list[str] | None = None,
+        statuses: list[str] | None = None,
         entity_type: str | None = None,
         entity_id: int | None = None,
         created_by: str | None = None,
@@ -32,7 +36,11 @@ class ListAgentActionsUseCase:
         """Получить список действий агента с опциональной фильтрацией.
 
         Args:
-            type: Фильтр по типу действия (например, "send_message", "create_event").
+            types: Фильтр по списку типов действий (например, ["send_message", "create_event"]).
+            exclude_types: Исключить указанные типы действий.
+            event_types: Фильтр по подтипам событий (data["event_type"]) для create_event.
+            exclude_event_types: Исключить указанные подтипы событий (data["event_type"]).
+            statuses: Фильтр по статусам (data["status"]) для create_event.
             entity_type: Фильтр по типу сущности (например, "hh_dialog").
             entity_id: Фильтр по ID сущности (например, ID диалога).
             created_by: Фильтр по идентификатору агента (например, "messages_agent").
@@ -45,11 +53,18 @@ class ListAgentActionsUseCase:
         """
         try:
             logger.info(
-                f"Получение списка действий агента: type={type}, "
+                "Получение списка действий агента: "
+                f"types={types}, exclude_types={exclude_types}, "
+                f"event_types={event_types}, exclude_event_types={exclude_event_types}, "
+                f"statuses={statuses}, "
                 f"entity_type={entity_type}, entity_id={entity_id}, created_by={created_by}"
             )
             actions = await self._agent_action_repository.list(
-                type=type,
+                types=types,
+                exclude_types=exclude_types,
+                event_types=event_types,
+                exclude_event_types=exclude_event_types,
+                statuses=statuses,
                 entity_type=entity_type,
                 entity_id=entity_id,
                 created_by=created_by,
@@ -62,4 +77,3 @@ class ListAgentActionsUseCase:
                 exc_info=True,
             )
             raise
-

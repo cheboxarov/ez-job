@@ -12,10 +12,12 @@ import {
   CrownOutlined,
   SafetyOutlined,
   MenuOutlined,
+  ProfileOutlined,
   } from '@ant-design/icons';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
 import { useAgentActionsStore } from '../../stores/agentActionsStore';
+import { useTasksStore } from '../../stores/tasksStore';
 import { Logo } from '../Logo';
 
 const { Sider, Content } = Layout;
@@ -28,6 +30,7 @@ interface MainLayoutProps {
 export const MainLayout = ({ children }: MainLayoutProps) => {
   const { logout, user } = useAuthStore();
   const { unreadCount, fetchUnreadCount } = useAgentActionsStore();
+  const { pendingCount, fetchPendingCount } = useTasksStore();
   const navigate = useNavigate();
   const location = useLocation();
   const screens = useBreakpoint();
@@ -45,6 +48,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
   useEffect(() => {
     fetchUnreadCount();
   }, [fetchUnreadCount]);
+
+  useEffect(() => {
+    fetchPendingCount();
+  }, [fetchPendingCount]);
 
   const handleLogout = () => {
     logout();
@@ -73,6 +80,19 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
             </Badge>
           ),
           label: 'События',
+        },
+        {
+          key: 'tasks',
+          icon: (
+            <Badge
+              count={pendingCount > 0 ? pendingCount : 0}
+              offset={[8, 0]}
+              size="small"
+            >
+              <ProfileOutlined />
+            </Badge>
+          ),
+          label: 'Задания',
         },
         {
           key: 'statistics',
@@ -149,6 +169,10 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
       navigate('/events');
       return;
     }
+    if (key === 'tasks') {
+      navigate('/tasks');
+      return;
+    }
     if (key === 'chats') {
       navigate('/chats');
       return;
@@ -187,6 +211,7 @@ export const MainLayout = ({ children }: MainLayoutProps) => {
           selectedKeys={[
             location.pathname === '/statistics' ? 'statistics' : 
             location.pathname === '/events' ? 'events' : 
+            location.pathname === '/tasks' ? 'tasks' :
             location.pathname.startsWith('/settings') ? '/settings' :
             location.pathname.startsWith('/admin') ? '/admin/users' :
             location.pathname

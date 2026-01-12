@@ -247,8 +247,11 @@ class HHVacancyClient(HHBaseMixin):
                             try:
                                 role_id = int(role_id_str)
                                 professional_role_map[role_id] = role_title
-                            except (ValueError, TypeError):
-                                pass
+                            except (ValueError, TypeError) as exc:
+                                logger.debug(
+                                    f"Не удалось распарсить role_id (ожидаемое поведение при некорректных данных от API): "
+                                    f"role_id_str={role_id_str}, error={exc}"
+                                )
 
         items: list[VacancyListItem] = []
         for raw in raw_vacancies:
@@ -301,8 +304,12 @@ class HHVacancyClient(HHBaseMixin):
                                 salary_from = int(from_val)
                             elif isinstance(from_val, str) and from_val.strip():
                                 salary_from = int(from_val)
-                        except (ValueError, TypeError):
-                            pass  # salary_from остается None
+                        except (ValueError, TypeError) as exc:
+                            logger.debug(
+                                f"Не удалось распарсить salary_from (ожидаемое поведение при некорректных данных от API): "
+                                f"from_val={from_val}, error={exc}"
+                            )
+                            # salary_from остается None
                     
                     to_val = compensation.get("to")
                     if to_val is not None:
@@ -311,8 +318,12 @@ class HHVacancyClient(HHBaseMixin):
                                 salary_to = int(to_val)
                             elif isinstance(to_val, str) and to_val.strip():
                                 salary_to = int(to_val)
-                        except (ValueError, TypeError):
-                            pass  # salary_to остается None
+                        except (ValueError, TypeError) as exc:
+                            logger.debug(
+                                f"Не удалось распарсить salary_to (ожидаемое поведение при некорректных данных от API): "
+                                f"to_val={to_val}, error={exc}"
+                            )
+                            # salary_to остается None
                     
                     # Во внутреннем API используется currencyCode (не currency)
                     salary_currency = compensation.get("currencyCode")

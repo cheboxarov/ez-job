@@ -15,7 +15,8 @@ export interface ResumeEditWebSocketMessage {
     | 'streaming'
     | 'error'
     | 'warnings'
-    | 'patch_applied';
+    | 'patch_applied'
+    | 'generation_stopped';
   data: any;
 }
 
@@ -58,6 +59,10 @@ export interface ErrorData {
   message: string;
 }
 
+export interface GenerationStoppedData {
+  message: string;
+}
+
 export class ResumeEditWebSocketClient {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -77,9 +82,10 @@ export class ResumeEditWebSocketClient {
     this.messageListeners.set('patches', new Set());
     this.messageListeners.set('plan', new Set());
     this.messageListeners.set('streaming', new Set());
-    this.messageListeners.set('error', new Set());
-    this.messageListeners.set('warnings', new Set());
-    this.messageListeners.set('patch_applied', new Set());
+        this.messageListeners.set('error', new Set());
+        this.messageListeners.set('warnings', new Set());
+        this.messageListeners.set('patch_applied', new Set());
+        this.messageListeners.set('generation_stopped', new Set());
   }
 
   connect(resumeId: string): void {
@@ -226,6 +232,20 @@ export class ResumeEditWebSocketClient {
         data: {
           patch_id: patchId,
         },
+      })
+    );
+  }
+
+  stopGeneration(): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      console.warn('ResumeEditWebSocket: Соединение не установлено');
+      return;
+    }
+
+    this.ws.send(
+      JSON.stringify({
+        type: 'stop_generation',
+        data: {},
       })
     );
   }
