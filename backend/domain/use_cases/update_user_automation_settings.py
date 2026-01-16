@@ -29,6 +29,7 @@ class UpdateUserAutomationSettingsUseCase:
         user_id: UUID,
         *,
         auto_reply_to_questions_in_chats: bool | None = None,
+        auto_watch_chats: bool | None = None,
     ) -> UserAutomationSettings:
         """Обновить настройки автоматизации пользователя.
 
@@ -51,6 +52,9 @@ class UpdateUserAutomationSettingsUseCase:
 
             if auto_reply_to_questions_in_chats is not None:
                 settings.auto_reply_to_questions_in_chats = auto_reply_to_questions_in_chats
+            
+            if auto_watch_chats is not None:
+                settings.auto_watch_chats = auto_watch_chats
 
             settings.updated_at = datetime.now(timezone.utc)
 

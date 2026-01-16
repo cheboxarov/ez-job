@@ -104,6 +104,16 @@ async def process_chats_cycle(config: AppConfig) -> None:
         for user in users:
             logger.info(f"Обработка чатов для пользователя: {user.id}")
             
+            # Получаем настройки автоматизации для пользователя
+            get_automation_settings_uc = GetUserAutomationSettingsUseCase(
+                settings_repository=uow.user_automation_settings_repository
+            )
+            automation_settings = await get_automation_settings_uc.execute(user.id)
+            
+            if not automation_settings.auto_watch_chats:
+                logger.info(f"Автоматический просмотр чатов выключен для пользователя {user.id}, пропускаем")
+                continue
+            
             # Получаем auth данные пользователя
             auth_data = await uow.user_hh_auth_data_repository.get_by_user_id(user.id)
             
@@ -313,10 +323,7 @@ async def process_chats_cycle(config: AppConfig) -> None:
                     logger.info(f"Сохранено {saved_count} из {len(all_actions)} действий в БД")
                     
                     # Получаем настройки автоматизации для пользователя
-                    get_automation_settings_uc = GetUserAutomationSettingsUseCase(
-                        settings_repository=uow.user_automation_settings_repository
-                    )
-                    automation_settings = await get_automation_settings_uc.execute(user.id)
+                    # (Они уже получены выше в начале цикла по пользователю)
                     
                     # Если включена автоматическая отправка ответов на вопросы
                     if automation_settings.auto_reply_to_questions_in_chats:

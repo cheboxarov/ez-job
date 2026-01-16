@@ -75,6 +75,7 @@ async def update_automation_settings(
         settings = await update_settings_uc.execute(
             user_id=current_user.id,
             auto_reply_to_questions_in_chats=request.auto_reply_to_questions_in_chats,
+            auto_watch_chats=request.auto_watch_chats,
         )
         return UserAutomationSettingsResponse.from_entity(settings)
     except ValueError as exc:

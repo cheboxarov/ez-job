@@ -465,12 +465,14 @@ export interface UserAutomationSettings {
   id: string;
   user_id: string;
   auto_reply_to_questions_in_chats: boolean;
+  auto_watch_chats: boolean;
   created_at: string;
   updated_at: string;
 }
 
 export interface UpdateUserAutomationSettingsRequest {
   auto_reply_to_questions_in_chats?: boolean | null;
+  auto_watch_chats?: boolean | null;
 }
 
 export interface GenerateTelegramLinkTokenResponse {

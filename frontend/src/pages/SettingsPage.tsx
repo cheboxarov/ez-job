@@ -131,6 +131,10 @@ export const SettingsPage = () => {
     await handleUpdateAutomationSettings({ auto_reply_to_questions_in_chats: checked });
   };
 
+  const handleToggleAutoWatch = async (checked: boolean) => {
+    await handleUpdateAutomationSettings({ auto_watch_chats: checked });
+  };
+
   const handleGenerateLink = async () => {
     setGeneratingLink(true);
     try {
@@ -558,6 +562,35 @@ export const SettingsPage = () => {
             <Switch
               checked={automationSettings.auto_reply_to_questions_in_chats}
               onChange={handleToggleAutoReply}
+              disabled={saving}
+              size="default"
+            />
+          </div>
+
+          <Divider style={{ margin: '8px 0' }} />
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              padding: '16px 20px',
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb',
+            }}
+          >
+            <div>
+              <Text strong style={{ fontSize: 15, display: 'block', marginBottom: 4 }}>
+                Автоматически просматривать чаты агентом
+              </Text>
+              <Text type="secondary" style={{ fontSize: 13 }}>
+                Когда включено, агент будет автоматически просматривать входящие чаты и анализировать их
+              </Text>
+            </div>
+            <Switch
+              checked={automationSettings.auto_watch_chats}
+              onChange={handleToggleAutoWatch}
               disabled={saving}
               size="default"
             />

@@ -20,6 +20,9 @@ class UserAutomationSettings:
     auto_reply_to_questions_in_chats: bool
     """Автоматически отвечать на вопросы в чатах."""
 
+    auto_watch_chats: bool
+    """Автоматически просматривать чаты агентом."""
+
     created_at: datetime
     """Дата и время создания записи."""
 

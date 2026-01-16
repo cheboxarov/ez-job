@@ -18,6 +18,9 @@ class UserAutomationSettingsResponse(BaseModel):
     auto_reply_to_questions_in_chats: bool = Field(
         ..., description="Автоматически отвечать на вопросы в чатах"
     )
+    auto_watch_chats: bool = Field(
+        ..., description="Автоматически просматривать чаты агентом"
+    )
     created_at: datetime = Field(..., description="Дата создания")
     updated_at: datetime = Field(..., description="Дата обновления")
 
@@ -37,6 +40,7 @@ class UserAutomationSettingsResponse(BaseModel):
             id=settings.id,
             user_id=settings.user_id,
             auto_reply_to_questions_in_chats=settings.auto_reply_to_questions_in_chats,
+            auto_watch_chats=settings.auto_watch_chats,
             created_at=settings.created_at,
             updated_at=settings.updated_at,
         )

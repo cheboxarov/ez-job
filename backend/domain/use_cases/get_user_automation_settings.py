@@ -50,6 +50,7 @@ class GetUserAutomationSettingsUseCase:
                     id=uuid4(),
                     user_id=user_id,
                     auto_reply_to_questions_in_chats=False,
+                    auto_watch_chats=True,
                     created_at=now,
                     updated_at=now,
                 )

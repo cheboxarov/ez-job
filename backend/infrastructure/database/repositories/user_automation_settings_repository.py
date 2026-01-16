@@ -72,6 +72,7 @@ class UserAutomationSettingsRepository(BaseRepository, UserAutomationSettingsRep
                 id=settings_id,
                 user_id=settings.user_id,
                 auto_reply_to_questions_in_chats=settings.auto_reply_to_questions_in_chats,
+                auto_watch_chats=settings.auto_watch_chats,
                 created_at=settings.created_at if settings.created_at else now,
                 updated_at=settings.updated_at if settings.updated_at else now,
             )
@@ -104,6 +105,7 @@ class UserAutomationSettingsRepository(BaseRepository, UserAutomationSettingsRep
 
             model.user_id = settings.user_id
             model.auto_reply_to_questions_in_chats = settings.auto_reply_to_questions_in_chats
+            model.auto_watch_chats = settings.auto_watch_chats
             model.updated_at = datetime.now(timezone.utc)
 
             await session.flush()
@@ -124,6 +126,7 @@ class UserAutomationSettingsRepository(BaseRepository, UserAutomationSettingsRep
             id=model.id,
             user_id=model.user_id,
             auto_reply_to_questions_in_chats=model.auto_reply_to_questions_in_chats,
+            auto_watch_chats=model.auto_watch_chats,
             created_at=model.created_at,
             updated_at=model.updated_at,
         )

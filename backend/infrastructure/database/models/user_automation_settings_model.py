@@ -31,6 +31,9 @@ class UserAutomationSettingsModel(Base):
     auto_reply_to_questions_in_chats: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, server_default="false"
     )
+    auto_watch_chats: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, server_default="false"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )

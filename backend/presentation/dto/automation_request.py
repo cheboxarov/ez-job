@@ -11,3 +11,6 @@ class UpdateUserAutomationSettingsRequest(BaseModel):
     auto_reply_to_questions_in_chats: bool | None = Field(
         None, description="Автоматически отвечать на вопросы в чатах"
     )
+    auto_watch_chats: bool | None = Field(
+        None, description="Автоматически просматривать чаты агентом"
+    )
