@@ -80,8 +80,6 @@ class Application:
                 chat_list: HHListChat = await self._fetch_user_chats_uc.execute(
                     headers=auth_data.headers,
                     cookies=auth_data.cookies,
-                    user_id=user.id,
-                    update_cookies_uc=update_cookies_uc,
                 )
                 logger.info(f"[app] Получено чатов: {len(chat_list.items)}")
             except Exception as exc:
@@ -113,8 +111,6 @@ class Application:
                     chat_ids=chat_ids,
                     headers=auth_data.headers,
                     cookies=auth_data.cookies,
-                    user_id=user.id,
-                    update_cookies_uc=update_cookies_uc,
                 )
                 logger.info(f"[app] Получено детальной информации о чатах: {len(chats_details)}")
             except Exception as exc:
@@ -251,8 +247,6 @@ class Application:
                                         message_id=message_id,
                                         headers=auth_data.headers,
                                         cookies=auth_data.cookies,
-                                        user_id=user.id,
-                                        update_cookies_uc=update_cookies_uc,
                                     )
                                     logger.debug(f"[app] Успешно помечено как прочитанное: chat_id={chat_id}, message_id={message_id}")
                                 except Exception as exc:

@@ -29,9 +29,9 @@ from domain.use_cases.search_and_get_filtered_vacancy_list import (
     SearchAndGetFilteredVacancyListUseCase,
 )
 from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
-from infrastructure.database.session import create_session_factory
-from infrastructure.database.repositories.user_hh_auth_data_repository import UserHhAuthDataRepository
-from config import DatabaseConfig
+from domain.interfaces.event_publisher_port import EventPublisherPort
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
+from typing import Callable, Optional
 
 
 class AutoReplyDisabledError(Exception):
@@ -57,15 +57,16 @@ class ProcessAutoRepliesUseCase:
         resume_filter_settings_repository: ResumeFilterSettingsRepositoryPort,
         search_and_get_filtered_vacancy_list_uc: SearchAndGetFilteredVacancyListUseCase,
         cover_letter_generator: CoverLetterGeneratorPort,
-        create_unit_of_work_factory,
+        create_unit_of_work_factory: Callable[[], UnitOfWorkPort],
         respond_to_vacancy_uc,
         hh_client: HHClientPort,
         generate_test_answers_uc: GenerateTestAnswersUseCase,
+        event_publisher: EventPublisherPort,
+        standalone_cookies_uow_factory: Optional[Callable[[], UnitOfWorkPort]] = None,
         check_subscription_uc=None,
         increment_response_count_uc=None,
         max_vacancies_per_resume: int = 200,
         delay_between_replies_seconds: int = 30,
-        database_config: DatabaseConfig | None = None,
     ) -> None:
         """Инициализация use case.
 
@@ -75,15 +76,16 @@ class ProcessAutoRepliesUseCase:
             resume_filter_settings_repository: Репозиторий настроек фильтров резюме.
             search_and_get_filtered_vacancy_list_uc: Use case для поиска вакансий.
             cover_letter_generator: Генератор сопроводительных писем.
-            create_unit_of_work_factory: Фабрика для создания UnitOfWork (для каждого отклика отдельная транзакция).
+            create_unit_of_work_factory: Фабрика для создания UnitOfWork.
             respond_to_vacancy_uc: Use case для отправки отклика в HH API.
-            hh_client: Клиент для работы с HeadHunter API (для получения теста вакансии).
+            hh_client: Клиент для работы с HeadHunter API.
             generate_test_answers_uc: Use case для генерации ответов на тест вакансии.
+            event_publisher: Публикатор событий для WebSocket уведомлений.
+            standalone_cookies_uow_factory: Фабрика для создания UnitOfWork для обновления cookies.
             check_subscription_uc: Use case для проверки подписки (опционально).
             increment_response_count_uc: Use case для инкремента счетчика откликов (опционально).
             max_vacancies_per_resume: Максимальное количество вакансий для обработки на одно резюме.
             delay_between_replies_seconds: Задержка между откликами в секундах.
-            database_config: Конфигурация БД для создания standalone репозитория обновления cookies.
         """
         self._resume_repository = resume_repository
         self._user_hh_auth_data_repository = user_hh_auth_data_repository
@@ -94,11 +96,12 @@ class ProcessAutoRepliesUseCase:
         self._respond_to_vacancy_uc = respond_to_vacancy_uc
         self._hh_client = hh_client
         self._generate_test_answers_uc = generate_test_answers_uc
+        self._event_publisher = event_publisher
+        self._standalone_cookies_uow_factory = standalone_cookies_uow_factory
         self._check_subscription_uc = check_subscription_uc
         self._increment_response_count_uc = increment_response_count_uc
         self._max_vacancies_per_resume = max_vacancies_per_resume
         self._delay_between_replies_seconds = delay_between_replies_seconds
-        self._database_config = database_config
 
     async def execute(self) -> None:
         """Выполнить обработку автооткликов для всех активных резюме."""
@@ -203,18 +206,19 @@ class ProcessAutoRepliesUseCase:
         # Создаем use case для обновления cookies с standalone репозиторием
         # Это гарантирует, что advisory lock будет держаться только на время обновления cookies,
         # а не на всё время обработки резюме (что предотвращает deadlock с login_by_code)
-        if self._database_config:
-            # Создаем standalone репозиторий с отдельной session_factory
-            session_factory = create_session_factory(self._database_config)
-            standalone_cookies_repository = UserHhAuthDataRepository(session_factory)
-            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(standalone_cookies_repository)
+        if self._standalone_cookies_uow_factory:
+            # Создаем standalone UoW для получения репозитория
+            standalone_uow = self._standalone_cookies_uow_factory()
+            update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
+                standalone_uow.standalone_user_hh_auth_data_repository
+            )
             logger.debug(f"Создан UpdateUserHhAuthCookiesUseCase с standalone репозиторием для резюме {resume.id}")
         else:
             # Fallback: используем транзакционный репозиторий (не рекомендуется)
             update_cookies_uc = UpdateUserHhAuthCookiesUseCase(
                 self._user_hh_auth_data_repository
             )
-            logger.warning(f"UpdateUserHhAuthCookiesUseCase создан с транзакционным репозиторием (database_config не передан)")
+            logger.warning(f"UpdateUserHhAuthCookiesUseCase создан с транзакционным репозиторием (standalone_cookies_uow_factory не передан)")
 
         try:
             vacancies = await self._search_and_get_filtered_vacancy_list_uc.execute(
@@ -410,8 +414,7 @@ class ProcessAutoRepliesUseCase:
         cover_letter = "1"
         async with llm_unit_of_work_letter:
             # Обновляем unit_of_work в агенте для логирования
-            if hasattr(self._cover_letter_generator, 'set_unit_of_work'):
-                self._cover_letter_generator.set_unit_of_work(llm_unit_of_work_letter)
+            self._cover_letter_generator.set_unit_of_work(llm_unit_of_work_letter)
             
             try:
                 cover_letter = await self._cover_letter_generator.generate(
@@ -535,11 +538,7 @@ class ProcessAutoRepliesUseCase:
                     CreateVacancyResponseWithNotificationUseCase,
                 )
                 from domain.use_cases.respond_to_vacancy_and_save import RespondToVacancyAndSaveUseCase
-                
-                # Создаём Event Publisher для уведомлений через WebSocket
-                from application.factories.event_factory import create_event_publisher
-                event_publisher = create_event_publisher()
-                
+
                 # Создаем Use Case для сохранения откликов в БД с уведомлениями
                 # Используем standalone репозиторий, так как сохранение происходит после HTTP запроса
                 # и не требует атомарности с другими операциями
@@ -548,7 +547,7 @@ class ProcessAutoRepliesUseCase:
                 )
                 create_vacancy_response_uc = CreateVacancyResponseWithNotificationUseCase(
                     create_vacancy_response_uc=create_vacancy_response_base_uc,
-                    event_publisher=event_publisher,
+                    event_publisher=self._event_publisher,
                 )
 
                 # НЕ передаем update_cookies_uc в транзакцию - обновим cookies после коммита

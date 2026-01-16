@@ -17,6 +17,7 @@ from infrastructure.agents.vacancy_filter_agent import VacancyFilterAgent
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
 from domain.use_cases.fetch_vacancies import FetchVacanciesUseCase
 from infrastructure.database.session import create_session_factory
+from infrastructure.database.unit_of_work import UnitOfWork
 
 
 def create_search_and_generate_cover_letters_usecase(
@@ -46,9 +47,13 @@ def create_search_and_generate_cover_letters_usecase(
     # Создаем session_factory для работы с репозиторием мэтчей
     session_factory = create_session_factory(config.database)
 
+    # Создаем функцию-фабрику для создания UnitOfWork
+    def create_unit_of_work() -> UnitOfWork:
+        return UnitOfWork(session_factory)
+
     # Создаем GetFilteredVacanciesWithCacheUseCase
     filter_vacancies_with_cache_uc = GetFilteredVacanciesWithCacheUseCase(
-        session_factory=session_factory,
+        create_unit_of_work=create_unit_of_work,
         filter_service=vacancy_filter_service,
         minimal_confidence=config.openai.minimal_confidence,
         batch_size=10,

@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from abc import ABC
 from contextlib import asynccontextmanager
-from typing import Union
+from typing import Awaitable, Callable, TypeVar, Union
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from domain.exceptions.repository_exceptions import DuplicateEntityError
+
+
+T = TypeVar("T")
 
 
 class BaseRepository(ABC):
@@ -52,3 +58,24 @@ class BaseRepository(ABC):
                 except Exception:
                     await session.rollback()
                     raise
+
+    async def _execute_with_integrity_handling(
+        self, operation: Callable[[], Awaitable[T]]
+    ) -> T:
+        """Выполнить операцию с обработкой IntegrityError.
+
+        Преобразует SQLAlchemy IntegrityError в доменное исключение DuplicateEntityError.
+
+        Args:
+            operation: Асинхронная операция для выполнения.
+
+        Returns:
+            Результат операции.
+
+        Raises:
+            DuplicateEntityError: При нарушении уникальности.
+        """
+        try:
+            return await operation()
+        except IntegrityError as exc:
+            raise DuplicateEntityError(str(exc)) from exc

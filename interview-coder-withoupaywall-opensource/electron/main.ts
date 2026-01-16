@@ -1,4 +1,4 @@
-import { app, BrowserWindow, screen, shell, ipcMain } from "electron"
+import { app, BrowserWindow, screen, shell, ipcMain, globalShortcut } from "electron"
 import path from "path"
 import fs from "fs"
 import { initializeIpcHandlers } from "./ipcHandlers"
@@ -16,6 +16,8 @@ const isDev = process.env.NODE_ENV === "development"
 const state = {
   // Window management properties
   mainWindow: null as BrowserWindow | null,
+  voiceWindow: null as BrowserWindow | null,
+  pttWindow: null as BrowserWindow | null,
   isWindowVisible: false,
   windowPosition: null as { x: number; y: number } | null,
   windowSize: null as { width: number; height: number } | null,
@@ -50,6 +52,9 @@ const state = {
     DEBUG_ERROR: "debug-error"
   } as const
 }
+
+let pttWindowVisible = false
+let pttWindowPosition: { x: number; y: number } | null = null
 
 // Add interfaces for helper classes
 export interface IProcessingHelperDeps {
@@ -89,6 +94,9 @@ export interface IShortcutsHelperDeps {
 
 export interface IIpcHandlerDeps {
   getMainWindow: () => BrowserWindow | null
+  getVoiceWindow?: () => BrowserWindow | null
+  hidePTTWindow: () => void
+  togglePTTWindow: () => void
   setWindowDimensions: (width: number, height: number) => void
   getScreenshotQueue: () => string[]
   getExtraScreenshotQueue: () => string[]
@@ -366,6 +374,184 @@ async function createWindow(): Promise<void> {
   }
 }
 
+function createVoiceWindow(): void {
+  if (state.voiceWindow && !state.voiceWindow.isDestroyed()) {
+    state.voiceWindow.focus()
+    return
+  }
+
+  const voiceWindow = new BrowserWindow({
+    width: 500,
+    height: 700,
+    minWidth: 420,
+    minHeight: 520,
+    title: "Voice Assistant",
+    alwaysOnTop: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: isDev
+        ? path.join(__dirname, "../dist-electron/preload.js")
+        : path.join(__dirname, "preload.js")
+    },
+    backgroundColor: "#0b0b0b",
+    show: true
+  })
+
+  if (isDev) {
+    voiceWindow.loadURL("http://localhost:54321/#/voice").catch((error) => {
+      console.error("Failed to load voice window in dev:", error)
+    })
+  } else {
+    const indexPath = path.join(__dirname, "../dist/index.html")
+    if (fs.existsSync(indexPath)) {
+      voiceWindow.loadFile(indexPath, { hash: "/voice" })
+    } else {
+      console.error("Could not find index.html for voice window")
+    }
+  }
+
+  voiceWindow.on("closed", () => {
+    state.voiceWindow = null
+  })
+
+  state.voiceWindow = voiceWindow
+}
+
+function createPTTWindow(): void {
+  if (state.pttWindow && !state.pttWindow.isDestroyed()) {
+    state.pttWindow.focus()
+    return
+  }
+
+  const primaryDisplay = screen.getPrimaryDisplay()
+  const workArea = primaryDisplay.workArea
+
+  const pttWidth = 350
+  const pttHeight = 600
+
+  const pttX = workArea.x + workArea.width - pttWidth - 20
+  const pttY = workArea.y + 50
+
+  const windowSettings: Electron.BrowserWindowConstructorOptions = {
+    width: pttWidth,
+    height: pttHeight,
+    x: pttX,
+    y: pttY,
+    alwaysOnTop: true,
+    frame: false,
+    transparent: true,
+    fullscreenable: false,
+    hasShadow: false,
+    backgroundColor: "#00000000",
+    focusable: true,
+    skipTaskbar: true,
+    type: "panel",
+    titleBarStyle: "hidden",
+    movable: true,
+    resizable: false,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: isDev
+        ? path.join(__dirname, "../dist-electron/preload.js")
+        : path.join(__dirname, "preload.js")
+    },
+    show: true
+  }
+
+  state.pttWindow = new BrowserWindow(windowSettings)
+
+  state.pttWindow.setContentProtection(true)
+  state.pttWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  state.pttWindow.setAlwaysOnTop(true, "screen-saver", 1)
+
+  if (process.platform === "darwin") {
+    state.pttWindow.setHiddenInMissionControl(true)
+    state.pttWindow.setWindowButtonVisibility(false)
+    state.pttWindow.setBackgroundColor("#00000000")
+    state.pttWindow.setSkipTaskbar(true)
+    state.pttWindow.setHasShadow(false)
+  }
+
+  if (isDev) {
+    state.pttWindow.loadURL("http://localhost:54321/#/ptt").catch((error) => {
+      console.error("Failed to load ptt window in dev:", error)
+    })
+  } else {
+    const indexPath = path.join(__dirname, "../dist/index.html")
+    if (fs.existsSync(indexPath)) {
+      state.pttWindow.loadFile(indexPath, { hash: "/ptt" })
+    } else {
+      console.error("Could not find index.html for ptt window")
+    }
+  }
+
+  state.pttWindow.on("closed", () => {
+    state.pttWindow = null
+    pttWindowVisible = false
+    pttWindowPosition = null
+  })
+
+  pttWindowVisible = true
+  pttWindowPosition = { x: pttX, y: pttY }
+}
+
+function toggleVoiceWindow(): void {
+  if (state.voiceWindow && !state.voiceWindow.isDestroyed()) {
+    if (state.voiceWindow.isVisible()) {
+      state.voiceWindow.hide()
+    } else {
+      state.voiceWindow.show()
+      state.voiceWindow.focus()
+    }
+    return
+  }
+
+  createVoiceWindow()
+}
+
+function hidePTTWindow(): void {
+  if (!state.pttWindow?.isDestroyed()) {
+    const bounds = state.pttWindow.getBounds()
+    pttWindowPosition = { x: bounds.x, y: bounds.y }
+    state.pttWindow.setIgnoreMouseEvents(true, { forward: true })
+    state.pttWindow.setOpacity(0)
+    pttWindowVisible = false
+  }
+}
+
+function showPTTWindow(): void {
+  if (!state.pttWindow?.isDestroyed()) {
+    if (pttWindowPosition) {
+      state.pttWindow.setPosition(pttWindowPosition.x, pttWindowPosition.y)
+    }
+    state.pttWindow.setIgnoreMouseEvents(false)
+    state.pttWindow.setAlwaysOnTop(true, "screen-saver", 1)
+    state.pttWindow.setVisibleOnAllWorkspaces(true, {
+      visibleOnFullScreen: true
+    })
+    state.pttWindow.setContentProtection(true)
+    state.pttWindow.setOpacity(0)
+    state.pttWindow.showInactive()
+    state.pttWindow.setOpacity(1)
+    pttWindowVisible = true
+  }
+}
+
+function togglePTTWindow(): void {
+  if (state.pttWindow && !state.pttWindow.isDestroyed()) {
+    if (pttWindowVisible) {
+      hidePTTWindow()
+    } else {
+      showPTTWindow()
+    }
+    return
+  }
+
+  createPTTWindow()
+}
+
 function handleWindowMove(): void {
   if (!state.mainWindow) return
   const bounds = state.mainWindow.getBounds()
@@ -537,6 +723,9 @@ async function initializeApp() {
     initializeHelpers()
     initializeIpcHandlers({
       getMainWindow,
+      getVoiceWindow,
+      hidePTTWindow,
+      togglePTTWindow,
       setWindowDimensions,
       getScreenshotQueue,
       getExtraScreenshotQueue,
@@ -565,6 +754,12 @@ async function initializeApp() {
     })
     await createWindow()
     state.shortcutsHelper?.registerGlobalShortcuts()
+    globalShortcut.register("CommandOrControl+Shift+V", () => {
+      toggleVoiceWindow()
+    })
+    globalShortcut.register("CommandOrControl+Shift+P", () => {
+      togglePTTWindow()
+    })
 
     // Initialize auto-updater regardless of environment
     initAutoUpdater()
@@ -619,6 +814,10 @@ app.on("activate", () => {
 // State getter/setter functions
 function getMainWindow(): BrowserWindow | null {
   return state.mainWindow
+}
+
+function getVoiceWindow(): BrowserWindow | null {
+  return state.voiceWindow
 }
 
 function getView(): "queue" | "solutions" | "debug" {
@@ -693,6 +892,12 @@ function getHasDebugged(): boolean {
 export {
   state,
   createWindow,
+  createVoiceWindow,
+  toggleVoiceWindow,
+  createPTTWindow,
+  hidePTTWindow,
+  showPTTWindow,
+  togglePTTWindow,
   hideMainWindow,
   showMainWindow,
   toggleMainWindow,
@@ -700,6 +905,7 @@ export {
   moveWindowHorizontal,
   moveWindowVertical,
   getMainWindow,
+  getVoiceWindow,
   getView,
   setView,
   getScreenshotHelper,

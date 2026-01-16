@@ -5,6 +5,18 @@ import { app } from "electron"
 import { EventEmitter } from "events"
 import axios from "axios"
 
+export interface TranscriptionConfig {
+  enabled: boolean;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  language: string;
+  chunkDurationMs: number;
+  defaultMode: "continuous" | "push-to-talk";
+  pttPrompt: string;
+  sendAudioDirectly: boolean;
+}
+
 interface Config {
   apiKey: string;
   baseUrl: string;
@@ -12,6 +24,7 @@ interface Config {
   language: string;
   interfaceLanguage: string;
   opacity: number;
+  transcription: TranscriptionConfig;
 }
 
 export class ConfigHelper extends EventEmitter {
@@ -22,7 +35,18 @@ export class ConfigHelper extends EventEmitter {
     model: "gpt-4o",
     language: "python",
     interfaceLanguage: "en",
-    opacity: 1.0
+    opacity: 1.0,
+    transcription: {
+      enabled: false,
+      baseUrl: "https://api.openai.com/v1",
+      apiKey: "",
+      model: "whisper-1",
+      language: "ru",
+      chunkDurationMs: 10000,
+      defaultMode: "continuous",
+      pttPrompt: "",
+      sendAudioDirectly: false
+    }
   };
 
   constructor() {
@@ -77,6 +101,9 @@ export class ConfigHelper extends EventEmitter {
       typeof raw.interfaceLanguage === "string" ? raw.interfaceLanguage.trim() : "";
     const interfaceLanguage =
       interfaceLanguageValue === "ru" ? "ru" : this.defaultConfig.interfaceLanguage;
+    const transcription = this.normalizeTranscriptionConfig(
+      (raw.transcription as Partial<TranscriptionConfig> | undefined) || undefined
+    );
 
     return {
       apiKey: typeof raw.apiKey === "string" ? raw.apiKey : this.defaultConfig.apiKey,
@@ -86,7 +113,59 @@ export class ConfigHelper extends EventEmitter {
         ? raw.language
         : this.defaultConfig.language,
       interfaceLanguage,
-      opacity: typeof raw.opacity === "number" ? raw.opacity : this.defaultConfig.opacity
+      opacity: typeof raw.opacity === "number" ? raw.opacity : this.defaultConfig.opacity,
+      transcription
+    };
+  }
+
+  private normalizeTranscriptionConfig(
+    raw?: Partial<TranscriptionConfig>
+  ): TranscriptionConfig {
+    const baseUrlValue =
+      typeof raw?.baseUrl === "string" ? raw.baseUrl : this.defaultConfig.transcription.baseUrl;
+    const normalizedBaseUrl = this.normalizeBaseUrl(baseUrlValue);
+    const rawChunkDuration =
+      typeof raw?.chunkDurationMs === "number"
+        ? raw.chunkDurationMs
+        : typeof raw?.chunkDurationMs === "string"
+          ? Number(raw.chunkDurationMs)
+          : NaN;
+    const chunkDurationMs = Number.isFinite(rawChunkDuration)
+      ? Math.min(30000, Math.max(5000, Math.round(rawChunkDuration)))
+      : this.defaultConfig.transcription.chunkDurationMs;
+    const defaultMode =
+      raw?.defaultMode === "push-to-talk" || raw?.defaultMode === "continuous"
+        ? raw.defaultMode
+        : this.defaultConfig.transcription.defaultMode;
+    const pttPrompt =
+      typeof raw?.pttPrompt === "string"
+        ? raw.pttPrompt
+        : this.defaultConfig.transcription.pttPrompt;
+    const sendAudioDirectly =
+      typeof raw?.sendAudioDirectly === "boolean"
+        ? raw.sendAudioDirectly
+        : this.defaultConfig.transcription.sendAudioDirectly;
+
+    return {
+      enabled:
+        typeof raw?.enabled === "boolean"
+          ? raw.enabled
+          : this.defaultConfig.transcription.enabled,
+      baseUrl: normalizedBaseUrl,
+      apiKey:
+        typeof raw?.apiKey === "string" ? raw.apiKey : this.defaultConfig.transcription.apiKey,
+      model:
+        typeof raw?.model === "string" && raw.model.trim().length > 0
+          ? raw.model
+          : this.defaultConfig.transcription.model,
+      language:
+        typeof raw?.language === "string" && raw.language.trim().length > 0
+          ? raw.language
+          : this.defaultConfig.transcription.language,
+      chunkDurationMs,
+      defaultMode,
+      pttPrompt,
+      sendAudioDirectly
     };
   }
 
@@ -118,6 +197,7 @@ export class ConfigHelper extends EventEmitter {
           !config.baseUrl ||
           !config.model ||
           !config.interfaceLanguage ||
+          !config.transcription ||
           config.apiProvider ||
           config.extractionModel ||
           config.solutionModel ||
@@ -161,7 +241,17 @@ export class ConfigHelper extends EventEmitter {
   public updateConfig(updates: Partial<Config>): Config {
     try {
       const currentConfig = this.loadConfig();
-      const mergedConfig = { ...currentConfig, ...updates };
+      const mergedConfig = {
+        ...currentConfig,
+        ...updates,
+        transcription:
+          updates.transcription || currentConfig.transcription
+            ? {
+                ...currentConfig.transcription,
+                ...(updates.transcription || {})
+              }
+            : currentConfig.transcription
+      };
       const normalizedConfig = this.normalizeConfig(mergedConfig);
       this.saveConfig(normalizedConfig);
 
@@ -219,6 +309,27 @@ export class ConfigHelper extends EventEmitter {
   public hasApiKey(): boolean {
     const config = this.loadConfig();
     return !!config.apiKey && config.apiKey.trim().length > 0;
+  }
+
+  public getTranscriptionConfig(): TranscriptionConfig {
+    const config = this.loadConfig();
+    return config.transcription;
+  }
+
+  public updateTranscriptionConfig(
+    updates: Partial<TranscriptionConfig>
+  ): TranscriptionConfig {
+    const currentConfig = this.loadConfig();
+    const merged = {
+      ...currentConfig,
+      transcription: {
+        ...currentConfig.transcription,
+        ...updates
+      }
+    };
+    const normalized = this.normalizeConfig(merged);
+    this.saveConfig(normalized);
+    return normalized.transcription;
   }
 
   /**

@@ -7,12 +7,14 @@ from typing import Dict, List
 from uuid import UUID
 
 from domain.entities.vacancy_test import VacancyTest
+from domain.interfaces.unit_of_work_aware_port import UnitOfWorkAwarePort
 
 
-class VacancyTestAgentServicePort(ABC):
+class VacancyTestAgentServicePort(UnitOfWorkAwarePort, ABC):
     """Порт сервиса агента для генерации ответов на тест вакансии.
 
     Инфраструктура должна реализовать этот интерфейс.
+    Наследует UnitOfWorkAwarePort для поддержки логирования через UnitOfWork.
     """
 
     @abstractmethod

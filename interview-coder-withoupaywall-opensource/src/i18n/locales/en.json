@@ -84,6 +84,20 @@
     "apiKeyStoredNote": "Your API key is stored locally and only sent to the Base URL you provide.",
     "currentKey": "Current:",
     "interfaceLanguage": "Interface Language",
+    "transcription": {
+      "title": "Voice Transcription",
+      "enabled": "Enable transcription",
+      "baseUrl": "Transcription Base URL",
+      "model": "Transcription Model",
+      "language": "Transcription Language",
+      "apiKey": "Transcription API Key",
+      "defaultMode": "Default Voice Mode",
+      "pttPrompt": "Push-to-Talk System Prompt",
+      "pttPromptPlaceholder": "Optional instructions for the push-to-talk response.",
+      "chunkDuration": "Chunk Duration (ms)",
+      "chunkDurationHint": "Use 5000-30000 ms for stable transcription.",
+      "testConnection": "Test Transcription"
+    },
     "testConnection": "Test Connection",
     "save": "Save Settings",
     "cancel": "Cancel",
@@ -132,6 +146,7 @@
     "settingsSaved": "Settings saved successfully",
     "loggedOut": "Logged out successfully",
     "connectionVerified": "Connection verified successfully",
+    "transcriptionConnectionVerified": "Transcription connection verified successfully",
     "resetAppData": "Cache and config cleared"
   },
   "shortcuts": {
@@ -140,6 +155,7 @@
     "deleteScreenshot": "Delete Last Screenshot",
     "processScreenshots": "Process Screenshots",
     "resetView": "Reset View",
+    "voiceAssistant": "Voice Assistant",
     "quitApp": "Quit App",
     "moveWindow": "Move Window",
     "decreaseOpacity": "Decrease Opacity",
@@ -165,5 +181,27 @@
     "send": "Send",
     "thinking": "Thinking...",
     "error": "Failed to send message"
+  },
+  "voice": {
+    "mode": {
+      "continuous": "Continuous Recording",
+      "pushToTalk": "Push-to-Talk"
+    },
+    "ptt": {
+      "startRecording": "Start Recording",
+      "stopAndProcess": "Stop & Process",
+      "processing": "Processing...",
+      "recording": "Recording",
+      "extracting": "Extracting audio...",
+      "transcribing": "Transcribing...",
+      "thinking": "Thinking...",
+      "idle": "Ready",
+      "sendLast": "Send last {{minutes}} min",
+      "transcription": "Transcription",
+      "sendDirectly": "Send audio directly to LLM",
+      "sendDirectlyHint": "Skip transcription, send audio directly (requires model with audio support)",
+      "context": "Context",
+      "contextPlaceholder": "Enter additional context or system prompt..."
+    }
   }
 }

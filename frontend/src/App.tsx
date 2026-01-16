@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
+import { OfferPage } from './pages/OfferPage';
 import { ResumesListPage } from './pages/ResumesListPage';
 import { ResumeDetailPage } from './pages/ResumeDetailPage';
 import { ResumeAutolikePage } from './pages/ResumeAutolikePage';
@@ -60,6 +61,9 @@ function App() {
       <Routes>
         {/* Landing page - публичная */}
         <Route path="/" element={<LandingPage />} />
+        
+        {/* Public pages */}
+        <Route path="/offer" element={<OfferPage />} />
         
         {/* Auth pages */}
         <Route path="/login" element={<LoginPage />} />

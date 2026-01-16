@@ -6,9 +6,37 @@ import path from "node:path"
 import { randomBytes } from "crypto"
 import { IIpcHandlerDeps } from "./main"
 import { configHelper } from "./ConfigHelper"
+import { TranscriptionHelper } from "./TranscriptionHelper"
+import { TranscriptionQueue } from "./TranscriptionQueue"
 
 export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
   console.log("Initializing IPC handlers")
+  const transcriptionHelper = new TranscriptionHelper(() =>
+    configHelper.getTranscriptionConfig()
+  )
+  const transcriptionQueue = new TranscriptionQueue((job) =>
+    transcriptionHelper.transcribe(job.buffer, { mimeType: job.mimeType })
+  )
+  let isRecording = false
+
+  const sendToVoiceWindow = (channel: string, payload: any) => {
+    const voiceWindow = deps.getVoiceWindow?.()
+    const targetWindow =
+      voiceWindow && !voiceWindow.isDestroyed()
+        ? voiceWindow
+        : deps.getMainWindow()
+    if (targetWindow && !targetWindow.isDestroyed()) {
+      targetWindow.webContents.send(channel, payload)
+    }
+  }
+
+  transcriptionQueue.onTranscriptionReady = (payload) => {
+    sendToVoiceWindow("voice:transcription-ready", payload)
+  }
+
+  transcriptionQueue.onTranscriptionError = (payload) => {
+    sendToVoiceWindow("voice:transcription-error", payload)
+  }
 
   // Configuration handlers
   ipcMain.handle("get-config", () => {
@@ -44,6 +72,148 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
     const result = await configHelper.testApiKey(apiKey, baseUrl, model);
     return result;
+  })
+
+  // Voice recording handlers
+  ipcMain.handle("voice:start-recording", () => {
+    isRecording = true
+    return { success: true }
+  })
+
+  ipcMain.handle("voice:stop-recording", () => {
+    isRecording = false
+    return { success: true }
+  })
+
+  ipcMain.handle("voice:get-recording-status", () => {
+    return { isRecording }
+  })
+
+  ipcMain.handle("voice:enqueue-chunk", async (_event, payload) => {
+    // #region agent log
+    const logPath = '/Users/apple/dev/hh/.cursor/debug.log';
+    try {
+      const logEntry = JSON.stringify({location:'ipcHandlers.ts:92',message:'enqueue-chunk handler entry',data:{hasPayload:!!payload,hasAudioData:!!payload?.audioData,audioDataSize:payload?.audioData?.byteLength||0,mimeType:payload?.mimeType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n';
+      fs.appendFileSync(logPath, logEntry);
+    } catch (logErr) {
+      console.error('Failed to write log:', logErr);
+    }
+    // #endregion
+    if (!payload || !payload.audioData) {
+      // #region agent log
+      try {
+        const logEntry2 = JSON.stringify({location:'ipcHandlers.ts:96',message:'enqueue-chunk rejected - missing payload',data:{hasPayload:!!payload,hasAudioData:!!payload?.audioData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})+'\n';
+        fs.appendFileSync(logPath, logEntry2);
+      } catch (logErr) {
+        console.error('Failed to write log:', logErr);
+      }
+      // #endregion
+      return { success: false, error: "Missing audio payload." }
+    }
+    const timestamp =
+      typeof payload.timestamp === "number" ? payload.timestamp : Date.now()
+    const mimeType =
+      typeof payload.mimeType === "string" ? payload.mimeType : undefined
+    const buffer = Buffer.from(payload.audioData)
+    // #region agent log
+    try {
+      const logEntry3 = JSON.stringify({location:'ipcHandlers.ts:103',message:'buffer created and enqueued',data:{bufferLength:buffer.length,originalSize:payload.audioData?.byteLength||0,mimeType:mimeType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n';
+      fs.appendFileSync(logPath, logEntry3);
+    } catch (logErr) {
+      console.error('Failed to write log:', logErr);
+    }
+    // #endregion
+    transcriptionQueue.enqueue({ buffer, timestamp, mimeType })
+    return { success: true }
+  })
+
+  ipcMain.handle("voice:transcribe-chunk", async (_event, payload) => {
+    if (!payload || !payload.audioData) {
+      return { success: false, error: "Missing audio payload." }
+    }
+    const buffer = Buffer.from(payload.audioData)
+    const mimeType =
+      typeof payload.mimeType === "string" ? payload.mimeType : undefined
+    return transcriptionHelper.transcribe(buffer, { mimeType })
+  })
+
+  ipcMain.handle("voice:transcribe-full", async (_event, payload) => {
+    if (!payload || !payload.audioData) {
+      return { success: false, error: "Missing audio payload." }
+    }
+    const buffer = Buffer.from(payload.audioData)
+    const mimeType =
+      typeof payload.mimeType === "string" ? payload.mimeType : undefined
+    const result = await transcriptionHelper.transcribe(buffer, { mimeType })
+    return { text: result.text }
+  })
+
+  ipcMain.handle("voice:get-config", () => {
+    return configHelper.getTranscriptionConfig()
+  })
+
+  ipcMain.handle("voice:update-config", async (_event, config) => {
+    return configHelper.updateTranscriptionConfig(config || {})
+  })
+
+  ipcMain.handle("voice:validate-config", async (_event, config) => {
+    const resolvedConfig = config || configHelper.getTranscriptionConfig()
+    return transcriptionHelper.validateConfig(resolvedConfig)
+  })
+
+  ipcMain.handle("voice:process-query", async (_event, payload) => {
+    if (!deps.processingHelper) {
+      return { success: false, error: "Processing helper not available." }
+    }
+    const { chunks, question, systemPrompt } = payload || {}
+    try {
+      const response = await deps.processingHelper.processVoiceQuery(
+        chunks || [],
+        question,
+        systemPrompt
+      )
+      return { success: true, response }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message || "Failed to process voice query."
+      }
+    }
+  })
+
+  ipcMain.handle("voice:process-audio-directly", async (_event, payload) => {
+    if (!deps.processingHelper) {
+      return { success: false, error: "Processing helper not available." }
+    }
+    const { audioData, mimeType, systemPrompt } = payload || {}
+
+    if (!audioData) {
+      return { success: false, error: "Missing audio data." }
+    }
+
+    try {
+      // Конвертируем ArrayBuffer в base64
+      const buffer = Buffer.from(audioData)
+      const audioBase64 = buffer.toString("base64")
+
+      // Определяем формат из mimeType
+      let format = "webm"
+      if (mimeType?.includes("wav")) format = "wav"
+      else if (mimeType?.includes("mp3")) format = "mp3"
+      else if (mimeType?.includes("ogg")) format = "ogg"
+
+      const response = await deps.processingHelper.processVoiceQueryWithAudio(
+        audioBase64,
+        format,
+        systemPrompt
+      )
+      return { success: true, response }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error?.message || "Failed to process audio directly."
+      }
+    }
   })
 
   // Credits handlers
@@ -229,6 +399,16 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
     } catch (error) {
       console.error("Error toggling window:", error)
       return { error: "Failed to toggle window" }
+    }
+  })
+
+  ipcMain.handle("ptt:hide", () => {
+    try {
+      deps.hidePTTWindow()
+      return { success: true }
+    } catch (error) {
+      console.error("Error hiding ptt window:", error)
+      return { success: false, error: "Failed to hide ptt window" }
     }
   })
 

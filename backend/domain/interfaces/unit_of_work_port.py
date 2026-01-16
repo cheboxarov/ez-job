@@ -39,6 +39,9 @@ from domain.interfaces.user_automation_settings_repository_port import (
 from domain.interfaces.resume_evaluation_repository_port import (
     ResumeEvaluationRepositoryPort,
 )
+from domain.interfaces.resume_to_vacancy_match_repository_port import (
+    ResumeToVacancyMatchRepositoryPort,
+)
 
 
 class UnitOfWorkPort(ABC):
@@ -116,6 +119,11 @@ class UnitOfWorkPort(ABC):
     @abstractmethod
     def resume_evaluation_repository(self) -> ResumeEvaluationRepositoryPort:
         """Получить репозиторий оценок резюме."""
+
+    @property
+    @abstractmethod
+    def resume_to_vacancy_match_repository(self) -> ResumeToVacancyMatchRepositoryPort:
+        """Получить репозиторий мэтчей резюме с вакансиями."""
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWorkPort":

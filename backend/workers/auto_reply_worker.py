@@ -25,6 +25,7 @@ from infrastructure.agents.cover_letter_generator_agent import CoverLetterGenera
 from infrastructure.agents.vacancy_test_agent import VacancyTestAgent
 from infrastructure.clients.hh_client import RateLimitedHHHttpClient
 from application.factories.database_factory import create_unit_of_work
+from application.factories.event_factory import create_event_publisher
 from application.factories.search_and_get_filtered_vacancy_list_factory import (
     create_search_and_get_filtered_vacancy_list_usecase,
 )
@@ -94,6 +95,7 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
     # Создаем зависимости, которые не требуют UnitOfWork
     hh_client = RateLimitedHHHttpClient(base_url=config.hh.base_url)
     respond_to_vacancy_uc = RespondToVacancyUseCase(hh_client)
+    event_publisher = create_event_publisher(config)
 
     # Фабрика для создания use case с unit_of_work (будет создаваться внутри контекста)
     def create_search_and_get_filtered_vacancy_list_usecase_with_uow(uow):
@@ -143,9 +145,10 @@ async def run_worker(config: AppConfig, shutdown_event: asyncio.Event | None = N
                     respond_to_vacancy_uc=respond_to_vacancy_uc,
                     hh_client=hh_client,
                     generate_test_answers_uc=generate_test_answers_uc,
+                    event_publisher=event_publisher,
+                    standalone_cookies_uow_factory=lambda: create_unit_of_work(config.database),
                     max_vacancies_per_resume=200,
                     delay_between_replies_seconds=30,
-                    database_config=config.database,  # Для создания standalone репозитория обновления cookies
                 )
                 
                 # Обрабатываем только это резюме

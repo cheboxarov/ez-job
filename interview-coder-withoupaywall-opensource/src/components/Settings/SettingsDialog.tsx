@@ -23,8 +23,17 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const [baseUrl, setBaseUrl] = useState("");
   const [model, setModel] = useState("");
   const [interfaceLanguage, setInterfaceLanguage] = useState("en");
+  const [transcriptionEnabled, setTranscriptionEnabled] = useState(false);
+  const [transcriptionBaseUrl, setTranscriptionBaseUrl] = useState("");
+  const [transcriptionApiKey, setTranscriptionApiKey] = useState("");
+  const [transcriptionModel, setTranscriptionModel] = useState("");
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState("ru");
+  const [transcriptionChunkDurationMs, setTranscriptionChunkDurationMs] = useState(10000);
+  const [transcriptionDefaultMode, setTranscriptionDefaultMode] = useState<"continuous" | "push-to-talk">("continuous");
+  const [transcriptionPttPrompt, setTranscriptionPttPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingTranscription, setIsTestingTranscription] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const { showToast } = useToast();
   const { t, i18n } = useTranslation();
@@ -54,6 +63,16 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
         baseUrl?: string;
         model?: string;
         interfaceLanguage?: string;
+        transcription?: {
+          enabled?: boolean;
+          baseUrl?: string;
+          apiKey?: string;
+          model?: string;
+          language?: string;
+          chunkDurationMs?: number;
+          defaultMode?: "continuous" | "push-to-talk";
+          pttPrompt?: string;
+        };
       }
 
       window.electronAPI
@@ -63,6 +82,22 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
           setBaseUrl(config.baseUrl || "https://api.openai.com/v1");
           setModel(config.model || "gpt-4o");
           setInterfaceLanguage(config.interfaceLanguage || "en");
+          setTranscriptionEnabled(!!config.transcription?.enabled);
+          setTranscriptionBaseUrl(
+            config.transcription?.baseUrl || "https://api.openai.com/v1"
+          );
+          setTranscriptionApiKey(config.transcription?.apiKey || "");
+          setTranscriptionModel(config.transcription?.model || "whisper-1");
+          setTranscriptionLanguage(config.transcription?.language || "ru");
+          setTranscriptionChunkDurationMs(
+            config.transcription?.chunkDurationMs || 10000
+          );
+          setTranscriptionDefaultMode(
+            config.transcription?.defaultMode === "push-to-talk"
+              ? "push-to-talk"
+              : "continuous"
+          );
+          setTranscriptionPttPrompt(config.transcription?.pttPrompt || "");
         })
         .catch((error: unknown) => {
           console.error("Failed to load config:", error);
@@ -77,11 +112,46 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
   const handleSave = async () => {
     setIsLoading(true);
     try {
+      if (transcriptionEnabled) {
+        if (
+          !transcriptionBaseUrl.trim() ||
+          !transcriptionApiKey.trim() ||
+          !transcriptionModel.trim() ||
+          !transcriptionLanguage.trim()
+        ) {
+          showToast(
+            t("errors.missingInfoTitle"),
+            t("errors.missingInfo"),
+            "error"
+          );
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const rawDuration = Number.isFinite(transcriptionChunkDurationMs)
+        ? transcriptionChunkDurationMs
+        : 10000;
+      const normalizedChunkDuration = Math.min(
+        30000,
+        Math.max(5000, Math.round(rawDuration))
+      );
+
       const result = await window.electronAPI.updateConfig({
         apiKey,
         baseUrl,
         model,
-        interfaceLanguage
+        interfaceLanguage,
+        transcription: {
+          enabled: transcriptionEnabled,
+          baseUrl: transcriptionBaseUrl,
+          apiKey: transcriptionApiKey,
+          model: transcriptionModel,
+          language: transcriptionLanguage,
+          chunkDurationMs: normalizedChunkDuration,
+          defaultMode: transcriptionDefaultMode,
+          pttPrompt: transcriptionPttPrompt
+        }
       });
 
       if (result) {
@@ -144,6 +214,65 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
       );
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleTestTranscription = async () => {
+    if (
+      !transcriptionBaseUrl.trim() ||
+      !transcriptionApiKey.trim() ||
+      !transcriptionModel.trim() ||
+      !transcriptionLanguage.trim()
+    ) {
+      showToast(
+        t("errors.missingInfoTitle"),
+        t("errors.missingInfo"),
+        "error"
+      );
+      return;
+    }
+
+    setIsTestingTranscription(true);
+    try {
+      const rawDuration = Number.isFinite(transcriptionChunkDurationMs)
+        ? transcriptionChunkDurationMs
+        : 10000;
+      const normalizedChunkDuration = Math.min(
+        30000,
+        Math.max(5000, Math.round(rawDuration))
+      );
+      const result = await window.electronAPI.voice.validateConfig({
+        enabled: transcriptionEnabled,
+        baseUrl: transcriptionBaseUrl,
+        apiKey: transcriptionApiKey,
+        model: transcriptionModel,
+        language: transcriptionLanguage,
+        chunkDurationMs: normalizedChunkDuration,
+        defaultMode: transcriptionDefaultMode,
+        pttPrompt: transcriptionPttPrompt
+      });
+      if (result.valid) {
+        showToast(
+          t("common.successTitle"),
+          t("success.transcriptionConnectionVerified"),
+          "success"
+        );
+      } else {
+        showToast(
+          t("errors.connectionFailedTitle"),
+          result.error || t("errors.connectionFailed"),
+          "error"
+        );
+      }
+    } catch (error) {
+      console.error("Failed to validate transcription config:", error);
+      showToast(
+        t("common.errorTitle"),
+        t("errors.connectionFailed"),
+        "error"
+      );
+    } finally {
+      setIsTestingTranscription(false);
     }
   };
 
@@ -295,6 +424,160 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
 
           <div className="space-y-2 mt-4">
             <label className="text-sm font-medium text-white mb-2 block">
+              {t("settings.transcription.title")}
+            </label>
+            <div className="bg-black/30 border border-white/10 rounded-lg p-4 space-y-4">
+              <label className="flex items-center gap-2 text-sm text-white">
+                <input
+                  type="checkbox"
+                  checked={transcriptionEnabled}
+                  onChange={(event) => setTranscriptionEnabled(event.target.checked)}
+                  className="h-4 w-4 accent-white/90"
+                />
+                {t("settings.transcription.enabled")}
+              </label>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionBaseUrl">
+                  {t("settings.transcription.baseUrl")}
+                </label>
+                <Input
+                  id="transcriptionBaseUrl"
+                  type="text"
+                  value={transcriptionBaseUrl}
+                  onChange={(e) => setTranscriptionBaseUrl(e.target.value)}
+                  placeholder="https://api.openai.com/v1"
+                  className="bg-black/50 border-white/10 text-white"
+                  disabled={!transcriptionEnabled}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionModel">
+                  {t("settings.transcription.model")}
+                </label>
+                <Input
+                  id="transcriptionModel"
+                  type="text"
+                  value={transcriptionModel}
+                  onChange={(e) => setTranscriptionModel(e.target.value)}
+                  placeholder="whisper-1"
+                  className="bg-black/50 border-white/10 text-white"
+                  disabled={!transcriptionEnabled}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionLanguage">
+                  {t("settings.transcription.language")}
+                </label>
+                <Input
+                  id="transcriptionLanguage"
+                  type="text"
+                  value={transcriptionLanguage}
+                  onChange={(e) => setTranscriptionLanguage(e.target.value)}
+                  placeholder="ru"
+                  className="bg-black/50 border-white/10 text-white"
+                  disabled={!transcriptionEnabled}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionApiKey">
+                  {t("settings.transcription.apiKey")}
+                </label>
+                <Input
+                  id="transcriptionApiKey"
+                  type="password"
+                  value={transcriptionApiKey}
+                  onChange={(e) => setTranscriptionApiKey(e.target.value)}
+                  placeholder={t("settings.apiKeyPlaceholder")}
+                  className="bg-black/50 border-white/10 text-white"
+                  disabled={!transcriptionEnabled}
+                />
+                {transcriptionApiKey && (
+                  <p className="text-xs text-white/50">
+                    {t("settings.currentKey")} {maskApiKey(transcriptionApiKey)}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionDefaultMode">
+                  {t("settings.transcription.defaultMode")}
+                </label>
+                <select
+                  id="transcriptionDefaultMode"
+                  value={transcriptionDefaultMode}
+                  onChange={(e) =>
+                    setTranscriptionDefaultMode(
+                      e.target.value === "push-to-talk" ? "push-to-talk" : "continuous"
+                    )
+                  }
+                  className="bg-black/50 border border-white/10 text-white rounded-md px-3 py-2 text-sm outline-none focus:border-white/20 w-full"
+                  disabled={!transcriptionEnabled}
+                >
+                  <option value="continuous" className="bg-black text-white">
+                    {t("voice.mode.continuous")}
+                  </option>
+                  <option value="push-to-talk" className="bg-black text-white">
+                    {t("voice.mode.pushToTalk")}
+                  </option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionPttPrompt">
+                  {t("settings.transcription.pttPrompt")}
+                </label>
+                <textarea
+                  id="transcriptionPttPrompt"
+                  value={transcriptionPttPrompt}
+                  onChange={(e) => setTranscriptionPttPrompt(e.target.value)}
+                  placeholder={t("settings.transcription.pttPromptPlaceholder")}
+                  className="min-h-[90px] w-full rounded-md border border-white/10 bg-black/50 px-3 py-2 text-sm text-white outline-none focus:border-white/20"
+                  disabled={!transcriptionEnabled}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs text-white/70" htmlFor="transcriptionChunkDuration">
+                  {t("settings.transcription.chunkDuration")}
+                </label>
+                <Input
+                  id="transcriptionChunkDuration"
+                  type="number"
+                  value={transcriptionChunkDurationMs}
+                  min={5000}
+                  max={30000}
+                  step={1000}
+                  onChange={(e) => {
+                    const value = Number(e.target.value)
+                    setTranscriptionChunkDurationMs(Number.isFinite(value) ? value : 0)
+                  }}
+                  className="bg-black/50 border-white/10 text-white"
+                  disabled={!transcriptionEnabled}
+                />
+                <p className="text-xs text-white/50">
+                  {t("settings.transcription.chunkDurationHint")}
+                </p>
+              </div>
+
+              <Button
+                variant="outline"
+                onClick={handleTestTranscription}
+                className="w-full border-white/10 text-white"
+                disabled={!transcriptionEnabled || isTestingTranscription}
+              >
+                {isTestingTranscription
+                  ? t("settings.testing")
+                  : t("settings.transcription.testConnection")}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2 mt-4">
+            <label className="text-sm font-medium text-white mb-2 block">
               {t("settings.maintenance")}
             </label>
             <div className="bg-black/30 border border-white/10 rounded-lg p-3 space-y-2">
@@ -332,6 +615,9 @@ export function SettingsDialog({ open: externalOpen, onOpenChange }: SettingsDia
 
                 <div className="text-white/70">{t("shortcuts.resetView")}</div>
                 <div className="text-white/90 font-mono">Ctrl+R / Cmd+R</div>
+
+                <div className="text-white/70">{t("shortcuts.voiceAssistant")}</div>
+                <div className="text-white/90 font-mono">Ctrl+Shift+V / Cmd+Shift+V</div>
 
                 <div className="text-white/70">{t("shortcuts.quitApp")}</div>
                 <div className="text-white/90 font-mono">Ctrl+Q / Cmd+Q</div>

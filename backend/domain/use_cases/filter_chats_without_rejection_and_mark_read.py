@@ -133,8 +133,6 @@ class FilterChatsWithoutRejectionAndMarkReadUseCase:
                     message_id=message_id,
                     headers=headers,
                     cookies=cookies,
-                    user_id=user_id,
-                    update_cookies_uc=update_cookies_uc,
                 )
                 logger.debug(
                     f"Успешно помечено как прочитанное: chat_id={chat_id}, message_id={message_id}"

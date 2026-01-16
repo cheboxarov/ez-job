@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Dict, List, Optional
-from uuid import UUID
+from typing import Dict, List
 
 from domain.entities.resume_filter_settings import ResumeFilterSettings
 from domain.entities.vacancy_detail import VacancyDetail
 from domain.interfaces.hh_client_port import HHClientPort
-from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
-from infrastructure.clients.hh_client_with_cookie_update import HHHttpClientWithCookieUpdate
 
 
 class FetchVacanciesUseCase:
@@ -19,6 +16,13 @@ class FetchVacanciesUseCase:
     """
 
     def __init__(self, hh_client: HHClientPort, max_vacancies: int = 50) -> None:
+        """Инициализация use case.
+
+        Args:
+            hh_client: Клиент для работы с HeadHunter API.
+                      Может быть обычным клиентом или клиентом с автообновлением cookies.
+            max_vacancies: Максимальное количество вакансий для загрузки.
+        """
         self._hh_client = hh_client
         self._max_vacancies = max_vacancies
 
@@ -32,14 +36,8 @@ class FetchVacanciesUseCase:
         page: str,
         search_session_id: str,
         order_by: str | None = None,
-        user_id: Optional[UUID] = None,
-        update_cookies_uc: Optional[UpdateUserHhAuthCookiesUseCase] = None,
     ) -> List[VacancyDetail]:
-        # Если передан user_id и update_cookies_uc, используем обертку для автоматического сохранения cookies
-        if user_id and update_cookies_uc:
-            client = HHHttpClientWithCookieUpdate(self._hh_client, user_id, update_cookies_uc)
-        else:
-            client = self._hh_client
+        client = self._hh_client
 
         # Собираем query из явных аргументов.
         # Для публичного API используем только поддерживаемые фильтры.

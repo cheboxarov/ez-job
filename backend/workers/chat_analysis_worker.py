@@ -123,8 +123,6 @@ async def process_chats_cycle(config: AppConfig) -> None:
                 chat_list: HHListChat = await fetch_user_chats_uc.execute(
                     headers=auth_data.headers,
                     cookies=auth_data.cookies,
-                    user_id=user.id,
-                    update_cookies_uc=update_cookies_uc,
                 )
                 
                 logger.info(f"Получено чатов: {len(chat_list.items)}")
@@ -162,8 +160,6 @@ async def process_chats_cycle(config: AppConfig) -> None:
                     chat_ids=chat_ids,
                     headers=auth_data.headers,
                     cookies=auth_data.cookies,
-                    user_id=user.id,
-                    update_cookies_uc=update_cookies_uc,
                 )
                 logger.info(f"Получено детальной информации о чатах: {len(chats_details)}")
             except Exception as exc:
@@ -384,8 +380,6 @@ async def process_chats_cycle(config: AppConfig) -> None:
                                         message_id=message_id,
                                         headers=auth_data.headers,
                                         cookies=auth_data.cookies,
-                                        user_id=user.id,
-                                        update_cookies_uc=update_cookies_uc,
                                     )
                                     logger.debug(
                                         f"Успешно помечено как прочитанное: "

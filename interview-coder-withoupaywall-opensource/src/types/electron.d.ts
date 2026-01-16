@@ -61,6 +61,16 @@ export interface ElectronAPI {
     language: string;
     interfaceLanguage: string;
     opacity: number;
+    transcription: {
+      enabled: boolean;
+      baseUrl: string;
+      apiKey: string;
+      model: string;
+      language: string;
+      chunkDurationMs: number;
+      defaultMode: "continuous" | "push-to-talk";
+      pttPrompt: string;
+    };
   }>
   updateConfig: (config: {
     apiKey?: string;
@@ -69,6 +79,16 @@ export interface ElectronAPI {
     language?: string;
     interfaceLanguage?: string;
     opacity?: number;
+    transcription?: {
+      enabled?: boolean;
+      baseUrl?: string;
+      apiKey?: string;
+      model?: string;
+      language?: string;
+      chunkDurationMs?: number;
+      defaultMode?: "continuous" | "push-to-talk";
+      pttPrompt?: string;
+    };
   }) => Promise<{
     apiKey: string;
     baseUrl: string;
@@ -76,6 +96,16 @@ export interface ElectronAPI {
     language: string;
     interfaceLanguage: string;
     opacity: number;
+    transcription: {
+      enabled: boolean;
+      baseUrl: string;
+      apiKey: string;
+      model: string;
+      language: string;
+      chunkDurationMs: number;
+      defaultMode: "continuous" | "push-to-talk";
+      pttPrompt: string;
+    };
   }>
   checkApiKey: () => Promise<boolean>
   validateApiKey: (config: {
@@ -88,6 +118,79 @@ export interface ElectronAPI {
   onApiKeyInvalid: (callback: () => void) => () => void
   removeListener: (eventName: string, callback: (...args: any[]) => void) => void
   sendChatMessage: (message: string, solutionData?: string) => Promise<{ success: boolean; response?: string; error?: string }>
+  ptt: {
+    hide: () => Promise<{ success: boolean; error?: string }>
+  }
+  voice: {
+    startRecording: () => Promise<{ success: boolean }>
+    stopRecording: () => Promise<{ success: boolean }>
+    getRecordingStatus: () => Promise<{ isRecording: boolean }>
+    enqueueChunk: (payload: {
+      audioData: ArrayBuffer
+      timestamp: number
+      mimeType?: string
+    }) => Promise<{ success: boolean; error?: string }>
+    transcribeChunk: (payload: {
+      audioData: ArrayBuffer
+      mimeType?: string
+    }) => Promise<any>
+    processQuery: (payload: {
+      chunks: Array<{ text: string; timestamp: number }>
+      question?: string
+      systemPrompt?: string
+    }) => Promise<{ success: boolean; response?: string; error?: string }>
+    getConfig: () => Promise<{
+      enabled: boolean
+      baseUrl: string
+      apiKey: string
+      model: string
+      language: string
+      chunkDurationMs: number
+      defaultMode: "continuous" | "push-to-talk"
+      pttPrompt: string
+    }>
+    updateConfig: (config: {
+      enabled?: boolean
+      baseUrl?: string
+      apiKey?: string
+      model?: string
+      language?: string
+      chunkDurationMs?: number
+      defaultMode?: "continuous" | "push-to-talk"
+      pttPrompt?: string
+    }) => Promise<{
+      enabled: boolean
+      baseUrl: string
+      apiKey: string
+      model: string
+      language: string
+      chunkDurationMs: number
+      defaultMode: "continuous" | "push-to-talk"
+      pttPrompt: string
+    }>
+    validateConfig: (config: {
+      enabled: boolean
+      baseUrl: string
+      apiKey: string
+      model: string
+      language: string
+      chunkDurationMs: number
+      defaultMode: "continuous" | "push-to-talk"
+      pttPrompt: string
+    }) => Promise<{ valid: boolean; error?: string }>
+    getDesktopSources: () => Promise<Array<{ id: string; name: string }>>
+    onTranscriptionReady: (callback: (data: any) => void) => () => void
+    onTranscriptionError: (callback: (data: any) => void) => () => void
+    transcribeFull: (payload: {
+      audioData: ArrayBuffer
+      mimeType?: string
+    }) => Promise<{ text: string }>
+    processAudioDirectly: (data: {
+      audioData: ArrayBuffer
+      mimeType: string
+      systemPrompt?: string
+    }) => Promise<{ success: boolean; response?: string; error?: string }>
+  }
 }
 
 declare global {

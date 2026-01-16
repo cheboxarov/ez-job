@@ -55,8 +55,6 @@ class GetFilteredVacancyListUseCase:
             search_session_id=search_session_id,
             resume_hash=resume_hash,
             order_by=order_by,
-            user_id=user_id,
-            update_cookies_uc=update_cookies_uc,
         )
 
         # 2. Фильтруем их через use case с кэшированием

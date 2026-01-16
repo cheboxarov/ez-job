@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
-from uuid import UUID
+from typing import Any, Dict, List
 
 from loguru import logger
 
 from domain.interfaces.hh_client_port import HHClientPort
-from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
-from infrastructure.clients.hh_client_with_cookie_update import HHHttpClientWithCookieUpdate
 
 
 class RespondToVacancyUseCase:
@@ -26,6 +23,7 @@ class RespondToVacancyUseCase:
 
         Args:
             hh_client: Клиент для работы с HeadHunter API.
+                      Может быть обычным клиентом или клиентом с автообновлением cookies.
         """
         self._hh_client = hh_client
 
@@ -38,8 +36,6 @@ class RespondToVacancyUseCase:
         cookies: Dict[str, str],
         letter: str = "1",
         internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
-        user_id: Optional[UUID] = None,
-        update_cookies_uc: Optional[UpdateUserHhAuthCookiesUseCase] = None,
         test_answers: Dict[str, str | List[str]] | None = None,
         test_metadata: Dict[str, str] | None = None,
     ) -> Dict[str, Any]:
@@ -52,8 +48,6 @@ class RespondToVacancyUseCase:
             cookies: HTTP cookies для запроса к HH API.
             letter: Текст сопроводительного письма (по умолчанию "1").
             internal_api_base_url: Базовый URL внутреннего API HH.
-            user_id: UUID пользователя для обновления cookies (опционально).
-            update_cookies_uc: Use case для обновления cookies (опционально).
             test_answers: Ответы на вопросы теста (ключ - field_name, значение - ответ).
             test_metadata: Метаданные теста (uidPk, guid, startTime, testRequired).
 
@@ -63,13 +57,8 @@ class RespondToVacancyUseCase:
         Raises:
             Exception: При ошибках выполнения запроса к HH API.
         """
-        # Если передан user_id и update_cookies_uc, используем обертку для автоматического сохранения cookies
-        if user_id and update_cookies_uc:
-            client = HHHttpClientWithCookieUpdate(self._hh_client, user_id, update_cookies_uc)
-        else:
-            client = self._hh_client
         try:
-            result = await client.respond_to_vacancy(
+            result = await self._hh_client.respond_to_vacancy(
                 vacancy_id=vacancy_id,
                 resume_hash=resume_hash,
                 headers=headers,

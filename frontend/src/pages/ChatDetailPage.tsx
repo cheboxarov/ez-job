@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Typography, Spin, Alert, Button, Input } from 'antd';
-import { MessageOutlined, SendOutlined } from '@ant-design/icons';
+import { MessageOutlined, SendOutlined, LinkOutlined } from '@ant-design/icons';
 import { getChat, sendChatMessage } from '../api/chats';
 import { getAgentActions } from '../api/agentActions';
 import { ActionCard } from '../components/ActionCard';
@@ -110,6 +110,23 @@ export const ChatDetailPage = () => {
     return message.participant_id === chat.current_participant_id;
   };
 
+  // Извлечение vacancy_id из resources
+  const vacancyId = useMemo(() => {
+    return chat?.resources?.VACANCY?.[0] || null;
+  }, [chat?.resources]);
+
+  // Формирование ссылки на вакансию
+  const vacancyUrl = useMemo(() => {
+    return vacancyId ? `https://hh.ru/vacancy/${vacancyId}` : null;
+  }, [vacancyId]);
+
+  // Обработка клика по кнопке перехода к вакансии
+  const handleOpenVacancy = () => {
+    if (vacancyUrl) {
+      window.open(vacancyUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
@@ -170,6 +187,34 @@ export const ChatDetailPage = () => {
             { title: 'Чаты', path: '/chats' },
             { title: `Чат #${chat.id}` }
           ]}
+          actions={
+            vacancyUrl ? (
+              <Button
+                icon={<LinkOutlined />}
+                onClick={handleOpenVacancy}
+                size={isMobile ? 'middle' : 'large'}
+                style={{
+                  borderRadius: 10,
+                  height: isMobile ? 36 : 44,
+                  border: '1px solid #e5e7eb',
+                  background: '#ffffff',
+                  color: '#2563eb',
+                  fontWeight: 500,
+                  transition: 'all 0.2s ease',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#2563eb';
+                  e.currentTarget.style.background = '#f0f7ff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.background = '#ffffff';
+                }}
+              >
+                Вакансия
+              </Button>
+            ) : null
+          }
         />
       </div>
 

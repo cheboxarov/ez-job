@@ -126,8 +126,6 @@ class RespondToVacancyAndSaveUseCase:
                 cookies=cookies,
                 letter=letter,
                 internal_api_base_url=internal_api_base_url,
-                user_id=user_id,
-                update_cookies_uc=update_cookies_uc,
                 test_answers=test_answers,
                 test_metadata=test_metadata,
             )

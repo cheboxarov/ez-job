@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Callable, Dict, List
 from uuid import UUID
+
+from loguru import logger
 
 from domain.entities.filtered_vacancy import FilteredVacancyDetail, FilteredVacancyDto
 from domain.entities.resume_to_vacancy_match import ResumeToVacancyMatch
 from domain.entities.vacancy_detail import VacancyDetail
+from domain.exceptions.agent_exceptions import AgentParseError
+from domain.interfaces.unit_of_work_port import UnitOfWorkPort
 from domain.interfaces.vacancy_filter_service_port import VacancyFilterServicePort
 from domain.utils.vacancy_hash import calculate_vacancy_hash
-from domain.exceptions.agent_exceptions import AgentParseError
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-from loguru import logger
 
 
 class GetFilteredVacanciesWithCacheUseCase:
@@ -24,7 +25,7 @@ class GetFilteredVacanciesWithCacheUseCase:
 
     def __init__(
         self,
-        session_factory: async_sessionmaker[AsyncSession],
+        create_unit_of_work: Callable[[], UnitOfWorkPort],
         filter_service: VacancyFilterServicePort,
         minimal_confidence: float,
         batch_size: int = 10,
@@ -32,12 +33,12 @@ class GetFilteredVacanciesWithCacheUseCase:
         """Инициализация use case.
 
         Args:
-            session_factory: Фабрика для создания async сессий SQLAlchemy.
+            create_unit_of_work: Фабрика для создания UnitOfWork.
             filter_service: Сервис нейронной фильтрации.
             minimal_confidence: Минимальный порог confidence.
             batch_size: Размер батча для нейронной фильтрации.
         """
-        self._session_factory = session_factory
+        self._create_uow = create_unit_of_work
         self._filter_service = filter_service
         self._minimal_confidence = minimal_confidence
         self._batch_size = batch_size
@@ -71,16 +72,14 @@ class GetFilteredVacanciesWithCacheUseCase:
         vacancy_hash_list = list(vacancy_hashes.values())
 
         # 2. Получаем мэтчи из БД
-        from infrastructure.database.repositories.resume_to_vacancy_match_repository import (
-            ResumeToVacancyMatchRepository,
-        )
         from domain.use_cases.get_batch_resume_to_vacancy_matches import (
             GetBatchResumeToVacancyMatchesUseCase,
         )
-        
-        async with self._session_factory() as session:
-            match_repository = ResumeToVacancyMatchRepository(session)
-            get_batch_matches_uc = GetBatchResumeToVacancyMatchesUseCase(match_repository)
+
+        async with self._create_uow() as uow:
+            get_batch_matches_uc = GetBatchResumeToVacancyMatchesUseCase(
+                uow.resume_to_vacancy_match_repository
+            )
             found_matches = await get_batch_matches_uc.execute(
                 resume_id, vacancy_hash_list
             )
@@ -150,11 +149,12 @@ class GetFilteredVacanciesWithCacheUseCase:
                 from domain.use_cases.create_batch_resume_to_vacancy_matches import (
                     CreateBatchResumeToVacancyMatchesUseCase,
                 )
-                async with self._session_factory() as session:
-                    match_repository = ResumeToVacancyMatchRepository(session)
-                    create_batch_matches_uc = CreateBatchResumeToVacancyMatchesUseCase(match_repository)
+                async with self._create_uow() as uow:
+                    create_batch_matches_uc = CreateBatchResumeToVacancyMatchesUseCase(
+                        uow.resume_to_vacancy_match_repository
+                    )
                     await create_batch_matches_uc.execute(new_matches)
-                    await session.commit()
+                    await uow.commit()
 
         # 6. Объединяем результаты из БД и нейронки
         all_matches: Dict[int, ResumeToVacancyMatch] = found_matches_by_vacancy_id.copy()

@@ -59,19 +59,25 @@ class ResumeEvaluationRepository(BaseRepository, ResumeEvaluationRepositoryPort)
 
         Returns:
             Созданная доменная сущность ResumeEvaluation с заполненным id.
+
+        Raises:
+            DuplicateEntityError: Если оценка с таким хешем уже существует.
         """
-        async with self._get_session() as session:
-            model = ResumeEvaluationModel(
-                id=evaluation.id if evaluation.id else uuid4(),
-                resume_content_hash=evaluation.resume_content_hash,
-                evaluation_data=evaluation.evaluation_data,
-                created_at=evaluation.created_at if evaluation.created_at else datetime.now(),
-                updated_at=evaluation.updated_at if evaluation.updated_at else datetime.now(),
-            )
-            session.add(model)
-            await session.flush()
-            await session.refresh(model)
-            return self._to_domain(model)
+        async def _do_create() -> ResumeEvaluation:
+            async with self._get_session() as session:
+                model = ResumeEvaluationModel(
+                    id=evaluation.id if evaluation.id else uuid4(),
+                    resume_content_hash=evaluation.resume_content_hash,
+                    evaluation_data=evaluation.evaluation_data,
+                    created_at=evaluation.created_at if evaluation.created_at else datetime.now(),
+                    updated_at=evaluation.updated_at if evaluation.updated_at else datetime.now(),
+                )
+                session.add(model)
+                await session.flush()
+                await session.refresh(model)
+                return self._to_domain(model)
+
+        return await self._execute_with_integrity_handling(_do_create)
 
     def _to_domain(self, model: ResumeEvaluationModel) -> ResumeEvaluation:
         """Преобразовать SQLAlchemy модель в доменную сущность.

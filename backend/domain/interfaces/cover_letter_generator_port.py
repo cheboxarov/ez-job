@@ -5,11 +5,14 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from uuid import UUID
 
+from domain.interfaces.unit_of_work_aware_port import UnitOfWorkAwarePort
 
-class CoverLetterGeneratorPort(ABC):
+
+class CoverLetterGeneratorPort(UnitOfWorkAwarePort, ABC):
     """Порт для генерации сопроводительных писем.
 
     Инфраструктура должна реализовать этот интерфейс.
+    Наследует UnitOfWorkAwarePort для поддержки логирования через UnitOfWork.
     """
 
     @abstractmethod

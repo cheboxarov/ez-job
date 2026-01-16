@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-  import { Card, Typography, message, Row, Col, Spin, Button, Segmented } from 'antd';
+import { Card, Typography, message, Row, Col, Spin, Button, Segmented, Space } from 'antd';
+import { Link } from 'react-router-dom';
 import { 
   CrownOutlined,
   UserOutlined,
@@ -8,6 +9,8 @@ import {
   CheckOutlined,
   ThunderboltOutlined,
   SafetyCertificateOutlined,
+  FileDoneOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons';
 import { getAllPlans, changePlan, getMySubscriptionPlan } from '../api/subscription';
 import { PageHeader } from '../components/PageHeader';
@@ -375,6 +378,35 @@ export const PlansPage = () => {
             );
           })}
         </Row>
+
+        {/* Ссылка на оферту */}
+        <div style={{ 
+          marginTop: 48, 
+          padding: '24px', 
+          textAlign: 'center',
+          background: 'white',
+          borderRadius: 20,
+          border: '1px solid #e5e7eb'
+        }}>
+          <Title level={5} style={{ marginBottom: 16 }}>Юридическая информация</Title>
+          <Text type="secondary" style={{ display: 'block', marginBottom: 20 }}>
+            Перед оплатой любого тарифного плана, пожалуйста, ознакомьтесь с условиями публичной оферты.
+          </Text>
+          <Space size="middle" wrap justify="center">
+            <Link to="/offer">
+              <Button icon={<FileDoneOutlined />}>
+                Читать оферту
+              </Button>
+            </Link>
+            <Button 
+              icon={<DownloadOutlined />} 
+              href="/oferta.docx" 
+              download
+            >
+              Скачать оферту (.docx)
+            </Button>
+          </Space>
+        </div>
       </div>
     </div>
   );

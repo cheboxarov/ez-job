@@ -49,8 +49,6 @@ async def list_chats(
         chat_list = await fetch_user_chats_uc.execute(
             headers=headers,
             cookies=cookies,
-            user_id=current_user.id,
-            update_cookies_uc=update_cookies_uc,
         )
 
         return ChatListResponse.from_entity(chat_list)
@@ -95,8 +93,6 @@ async def get_chat(
             chat_id=chat_id,
             headers=headers,
             cookies=cookies,
-            user_id=current_user.id,
-            update_cookies_uc=update_cookies_uc,
         )
 
         if chat is None:
@@ -150,8 +146,6 @@ async def send_chat_message(
             text=request.text,
             headers=headers,
             cookies=cookies,
-            user_id=current_user.id,
-            update_cookies_uc=update_cookies_uc,
             idempotency_key=request.idempotency_key,
             hhtm_source=request.hhtm_source,
             hhtm_source_label=request.hhtm_source_label,

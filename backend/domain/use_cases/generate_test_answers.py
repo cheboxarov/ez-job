@@ -35,8 +35,7 @@ class GenerateTestAnswersUseCase:
         Args:
             unit_of_work: Новый UnitOfWork для логирования (может быть None).
         """
-        if hasattr(self._vacancy_test_agent, 'set_unit_of_work'):
-            self._vacancy_test_agent.set_unit_of_work(unit_of_work)
+        self._vacancy_test_agent.set_unit_of_work(unit_of_work)
 
     async def execute(
         self,

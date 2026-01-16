@@ -6,9 +6,8 @@ from datetime import datetime
 from typing import Any, Dict
 from uuid import uuid4
 
-from sqlalchemy.exc import IntegrityError
-
 from domain.entities.resume_evaluation import ResumeEvaluation
+from domain.exceptions.repository_exceptions import DuplicateEntityError
 from domain.interfaces.resume_evaluation_repository_port import (
     ResumeEvaluationRepositoryPort,
 )
@@ -47,7 +46,7 @@ class SaveResumeEvaluationUseCase:
         )
         try:
             result = await self._resume_evaluation_repository.create(evaluation)
-        except IntegrityError:
+        except DuplicateEntityError:
             # Запись уже существует (race condition), получаем существующую
             result = await self._resume_evaluation_repository.get_by_content_hash(
                 resume_content_hash

@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 
 from loguru import logger
 
-from application.utils.login_trust_flags_generator import generate_login_trust_flags
+from domain.utils.login_trust_flags_generator import generate_login_trust_flags
 from domain.interfaces.hh_client_port import HHClientPort
 
 

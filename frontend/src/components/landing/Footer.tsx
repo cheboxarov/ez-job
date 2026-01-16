@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import styles from '../../pages/LandingPage.module.css';
 
 export const Footer = () => {
@@ -42,7 +43,7 @@ export const Footer = () => {
             <ul className={styles.footerList}>
               <li><a href="#" className={styles.footerLink}>О нас</a></li>
               <li><a href="#" className={styles.footerLink}>Конфиденциальность</a></li>
-              <li><a href="#" className={styles.footerLink}>Оферта</a></li>
+              <li><Link to="/offer" className={styles.footerLink}>Оферта</Link></li>
             </ul>
           </div>
         </div>

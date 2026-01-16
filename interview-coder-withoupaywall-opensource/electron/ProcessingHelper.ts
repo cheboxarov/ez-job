@@ -18,6 +18,7 @@ type OpenAIMessage =
         | Array<
             | { type: "text"; text: string }
             | { type: "image_url"; image_url: { url: string } }
+            | { type: "input_audio"; input_audio: { data: string; format: "wav" | "mp3" | "webm" | "ogg" } }
           >;
     };
 export class ProcessingHelper {
@@ -201,6 +202,100 @@ export class ProcessingHelper {
       return "IMPORTANT: Respond in Russian. All explanations, thoughts, and descriptions must be in Russian.";
     }
     return "IMPORTANT: Respond in English. All explanations, thoughts, and descriptions must be in English.";
+  }
+
+  private formatTimestamp(timestamp: number): string {
+    const date = new Date(timestamp)
+    const hours = String(date.getHours()).padStart(2, "0")
+    const minutes = String(date.getMinutes()).padStart(2, "0")
+    const seconds = String(date.getSeconds()).padStart(2, "0")
+    return `${hours}:${minutes}:${seconds}`
+  }
+
+  public async processVoiceQuery(
+    chunks: Array<{ text: string; timestamp: number }>,
+    question?: string,
+    systemPromptOverride?: string
+  ): Promise<string> {
+    if (!chunks || chunks.length === 0) {
+      throw new Error("No transcription chunks provided.")
+    }
+
+    const config = configHelper.loadConfig()
+    const languageInstruction = this.getResponseLanguageInstruction(
+      config.interfaceLanguage
+    )
+    const context = chunks
+      .map((chunk) => `[${this.formatTimestamp(chunk.timestamp)}] ${chunk.text}`)
+      .join("\n")
+
+    const promptHeader = systemPromptOverride?.trim()
+      ? systemPromptOverride.trim()
+      : "You are an interview assistant.\nThe user is in an interview and needs help answering questions."
+    const systemPrompt = `${languageInstruction} ${promptHeader}
+Below is the transcription of the conversation.
+
+Transcription:
+${context}
+
+${
+  question && question.trim().length > 0
+    ? `User's question: ${question}`
+    : "Please provide a helpful response to the latest question in the conversation."
+}`
+
+    const messages: OpenAIMessage[] = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: question && question.trim().length > 0
+          ? question
+          : "Please help me answer this."
+      }
+    ]
+
+    return this.callLLM(messages, { maxTokens: 1200, temperature: 0.2 })
+  }
+
+  public async processVoiceQueryWithAudio(
+    audioBase64: string,
+    audioFormat: string,
+    systemPromptOverride?: string
+  ): Promise<string> {
+    const config = configHelper.loadConfig()
+    const languageInstruction = this.getResponseLanguageInstruction(
+      config.interfaceLanguage
+    )
+
+    const promptHeader = systemPromptOverride?.trim()
+      ? systemPromptOverride.trim()
+      : "You are an interview assistant.\nThe user is in an interview and needs help answering questions."
+
+    const systemPrompt = `${languageInstruction} ${promptHeader}
+Listen to the audio recording below. This is a recording from an interview or meeting.
+Please provide a helpful response to the questions or topics discussed in the audio.`
+
+    const messages: OpenAIMessage[] = [
+      { role: "system", content: systemPrompt },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Please listen to this audio and help me with the question or topic being discussed."
+          },
+          {
+            type: "input_audio",
+            input_audio: {
+              data: audioBase64,
+              format: audioFormat as "wav" | "mp3" | "webm" | "ogg"
+            }
+          }
+        ]
+      }
+    ]
+
+    return this.callLLM(messages, { maxTokens: 1200, temperature: 0.2 })
   }
 
   public async processScreenshots(): Promise<void> {

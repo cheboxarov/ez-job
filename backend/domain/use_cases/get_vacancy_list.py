@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from typing import Dict, Optional
-from uuid import UUID
+from typing import Dict
 
 from domain.entities.resume_filter_settings import ResumeFilterSettings
 from domain.entities.vacancy_list import VacancyList
 from domain.interfaces.hh_client_port import HHClientPort
-from domain.use_cases.update_user_hh_auth_cookies import UpdateUserHhAuthCookiesUseCase
-from infrastructure.clients.hh_client_with_cookie_update import HHHttpClientWithCookieUpdate
 
 
 class GetVacancyListUseCase:
@@ -23,6 +20,14 @@ class GetVacancyListUseCase:
         max_vacancies: int = 50,
         internal_api_base_url: str = "https://krasnoyarsk.hh.ru",
     ) -> None:
+        """Инициализация use case.
+
+        Args:
+            hh_client: Клиент для работы с HeadHunter API.
+                      Может быть обычным клиентом или клиентом с автообновлением cookies.
+            max_vacancies: Максимальное количество вакансий на странице.
+            internal_api_base_url: Базовый URL внутреннего API HH.
+        """
         self._hh_client = hh_client
         self._max_vacancies = max_vacancies
         self._internal_api_base_url = internal_api_base_url
@@ -38,8 +43,6 @@ class GetVacancyListUseCase:
         search_session_id: str,
         resume_hash: str | None = None,
         order_by: str | None = None,
-        user_id: Optional[UUID] = None,
-        update_cookies_uc: Optional[UpdateUserHhAuthCookiesUseCase] = None,
     ) -> VacancyList:
         # Собираем query для внутреннего API /search/vacancy
         # Нумерация страниц во внутреннем API обычно с 1, но проверяем
@@ -91,15 +94,9 @@ class GetVacancyListUseCase:
         if final_order_by:
             query["order_by"] = final_order_by
 
-        # Если передан user_id и update_cookies_uc, используем обертку для автоматического сохранения cookies
-        if user_id and update_cookies_uc:
-            client = HHHttpClientWithCookieUpdate(self._hh_client, user_id, update_cookies_uc)
-        else:
-            client = self._hh_client
-        
         # Используем внутренний API /search/vacancy
-        vacancy_list = await client.fetch_vacancy_list_front(
+        vacancy_list = await self._hh_client.fetch_vacancy_list_front(
             headers, cookies, query, internal_api_base_url=self._internal_api_base_url
         )
-        
+
         return vacancy_list

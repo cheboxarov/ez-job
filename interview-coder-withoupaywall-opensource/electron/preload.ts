@@ -1,5 +1,5 @@
 console.log("Preload script starting...")
-import { contextBridge, ipcRenderer } from "electron"
+import { contextBridge, ipcRenderer, desktopCapturer } from "electron"
 const { shell } = require("electron")
 
 export const PROCESSING_EVENTS = {
@@ -245,7 +245,62 @@ const electronAPI = {
   deleteLastScreenshot: () => ipcRenderer.invoke("delete-last-screenshot"),
   resetAppData: () => ipcRenderer.invoke("reset-app-data"),
   sendChatMessage: (message: string, solutionData?: string) => 
-    ipcRenderer.invoke("send-chat-message", message, solutionData)
+    ipcRenderer.invoke("send-chat-message", message, solutionData),
+
+  ptt: {
+    hide: () => ipcRenderer.invoke("ptt:hide")
+  },
+
+  // Voice APIs
+  voice: {
+    startRecording: () => ipcRenderer.invoke("voice:start-recording"),
+    stopRecording: () => ipcRenderer.invoke("voice:stop-recording"),
+    getRecordingStatus: () => ipcRenderer.invoke("voice:get-recording-status"),
+    enqueueChunk: (payload: {
+      audioData: ArrayBuffer
+      timestamp: number
+      mimeType?: string
+    }) => ipcRenderer.invoke("voice:enqueue-chunk", payload),
+    transcribeChunk: (payload: {
+      audioData: ArrayBuffer
+      mimeType?: string
+    }) => ipcRenderer.invoke("voice:transcribe-chunk", payload),
+    processQuery: (payload: {
+      chunks: Array<{ text: string; timestamp: number }>
+      question?: string
+      systemPrompt?: string
+    }) => ipcRenderer.invoke("voice:process-query", payload),
+    getConfig: () => ipcRenderer.invoke("voice:get-config"),
+    updateConfig: (config: any) => ipcRenderer.invoke("voice:update-config", config),
+    validateConfig: (config: any) => ipcRenderer.invoke("voice:validate-config", config),
+    transcribeFull: (payload: {
+      audioData: ArrayBuffer
+      mimeType?: string
+    }) => ipcRenderer.invoke("voice:transcribe-full", payload),
+    processAudioDirectly: (data: {
+      audioData: ArrayBuffer
+      mimeType: string
+      systemPrompt?: string
+    }) => ipcRenderer.invoke("voice:process-audio-directly", data),
+    getDesktopSources: async () => {
+      const sources = await desktopCapturer.getSources({ types: ["screen"] })
+      return sources.map((source) => ({ id: source.id, name: source.name }))
+    },
+    onTranscriptionReady: (callback: (data: any) => void) => {
+      const subscription = (_: any, data: any) => callback(data)
+      ipcRenderer.on("voice:transcription-ready", subscription)
+      return () => {
+        ipcRenderer.removeListener("voice:transcription-ready", subscription)
+      }
+    },
+    onTranscriptionError: (callback: (data: any) => void) => {
+      const subscription = (_: any, data: any) => callback(data)
+      ipcRenderer.on("voice:transcription-error", subscription)
+      return () => {
+        ipcRenderer.removeListener("voice:transcription-error", subscription)
+      }
+    }
+  }
 }
 
 // Before exposing the API

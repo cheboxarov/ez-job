@@ -5,6 +5,7 @@ import {
   QueryClientProvider
 } from "@tanstack/react-query"
 import { useEffect, useState, useCallback, useRef } from "react"
+import { Route, Routes } from "react-router-dom"
 import {
   Toast,
   ToastDescription,
@@ -12,10 +13,12 @@ import {
   ToastTitle,
   ToastViewport
 } from "./components/ui/toast"
-import { ToastContext } from "./contexts/toast"
+import { ToastContext, useToast } from "./contexts/toast"
 import { WelcomeScreen } from "./components/WelcomeScreen"
 import { SettingsDialog } from "./components/Settings/SettingsDialog"
 import { useTranslation } from "react-i18next"
+import VoiceAssistant from "./_pages/VoiceAssistant"
+import PushToTalk from "./_pages/PushToTalk"
 
 // Create a React Query client
 const queryClient = new QueryClient({
@@ -33,18 +36,12 @@ const queryClient = new QueryClient({
 })
 
 // Root component that provides the QueryClient
-function App() {
-  const [toastState, setToastState] = useState({
-    open: false,
-    title: "",
-    description: "",
-    variant: "neutral" as "neutral" | "success" | "error"
-  })
+function MainApp() {
+  const { showToast } = useToast()
   const [credits, setCredits] = useState<number>(999) // Unlimited credits
   const [currentLanguage, setCurrentLanguage] = useState<string>("python")
   const [isInitialized, setIsInitialized] = useState(false)
   const [hasApiKey, setHasApiKey] = useState(false)
-  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false)
   // Note: Model selection is now handled via separate extraction/solution/debugging model settings
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -68,23 +65,6 @@ function App() {
     setIsInitialized(true)
     window.__IS_INITIALIZED__ = true
   }, [])
-
-  // Show toast method
-  const showToast = useCallback(
-    (
-      title: string,
-      description: string,
-      variant: "neutral" | "success" | "error"
-    ) => {
-      setToastState({
-        open: true,
-        title,
-        description,
-        variant
-      })
-    },
-    []
-  )
 
   // Check for API key and prompt if not found
   useEffect(() => {
@@ -212,7 +192,6 @@ function App() {
         t("errors.apiConfigInvalidDescription"),
         "error"
       )
-      setApiKeyDialogOpen(true)
     }
 
     // Setup API key invalid listener
@@ -246,56 +225,70 @@ function App() {
     setIsSettingsOpen(open);
   }, []);
 
-  const handleApiKeySave = useCallback(async (apiKey: string) => {
-    try {
-      await window.electronAPI.updateConfig({ apiKey })
-      setHasApiKey(true)
-      showToast(t("common.successTitle"), t("success.apiKeySaved"), "success")
-      
-      // Reload app after a short delay to reinitialize with the new API key
-      setTimeout(() => {
-        window.location.reload()
-      }, 1500)
-    } catch (error) {
-      console.error("Failed to save API key:", error)
-      showToast(t("common.errorTitle"), t("errors.failedToSaveApiKey"), "error")
-    }
-  }, [showToast, t])
+  return (
+    <div className="relative">
+      {isInitialized ? (
+        hasApiKey ? (
+          <SubscribedApp
+            credits={credits}
+            currentLanguage={currentLanguage}
+            setLanguage={updateLanguage}
+          />
+        ) : (
+          <WelcomeScreen onOpenSettings={handleOpenSettings} />
+        )
+      ) : (
+        <div className="min-h-screen bg-black flex items-center justify-center">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
+            <p className="text-white/60 text-sm">
+              {t("common.initializing")}
+            </p>
+          </div>
+        </div>
+      )}
+      <UpdateNotification />
+
+      {/* Settings Dialog */}
+      <SettingsDialog open={isSettingsOpen} onOpenChange={handleCloseSettings} />
+    </div>
+  )
+}
+
+function App() {
+  const [toastState, setToastState] = useState({
+    open: false,
+    title: "",
+    description: "",
+    variant: "neutral" as "neutral" | "success" | "error"
+  })
+
+  const showToast = useCallback(
+    (
+      title: string,
+      description: string,
+      variant: "neutral" | "success" | "error"
+    ) => {
+      setToastState({
+        open: true,
+        title,
+        description,
+        variant
+      })
+    },
+    []
+  )
 
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <ToastContext.Provider value={{ showToast }}>
-          <div className="relative">
-            {isInitialized ? (
-              hasApiKey ? (
-                <SubscribedApp
-                  credits={credits}
-                  currentLanguage={currentLanguage}
-                  setLanguage={updateLanguage}
-                />
-              ) : (
-                <WelcomeScreen onOpenSettings={handleOpenSettings} />
-              )
-            ) : (
-              <div className="min-h-screen bg-black flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-6 h-6 border-2 border-white/20 border-t-white/80 rounded-full animate-spin"></div>
-                  <p className="text-white/60 text-sm">
-                    {t("common.initializing")}
-                  </p>
-                </div>
-              </div>
-            )}
-            <UpdateNotification />
-          </div>
-          
-          {/* Settings Dialog */}
-          <SettingsDialog 
-            open={isSettingsOpen} 
-            onOpenChange={handleCloseSettings} 
-          />
-          
+          <Routes>
+            <Route path="/voice" element={<VoiceAssistant />} />
+            <Route path="/ptt" element={<PushToTalk />} />
+            <Route path="/*" element={<MainApp />} />
+          </Routes>
+
           <Toast
             open={toastState.open}
             onOpenChange={(open) =>

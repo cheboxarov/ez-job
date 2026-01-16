@@ -84,6 +84,20 @@
     "apiKeyStoredNote": "Ваш API ключ хранится локально и отправляется только на указанный URL.",
     "currentKey": "Текущий:",
     "interfaceLanguage": "Язык интерфейса",
+    "transcription": {
+      "title": "Голосовая транскрипция",
+      "enabled": "Включить транскрипцию",
+      "baseUrl": "URL транскрипции",
+      "model": "Модель транскрипции",
+      "language": "Язык транскрипции",
+      "apiKey": "API ключ транскрипции",
+      "defaultMode": "Режим по умолчанию",
+      "pttPrompt": "Системный промпт для Push-to-Talk",
+      "pttPromptPlaceholder": "Необязательные инструкции для режима Push-to-Talk.",
+      "chunkDuration": "Длительность чанка (мс)",
+      "chunkDurationHint": "Используйте 5000-30000 мс для стабильной транскрипции.",
+      "testConnection": "Проверить транскрипцию"
+    },
     "testConnection": "Проверить подключение",
     "save": "Сохранить настройки",
     "cancel": "Отмена",
@@ -132,6 +146,7 @@
     "settingsSaved": "Настройки сохранены",
     "loggedOut": "Вы вышли из системы",
     "connectionVerified": "Подключение успешно проверено",
+    "transcriptionConnectionVerified": "Транскрипция успешно проверена",
     "resetAppData": "Кеш и конфиг очищены"
   },
   "shortcuts": {
@@ -140,6 +155,7 @@
     "deleteScreenshot": "Удалить последний скриншот",
     "processScreenshots": "Обработать скриншоты",
     "resetView": "Сбросить вид",
+    "voiceAssistant": "Голосовой помощник",
     "quitApp": "Выйти из приложения",
     "moveWindow": "Переместить окно",
     "decreaseOpacity": "Уменьшить прозрачность",
@@ -165,5 +181,27 @@
     "send": "Отправить",
     "thinking": "Думаю...",
     "error": "Не удалось отправить сообщение"
+  },
+  "voice": {
+    "mode": {
+      "continuous": "Непрерывная запись",
+      "pushToTalk": "Push-to-Talk"
+    },
+    "ptt": {
+      "startRecording": "Начать запись",
+      "stopAndProcess": "Остановить и обработать",
+      "processing": "Обработка...",
+      "recording": "Запись",
+      "extracting": "Извлечение аудио...",
+      "transcribing": "Транскрипция...",
+      "thinking": "Думаю...",
+      "idle": "Готово",
+      "sendLast": "Отправить последние {{minutes}} мин",
+      "transcription": "Транскрипция",
+      "sendDirectly": "Отправить аудио напрямую в LLM",
+      "sendDirectlyHint": "Пропустить транскрипцию, отправить аудио напрямую (требуется модель с поддержкой аудио)",
+      "context": "Контекст",
+      "contextPlaceholder": "Введите дополнительный контекст или системный промпт..."
+    }
   }
 }
