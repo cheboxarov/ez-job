@@ -29,23 +29,30 @@ from infrastructure.database.repositories.base_repository import BaseRepository
 # region agent log
 def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
     try:
-        Path("/Users/apple/dev/hh/.cursor/debug.log").open("a", encoding="utf-8").write(
-            json.dumps(
-                {
-                    "sessionId": "hh-deadlock",
-                    "runId": "pre-fix",
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data,
-                    "pid": os.getpid(),
-                    "process": sys.argv[0] if sys.argv else None,
-                    "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
-                },
-                ensure_ascii=False,
+        # Путь к логу относительно корня проекта (поднимаемся на 4 уровня вверх из backend/infrastructure/database/repositories/)
+        log_path = Path(__file__).resolve().parents[4] / ".cursor" / "debug.log"
+        
+        # Создаем директорию, если она не существует
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "sessionId": "hh-deadlock",
+                        "runId": "pre-fix",
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data,
+                        "pid": os.getpid(),
+                        "process": sys.argv[0] if sys.argv else None,
+                        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
             )
-            + "\n"
-        )
     except Exception as exc:
         logger.warning(
             f"Не удалось записать debug лог: hypothesis_id={hypothesis_id}, "

@@ -177,7 +177,12 @@ def _create_access_token(user: UserModel) -> Dict[str, Any]:
 def _debug_log(hypothesis_id: str, location: str, message: str, data: Dict[str, Any]) -> None:
     """Локальный логгер для отладки HH login-by-code в debug-mode."""
     try:
-        log_path = Path("/Users/apple/dev/hh/.cursor/debug.log")
+        # Путь к логу относительно корня проекта (поднимаемся на 3 уровня вверх из backend/presentation/routers/)
+        log_path = Path(__file__).resolve().parents[3] / ".cursor" / "debug.log"
+        
+        # Создаем директорию, если она не существует
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
         payload = {
             "sessionId": "hh-auth-debug",
             "runId": "login-by-code",

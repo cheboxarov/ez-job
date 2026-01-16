@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto"
 import fs from "node:fs"
+import path from "node:path"
 import { TranscriptionResult } from "./TranscriptionHelper"
 
 export interface TranscriptionJob {
@@ -53,8 +54,11 @@ export class TranscriptionQueue {
       if (!job) continue
       const id = randomUUID()
       // #region agent log
-      const logPath = '/Users/apple/dev/hh/.cursor/debug.log';
+      const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
       try {
+        if (!fs.existsSync(path.dirname(logPath))) {
+          fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        }
         const logData = {location:'TranscriptionQueue.ts:54',message:'processing transcription job',data:{jobId:id,bufferLength:job.buffer.length,mimeType:job.mimeType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'};
         console.log('[DEBUG]', logData);
         const logEntry = JSON.stringify(logData)+'\n';

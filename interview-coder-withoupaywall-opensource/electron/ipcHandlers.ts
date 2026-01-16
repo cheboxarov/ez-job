@@ -91,8 +91,11 @@ export function initializeIpcHandlers(deps: IIpcHandlerDeps): void {
 
   ipcMain.handle("voice:enqueue-chunk", async (_event, payload) => {
     // #region agent log
-    const logPath = '/Users/apple/dev/hh/.cursor/debug.log';
+    const logPath = path.join(process.cwd(), '.cursor', 'debug.log');
     try {
+      if (!fs.existsSync(path.dirname(logPath))) {
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+      }
       const logEntry = JSON.stringify({location:'ipcHandlers.ts:92',message:'enqueue-chunk handler entry',data:{hasPayload:!!payload,hasAudioData:!!payload?.audioData,audioDataSize:payload?.audioData?.byteLength||0,mimeType:payload?.mimeType},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})+'\n';
       fs.appendFileSync(logPath, logEntry);
     } catch (logErr) {

@@ -22,23 +22,30 @@ from domain.interfaces.user_hh_auth_data_repository_port import (
 # region agent log
 def _debug_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
     try:
-        Path("/Users/apple/dev/hh/.cursor/debug.log").open("a", encoding="utf-8").write(
-            json.dumps(
-                {
-                    "sessionId": "hh-deadlock",
-                    "runId": "pre-fix",
-                    "hypothesisId": hypothesis_id,
-                    "location": location,
-                    "message": message,
-                    "data": data,
-                    "pid": os.getpid(),
-                    "process": sys.argv[0] if sys.argv else None,
-                    "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
-                },
-                ensure_ascii=False,
+        # Путь к логу относительно корня проекта (поднимаемся на 3 уровня вверх из backend/domain/use_cases/)
+        log_path = Path(__file__).resolve().parents[3] / ".cursor" / "debug.log"
+        
+        # Создаем директорию, если она не существует
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with log_path.open("a", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "sessionId": "hh-deadlock",
+                        "runId": "pre-fix",
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data,
+                        "pid": os.getpid(),
+                        "process": sys.argv[0] if sys.argv else None,
+                        "timestamp": int(datetime.now(timezone.utc).timestamp() * 1000),
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
             )
-            + "\n"
-        )
     except Exception as exc:
         # не ломаем основной флоу
         logger.warning(
